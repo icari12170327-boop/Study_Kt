@@ -34,8 +34,8 @@
 ## Cloudflare 준비 (보호자, 이미 완료하면 체크)
 Codex는 Cloudflare 계정이나 키를 직접 다루지 않는다. 보호자가 대시보드에서 아래를 준비하고, **비밀이 아닌 값만** 이 명세에 적어 Codex에게 넘긴다.
 - [ ] Cloudflare 가입, workers.dev 서브도메인 정하기 → Worker 주소: `https://study-kt-proxy.<서브도메인>.workers.dev`
-- [ ] KV 네임스페이스 `study-kt-usage` 생성 → **네임스페이스 ID**를 `worker/wrangler.toml`의 `kv_namespaces` 바인딩(`USAGE`)에 넣는다 (ID는 비밀 아님: `<여기에 KV ID>`)
-- [ ] API 토큰 생성("Edit Cloudflare Workers" 템플릿) → GitHub Secrets `CLOUDFLARE_API_TOKEN`
+- [x] KV 네임스페이스 `study-kt-usage` 생성 → `worker/wrangler.toml`의 `kv_namespaces` 바인딩 `USAGE`에 이 ID를 넣는다 (비밀 아님): `6cd93b6e51904a5ea0601dfdd089bfca`
+- [ ] API 토큰 생성("Edit Cloudflare Workers" 템플릿) → GitHub Secrets `CLOUDFLARE_API_TOKEN`. 도메인이 없으므로 템플릿의 Zone 권한(Workers Routes) 줄은 지우거나 Zone Resources를 "All zones"로 둔다 (workers.dev 주소만 쓴다)
 - [ ] 계정 ID → GitHub Secrets `CLOUDFLARE_ACCOUNT_ID`
 - [ ] (T02 머지 후, 첫 배포 뒤) Worker 설정의 Variables and Secrets에 **Secret**으로 `OPENAI_API_KEY`, `FAMILY_TOKEN` 등록
 - 비밀이 아닌 설정(`ALLOWED_ORIGINS=https://icari12170327-boop.github.io`, 모델, 시간 상한)은 `wrangler.toml`의 `[vars]`에 둔다. 대시보드에서 바꾼 vars는 다음 배포 때 덮어써지므로 바꿀 땐 `wrangler.toml`을 고친다. Secret은 배포해도 유지된다.
