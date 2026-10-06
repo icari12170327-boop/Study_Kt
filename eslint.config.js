@@ -5,7 +5,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig([
-  globalIgnores(['dist/**', 'dev-dist/**', 'node_modules/**', 'work/**']),
+  globalIgnores(['dist/**', 'dev-dist/**', '**/node_modules/**', 'worker/dist/**', 'worker/.wrangler/**', 'work/**']),
   {
     files: ['**/*.{js,ts,tsx}'],
     extends: [js.configs.recommended, tseslint.configs.recommended],

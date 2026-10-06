@@ -1,0 +1,27 @@
+name = "study-kt-proxy"
+main = "src/index.ts"
+compatibility_date = "2026-06-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ALLOWED_ORIGINS = "https://icari12170327-boop.github.io"
+REALTIME_MODEL = "gpt-realtime-2.1-mini"
+TEXT_MODEL = "gpt-5-nano"
+TALK_MINUTES_kid1 = "20"
+TALK_MINUTES_kid2 = "15"
+TALK_MINUTES_parent = "30"
+TALK_MINUTES_MONTH_TOTAL = "1500"
+GENERATE_LIMIT_DAY_TOTAL = "200"
+KRW_PER_TALK_MINUTE = "15"
+
+[[kv_namespaces]]
+binding = "USAGE"
+id = "6cd93b6e51904a5ea0601dfdd089bfca"
+
+[[durable_objects.bindings]]
+name = "FAMILY"
+class_name = "FamilyUsage"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["FamilyUsage"]
