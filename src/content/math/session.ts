@@ -10,7 +10,10 @@ export interface QueueItem {
   band?: 'main' | 'review';
 }
 
-/** 하루 목표의 70%는 주 단원, 나머지는 아래 레벨 단원에서 출제한다. */
+/**
+ * 하루 목표의 70%는 주 단원, 나머지는 아래 레벨 단원에서 출제한다.
+ * 오답은 같은 단원의 문제를 대체하며, 현재 출제 범위 밖의 오답은 다시 내지 않는다.
+ */
 export function buildLevelQueue(grade: Level, level: number, wrongNotes: readonly WrongItem[], count: number,
   rng: Rng = defaultRng): QueueItem[] {
   const mainSkills = mathLevelsFor(grade)[clampMathLevel(level, grade) - 1].mainSkills;
