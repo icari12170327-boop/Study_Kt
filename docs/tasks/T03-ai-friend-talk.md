@@ -6,7 +6,9 @@
 - 예상 분량: 이틀 (화면 1일, 기록과 보호자 화면 1일)
 
 ## 목표
-첫째와 둘째가 자기만의 AI 친구와 **음성으로 영어 수다**를 떤다. 단어 시험이 아니라 마인크래프트, 포켓몬, 학교에서 있었던 일처럼 좋아하는 이야기를 마음껏 하고, 친구가 가끔 "영어로 따라 해 볼까?" 하고 유도한다. 대화 시간이 하루 미션("AI 친구와 대화 N분")이 된다.
+첫째와 둘째가 자기만의 AI 친구와 **음성으로 영어 수다**를 떤다. 공부가 아니라 **노는 시간**이다. 마인크래프트, 포켓몬, 학교에서 있었던 일, 오늘 한 실험처럼 좋아하는 이야기를 마음껏 하고, 막히면 친구가 한국어로 말해도 된다고 이끌어 대화가 끊기지 않게 한다. 대화 시간이 하루 미션("AI 친구와 대화 N분")이 된다.
+
+**하지 않는 것**: 단어 외우기, 따라 말하기 시키기, 문법 교정, 퀴즈. 영어 단어는 학원에서 배우므로 이 앱의 영어는 순수한 프리토킹이다.
 
 ## 배경
 원글: GPT 음성 대화는 원어민 발음에 실시간으로 끼어들고 되묻는 수준이라, 아이에게 맞춘 "AI 친구" 성격만 넣으면 전화영어보다 훨씬 싸다. 아이가 친구한테 하듯 주저리주저리 떠들어 만족도가 높았다. 자막은 처음엔 다 보여 주고 조금씩 가린다.
@@ -64,7 +66,7 @@ interface TalkLog {
 
 ### 화면 1: 대화 준비
 - 친구 아바타(큰 이모지나 SVG)와 이름, "오늘 남은 시간 12분"
-- 주제 칩: `nextTopics` + 관심사 + "아무 얘기나". 누르면 `topic`으로 넘긴다. 칩 없이 바로 시작해도 된다.
+- 주제 칩: `nextTopics` + 관심사 + 오늘 한 실험(T08이 있으면) + "아무 얘기나". 누르면 `topic`으로 넘긴다. 칩 없이 바로 시작해도 된다.
 - 첫 사용 시 마이크 권한 안내(헤드셋 권장).
 - "대화 시작" 큰 버튼
 
@@ -75,13 +77,15 @@ interface TalkLog {
   - 친구 말: 스트리밍 자막. **자막 가림**: 단어 중 `subtitleHidePercent`%를 `▢▢▢`로 가린다. 가릴 단어는 `itemId`로 시드를 고정해 다시 그려도 같고, 3글자 이상 단어를 우선 가린다. 순수 함수 `maskSubtitle(text, percent, seed)`.
   - 문장을 꾹 누르면 그 문장만 전부 보인다(`peeked: true`로 기록, T12에서 이해도 판단에 씀).
   - 아이 말: 작은 글씨로 아래에 표시.
+- **막힘 감지**: 친구가 말을 마친 뒤 아이가 10초 동안 말을 시작하지 않으면 `sendSystemNote('[STUCK]')`를 보낸다(한 번 보낸 뒤 아이가 말할 때까지 다시 보내지 않음). 친구는 한국어로 짧게 말해도 된다고 안내한다.
+- 화면에 작은 "🤔 막혔어요" 버튼도 둔다. 누르면 똑같이 `[STUCK]`을 보낸다.
 - 버튼: "잠깐 멈춤"(마이크 끔), "끝내기". 눌러서 말하기 모드면 큰 🎤 버튼을 누르는 동안만 마이크 켜짐.
 - 진행: 1분이 지날 때마다 `applyProgress({ type: 'talk', amount: 1 })`. 미션 목표 도달 시 "오늘 미션 완료! 더 이야기해도 돼" 표시(남은 시간 안에서).
 - 오류: 마이크 거부, 연결 실패, 429(오늘 시간 다 씀), 409(다른 기기에서 대화 중)마다 아이용 문구와 "홈으로" 버튼.
 
 ### 화면 3: 대화 끝
 - 별 지급: 대화 1분당 1개(최대 미션 목표만큼)
-- `/api/generate kind: 'talk-summary'` 호출(입력: 자막 줄, 학년). 결과가 오면 "오늘 한 이야기" 주제 칩, "새로 배운 표현" 카드(🔊 브라우저 TTS로 듣기)를 보여 준다. 실패해도 대화 기록은 저장한다.
+- `/api/generate kind: 'talk-summary'` 호출(입력: 자막 줄, 학년). 결과가 오면 아이에게는 **"오늘 Max랑 한 이야기" 주제 칩**과 **"다음에 Max가 물어볼 것"** 예고만 보여 준다(공부처럼 보이는 표현 카드는 아이 화면에 없음). `newExpressions`는 보호자 화면에서만 본다. 실패해도 대화 기록은 저장한다.
 - 이어서 `kind: 'memory-merge'`(입력: 기존 `friendMemory`, 새 요약) → 새 `friendMemory`(1500자 이하, 아이의 좋아하는 것, 최근 일, 다음에 물어볼 것). 개인정보(실명, 학교, 주소, 연락처)는 넣지 않도록 지시문에 명시.
 
 ### 보호자 화면: 대화 기록 탭
@@ -97,18 +101,24 @@ interface TalkLog {
 구현 시 이 초안을 옮기고, 실제 대화를 해 보며 다듬는다(다듬은 내용은 PR에 기록).
 ```
 You are {friendName}, a friendly native English speaker and a fun friend of a Korean child.
-The child is in grade {grade} in Korea (about {age} years old) and is learning English.
+The child is in grade {grade} in Korea (about {age} years old). This is play time, not a lesson.
+The child learns vocabulary at an English academy; here you just chat and have fun together.
 Personality: {personaDescription}.
 
 How to talk:
 - Speak English. Use {levelGuide}. Keep each turn short: 1-2 sentences, then let the child talk.
 - Be a friend, not a teacher or an interviewer. React with real interest ("No way! A diamond sword?"),
-  share small things about "yourself", and ask at most one question at a time.
-- Follow the child's interests and stories. If the child changes the topic, go with it.
-- If the child speaks Korean, understand it, answer in simple English, and sometimes offer an easy
-  English sentence to repeat: "You can say: 'I caught a big fish.' Try it!" Praise any attempt.
-- About every 3-4 turns, invite the child to say one useful phrase in English. Do not overdo it.
-- Never say "that's wrong". If there is a mistake, naturally repeat the correct form in your reply.
+  share small things about "yourself" (you also love games, animals, and cool science experiments),
+  and ask at most one question at a time.
+- Follow the child's interests and stories. If the child changes the topic, go with it happily.
+- Do not teach: no vocabulary drills, no "repeat after me", no quizzes, no grammar correction.
+  If there is a mistake, just keep talking and naturally use the correct form in your own reply.
+- The child may answer in Korean at any time. That is totally fine. Understand it, react to the
+  content warmly, and keep going in simple English. Do not ask the child to translate or repeat.
+- When the child seems stuck (silence, "I don't know", "몰라", or you receive "[STUCK]"):
+  say in one short, friendly Korean sentence that they can answer in Korean
+  (e.g. "한국어로 말해도 괜찮아! 오늘 뭐가 제일 재밌었어?"), or offer two easy choices
+  ("Minecraft or Pokémon?"). Then switch back to simple English after they answer.
 - Speak slowly and clearly{slowNote}.
 
 Safety:
@@ -135,7 +145,8 @@ When you receive "[WRAP_UP]", say a warm, short goodbye and mention something to
 - [ ] 주제 칩을 고르거나 바로 시작해서 음성 대화가 되고, 친구 말이 자막으로 스트리밍된다.
 - [ ] 자막 가림 비율을 10%로 하면 친구 자막의 약 10% 단어가 가려지고, 꾹 누르면 그 문장이 다 보인다.
 - [ ] 남은 시간 1분에 작별 인사가 나오고, 0분에 자동 종료된다. 하루 시간을 다 쓰면 다시 시작할 수 없다는 안내가 나온다.
-- [ ] 대화가 끝나면 요약, 새 표현, 다음 주제가 보이고, 다음 대화의 주제 칩과 친구 기억에 반영된다.
+- [ ] 대화가 끝나면 아이에게 오늘 한 이야기와 다음 예고가 보이고(표현 카드나 퀴즈 없음), 다음 대화의 주제 칩과 친구 기억에 반영된다.
+- [ ] 아이가 10초 동안 말이 없거나 "막혔어요"를 누르면 친구가 한국어로 말해도 된다고 이끌고, 아이가 한국어로 답하면 대화가 이어진다.
 - [ ] 보호자 대화 기록 탭에서 전체 자막, 영어 비율, 요약, ⚠️ 표시를 볼 수 있고 친구 기억을 편집할 수 있다.
 - [ ] AI 연결이 없으면 talk 미션이 완료 조건에서 빠져 다른 미션만으로 쿠폰을 받을 수 있다.
 - [ ] 마이크 거부, 네트워크 끊김, 429, 409에서 아이가 막히지 않는다.
