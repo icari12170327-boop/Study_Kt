@@ -211,7 +211,8 @@
 - [ ] [T04](tasks/T04-parent-business-talk.md) 보호자 비즈니스 프리토킹과 "내 표현"
 
 ### 3단계 — 수학과 재미 (T02와 병행 가능, AI 불필요)
-- [ ] **[T05](tasks/T05-adaptive-math.md) 수학 도전: 레벨, 숫자 키패드, 꼼수 방지**
+- [x] [T05](tasks/T05-adaptive-math.md) 수학 도전: 레벨, 숫자 키패드, 꼼수 방지 (PR #8)
+- [ ] **[T15](tasks/T15-dex-keyboard.md) DeX 물리 키보드로 수학 도전 끝까지 풀기**
 - [ ] [T06](tasks/T06-brain-puzzles.md) 두뇌 퍼즐 6종 (10분, 유휴 시간 제외, 힌트)
 - [ ] [T07](tasks/T07-reward-games.md) 오늘의 문제 게임과 형제 대결
 
