@@ -35,20 +35,46 @@
 
 ## 각 도구에 줄 지시 예시
 
-**Codex (구현)**
+PR 번호(`#3`)와 명세 파일(`T01-ci-deploy.md`)만 바꿔서 붙여 넣는다.
+
+### 1. Codex: 구현
 ```
 AGENTS.md를 먼저 읽고, docs/tasks/T01-ci-deploy.md 명세를 구현해줘.
 수용 기준을 모두 만족하고 npm run typecheck && npm test && npm run build 가 통과하면
-feat/T01-ci-deploy 브랜치로 PR을 올려줘.
+feat/T01-ci-deploy 브랜치로 PR을 올려줘. PR 본문은 AGENTS.md의 PR 형식을 따라줘.
 ```
 
-**Claude Code (리뷰, Sonnet)**
+### 2. Claude Code (Sonnet 5.5): 첫 리뷰
+리뷰는 기획 세션과 **다른 세션**에서, 모델을 Sonnet 5.5로 골라서 한다(CLI라면 `/model`).
+기획한 세션은 설계 의도를 이미 알고 있어서 명세와 다른 부분을 놓치기 쉽기 때문이다.
 ```
-PR #3 을 리뷰해줘. 기준은 docs/REVIEW.md 이고, 명세는 docs/tasks/T01-ci-deploy.md 야.
+PR #3 을 리뷰해줘.
+- 명세: docs/tasks/T01-ci-deploy.md
+- 기준: CLAUDE.md의 "리뷰 세션" 규칙과 docs/REVIEW.md
+- 수용 기준을 하나씩 대조하고, 지적은 🔴/🟡/🟣 심각도로 표시해줘.
+- 코드는 직접 고치지 말고, 결과를 PR에 리뷰 코멘트로 남겨줘.
+- PR 브랜치를 받아서 npm run typecheck && npm test && npm run build 도 돌려보고 결과를 적어줘.
 ```
 
-**Claude Code (기획, Opus)**
+### 3. Codex: 리뷰 반영
 ```
-이번 주에 아이들이 써 본 결과: 둘째가 나눗셈을 어려워하고, 첫째는 말하기를 건너뛰려고 함.
-docs/PLAN.md 와 docs/tasks 를 보고 다음 작업 우선순위를 조정해줘.
+PR #3 의 리뷰 코멘트 중 🔴, 🟡 항목을 반영해서 같은 브랜치에 커밋해줘. 🟣(범위 밖)는 하지 마.
+반영하지 않은 항목이 있으면 이유를 PR 코멘트로 남겨줘.
+```
+
+### 4. Claude Code (Sonnet 5.5): 재리뷰
+첫 리뷰를 한 같은 세션에 이어서 보낸다.
+```
+Codex가 PR #3 에 수정 커밋을 올렸어. 지난번 🔴, 🟡 지적이 해결됐는지 다시 확인하고,
+해결된 건 표시하고, 남은 것만 다시 코멘트해줘. 다 해결됐으면 승인 의견을 남겨줘.
+```
+
+### 5. 머지 후: Claude Code (Opus) 기획 세션
+```
+PR #3 (T01) 머지했어. docs/tasks/README.md 보드 상태를 완료로 바꾸고,
+리뷰에서 나온 🟣 범위 밖 제안을 백로그에 정리해줘.
+```
+```
+이번 주에 아이들이 써 본 결과: 둘째가 나눗셈을 어려워하고, 첫째는 AI 친구와 로블록스 얘기만 함.
+docs/PLAN.md 와 docs/tasks 를 보고 다음 작업 우선순위와 명세를 조정해줘.
 ```
