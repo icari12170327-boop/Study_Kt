@@ -1,8 +1,8 @@
-# T05 — AI 수학 문장제 (관심사 맞춤)
+# T10 — AI 수학 문장제 (관심사 맞춤)
 
 - 상태: 준비됨
-- 단계: 2
-- 선행 작업: T02
+- 단계: 5
+- 선행 작업: T02, T05 (수학 도전 화면과 숫자 키패드 위에 얹는다)
 - 예상 분량: 반나절~하루
 
 ## 목표
@@ -17,7 +17,7 @@
 - 보호자 설정에 "문장제 비율" (0%, 20%, 40%, 기본 20%). `ProfileSettings.wordProblemRatio: number`
 - 문장제 생성 흐름:
   1. 기존 생성기로 문제를 만든다 (예: `g3-mul2x1` → `23 × 4`, 정답 92).
-  2. Worker `/api/generate` `kind: 'word-problem'`에 `{ skill, expression, numbers, answerKind, interest, level }`을 보낸다. **정답은 보내지 않는다.**
+  2. Worker `/api/generate` `kind: 'word-problem'`(T02의 텍스트 생성 엔드포인트)에 `{ skill, expression, numbers, answerKind, interest, level }`을 보낸다. **정답은 보내지 않는다.**
   3. AI는 `{ story: string, question: string }`만 돌려준다.
   4. 앱이 검증: 이야기에 원래 숫자가 모두 그대로 들어 있고, 다른 숫자가 없어야 함(검증 실패 시 원래 연산 문제로 대체).
 - 세션 시작 시 필요한 문장제를 **한 번에 묶어 요청**(최대 8개)하고, 오기 전까지 기다리게 하지 않는다: 연산 문제부터 시작하고, 도착한 문장제를 뒤쪽 순서에 끼운다.

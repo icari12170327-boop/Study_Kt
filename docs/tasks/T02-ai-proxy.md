@@ -1,118 +1,141 @@
-# T02 — AI 프록시 (Cloudflare Worker + OpenAI API)
+# T02 — AI 프록시: Realtime 대화 연결, 텍스트 생성, 하루 시간 상한
 
 - 상태: 준비됨
 - 단계: 2
 - 선행 작업: T01
-- 예상 분량: 하루
+- 예상 분량: 하루~이틀
 
 ## 목표
-앱이 API 키 없이 AI 기능을 쓸 수 있도록, 가족 전용 서버리스 프록시를 만든다. 이후 T03~T06이 모두 이 프록시를 쓴다.
+앱이 API 키 없이 OpenAI 기능을 쓰도록 가족 전용 Cloudflare Worker를 만든다. 핵심은 **실시간 음성 대화(Realtime API) 연결을 열어 주는 것**이고, 대화 요약과 피드백 같은 텍스트 생성도 맡는다. 비용이 새지 않도록 하루 대화 시간 상한을 서버에서 강제한다.
 
 ## 배경
-브라우저에 OpenAI API 키를 넣으면 누구나 키를 꺼내 쓸 수 있다. 키는 Worker 비밀값에만 두고, 앱은 가족 토큰으로 프록시를 호출한다. 비용 폭주를 막기 위해 사용량 제한을 서버에서 강제한다.
+- 영어는 AI 친구와 음성으로 수다를 떠는 방식이다(T03, T04). 모델은 `gpt-realtime-2.1-mini`(원글 실측 30분 약 430원).
+- 브라우저에 API 키를 두면 누구나 꺼내 쓸 수 있다. AI 친구의 성격 지시문도 앱이 마음대로 바꾸면 안 된다. 그래서 둘 다 Worker에만 둔다.
 
 ## 범위
 **포함**
-- `worker/` 폴더에 Cloudflare Worker 프로젝트 (TypeScript, `wrangler`, OpenAI 공식 SDK `openai`)
-- AI 호출은 **제공사 어댑터**(`worker/src/providers/`) 뒤에 둔다. 1차 구현은 `openai.ts` 하나. 나중에 다른 제공사로 바꿀 때 어댑터만 추가하면 되게 한다.
-- 엔드포인트
-  - `POST /api/chat`: 대화형, **SSE 스트리밍** 응답 (T03, T04)
-  - `POST /api/generate`: 구조화된 JSON 한 번에 받기 (T05, T06)
-  - `GET /api/usage`: 오늘 프로필별 사용량 조회 (보호자 화면용)
-- 인증: `Authorization: Bearer <FAMILY_TOKEN>`. 토큰은 Worker 비밀값 `FAMILY_TOKEN`과 비교(상수 시간 비교).
-- CORS: 환경변수 `ALLOWED_ORIGINS`(쉼표 구분)에 있는 출처만 허용
-- 사용량 제한: Cloudflare KV에 `usage:<YYYY-MM-DD>:<profileId>` 키로 요청 수와 토큰 수(응답의 usage 입력+출력 토큰) 누적. 프로필별 하루 상한을 넘으면 `429`와 한국어 메시지
-- 앱 쪽: `src/lib/ai.ts`(프록시 클라이언트), 보호자 모드 "백업·보안" 탭 옆에 **"AI 연결" 설정**(프록시 주소, 가족 토큰 입력, 연결 테스트 버튼, 오늘 사용량 표시)
-- 저장: 프록시 주소와 토큰은 `AppState.ai = { endpoint?: string; token?: string }`에 저장 (기기 로컬). **백업 JSON에는 토큰을 넣지 않는다.**
+- `worker/` 폴더에 Cloudflare Worker 프로젝트 (TypeScript, `wrangler`, Vitest, OpenAI 공식 SDK `openai`는 텍스트 생성에 사용)
+- 엔드포인트 4개 (아래 "API")
+- 인증: `Authorization: Bearer <FAMILY_TOKEN>`, 상수 시간 비교
+- CORS: `ALLOWED_ORIGINS`(쉼표 구분)만 허용
+- 사용량 기록: Cloudflare KV. 대화 시간(초)과 텍스트 생성 횟수, 프로필별 하루와 가족 전체 월간
+- 페르소나와 지시문 템플릿: `worker/src/personas.ts` (내용은 T03, T04 명세의 초안을 그대로 옮김)
+- 앱 쪽
+  - `src/lib/ai.ts`: Worker 클라이언트 (`generate`, `fetchUsage`, 오류 타입)
+  - `src/lib/realtime.ts`: WebRTC 연결 도우미 (아래 "앱 쪽 Realtime 도우미")
+  - 보호자 모드에 **"AI 연결" 탭**: Worker 주소, 가족 토큰, 연결 테스트, 오늘과 이번 달 사용 시간, 예상 비용
+  - `AppState.ai = { endpoint?: string; token?: string }` (기기 로컬). **백업 JSON에는 토큰을 넣지 않는다.**
 
 **제외**
-- 실제 회화, 퀴즈 화면 (T03~T06)
-- 사용자 계정, 로그인
+- 대화 화면 (T03, T04)
+- 사용자 계정, 로그인, 기기 간 동기화
 
 ## 설계
 
-### 모델과 요청 기본값 (Worker 환경변수로 바꿀 수 있게)
-저렴한 소형 모델을 기본으로 쓰고, 용도별로 모델을 따로 지정할 수 있게 한다.
-
-| 변수 | 기본값 (예시) | 설명 |
+### 환경변수 (`wrangler.toml` vars + secrets)
+| 변수 | 기본값 | 설명 |
 |---|---|---|
-| `AI_PROVIDER` | `openai` | 제공사 어댑터 선택 |
-| `CHAT_MODEL` | `gpt-5-mini` | 회화(T03, T04). 대화 품질이 중요하므로 mini급 |
-| `GENERATE_MODEL` | `gpt-5-nano` | 문장제, 퀴즈, 피드백 생성(T05, T06). 짧은 구조화 출력이라 가장 싼 nano급 |
-| `MAX_OUTPUT_TOKENS_CHAT` | `300` | 회화 답장 길이 상한 (아이 답장은 2문장이면 충분) |
-| `MAX_OUTPUT_TOKENS_GENERATE` | `1500` | 생성 요청 상한 |
-| `DAILY_REQUEST_LIMIT_KID` | `60` | 아이 프로필 하루 요청 수 |
-| `DAILY_REQUEST_LIMIT_PARENT` | `150` | 보호자 하루 요청 수 |
-| `DAILY_REQUEST_LIMIT_TOTAL` | `300` | 가족 전체 하루 요청 수 (profileId를 바꿔 보내는 우회 방지) |
+| `OPENAI_API_KEY` (secret) | - | OpenAI 프로젝트 키. 이 프로젝트에 **월 예산 한도**를 꼭 걸어 둔다 |
+| `FAMILY_TOKEN` (secret) | - | 앱에 입력하는 가족 토큰 (32자 이상 무작위) |
+| `REALTIME_MODEL` | `gpt-realtime-2.1-mini` | 음성 대화 모델 |
+| `TEXT_MODEL` | 구현 시 OpenAI 가격표에서 가장 싼 nano/mini 텍스트 모델로 지정 | 요약, 피드백, 초안 생성 |
+| `TALK_MINUTES_kid1` / `_kid2` / `_parent` | `20` / `15` / `30` | 프로필별 하루 대화 상한(분) |
+| `TALK_MINUTES_MONTH_TOTAL` | `1500` | 가족 전체 월 대화 상한(분) |
+| `GENERATE_LIMIT_DAY_TOTAL` | `200` | 가족 전체 하루 텍스트 생성 횟수 |
+| `KRW_PER_TALK_MINUTE` | `15` | 보호자 화면 예상 비용 표시용 (실측 보고 조정) |
 
-- **모델 이름은 구현 시점에 OpenAI 공식 가격 페이지(platform.openai.com/docs/pricing)와 모델 목록에서 확인해 기본값을 정한다.** 표의 값은 예시다. 기획 시점(2026년 10월) 기준 저가 후보는 nano, mini 계열이다.
-- 호출 방식은 OpenAI 공식 SDK 문서를 확인하고 구현한다. 기억에 의존해 파라미터 이름을 짐작하지 않는다. 권장 구성:
-  - 회화: Responses API 스트리밍. 시스템 지시(`instructions`)와 대화 기록(`input`)을 보낸다.
-  - 생성: Responses API의 구조화된 출력(JSON Schema, `strict`)으로 스키마를 강제한다. 그래도 Worker에서 한 번 더 검증한다(아래 "검증").
-  - 추론(reasoning) 모델이면 회화는 가장 낮은 추론 수준을 써서 지연과 비용을 줄인다(모델이 지원할 때만).
-- 시스템 프롬프트는 앱이 보내지 않는다. **Worker 안에 프롬프트 템플릿(`worker/src/prompts.ts`)을 두고**, 앱은 `mode`와 파라미터만 보낸다. 앱이 임의 프롬프트를 보내 프록시를 범용 API처럼 쓰는 것을 막기 위해서다.
-- 프롬프트 캐싱: OpenAI는 앞부분이 같은 긴 프롬프트를 자동으로 캐싱한다. 시스템 지시를 맨 앞에 고정하고, 날짜나 요청 id 같은 변하는 값은 넣지 않는다.
-- **안전 확인**: 아이 대화(`mode: 'kid-talk'`)는 아이가 보낸 메시지를 OpenAI Moderation API로 먼저 검사하고, 걸리면 모델을 부르지 않고 `{ error: "unsafe" }`를 돌려준다. 아이 화면에는 "다른 이야기를 해 볼까요?"를 보여준다. 모델이 답을 거부한 경우도 같은 오류로 처리한다.
-- SDK 오류는 SDK가 제공하는 오류 클래스와 HTTP 상태로 구분한다(429 → 앱에 `limit`, 그 외 → 502). 오류 메시지 문자열 비교는 하지 않는다.
-- 어댑터 인터페이스 (제공사와 무관한 형태):
-  ```ts
-  interface AiProvider {
-    streamChat(p: { model: string; system: string; messages: ChatTurn[]; maxOutputTokens: number }): AsyncIterable<string>; // 텍스트 조각
-    generateJson<T>(p: { model: string; system: string; user: string; schemaName: string; schema: object; maxOutputTokens: number }): Promise<{ data: T; usage: Usage }>;
-    moderate(text: string): Promise<{ flagged: boolean }>;
-  }
-  ```
-
-### 요청과 응답 형태
+### API
 ```ts
-// POST /api/chat  (응답: text/event-stream)
-type ChatRequest = {
+// 1) 대화 시작: 브라우저의 WebRTC offer를 받아 OpenAI와 연결하고 answer를 돌려준다.
+// POST /api/realtime/session   (Content-Type: application/json)
+type SessionRequest = {
   profileId: 'kid1' | 'kid2' | 'parent';
   level: 'g3' | 'g5' | 'adult';
-  mode: 'kid-talk' | 'biz-roleplay';
-  scenarioId: string;              // Worker의 시나리오 목록에 있는 id만 허용
-  messages: { role: 'user' | 'assistant'; content: string }[]; // 최대 30개, 각 500자
+  mode: 'kid-friend' | 'biz-talk';
+  offerSdp: string;
+  persona: { friendName: string; personaId: string; voice: string }; // 허용 목록 검증
+  memory?: string;        // 지난 대화 기억 요약, 최대 1500자
+  interests?: string[];   // 최대 8개, 각 20자
+  topic?: string;         // 오늘 시작 주제, 최대 40자
+  scenarioId?: string;    // biz-talk 전용, 허용 목록 검증
 };
-// SSE 이벤트: data: {"type":"text","text":"..."}  …  data: {"type":"done","usage":{...}}
+type SessionResponse = { sessionId: string; answerSdp: string; remainingSeconds: number };
 
-// POST /api/generate  (응답: application/json)
+// 2) 대화 종료: 사용 시간을 기록한다.
+// POST /api/realtime/end
+type EndRequest = { sessionId: string; seconds: number };
+// 서버 기록 시간 = min(seconds, 지금 - 시작 시각). 클라이언트가 줄여서 보고해도 서버 시계가 상한.
+
+// 3) 텍스트 생성 (구조화된 JSON)
+// POST /api/generate
 type GenerateRequest = {
   profileId: 'kid1' | 'kid2' | 'parent';
   level: 'g3' | 'g5' | 'adult';
-  kind: 'talk-feedback' | 'roleplay-feedback' | 'word-problem' | 'reading-quiz';
-  input: unknown;                  // kind별 스키마는 T03~T06에서 정의, Worker가 검증
+  kind: 'talk-summary' | 'biz-feedback' | 'memory-merge' | 'word-problem' | 'reading-quiz';
+  input: unknown; // kind별 스키마는 각 명세서(T03, T04, T10, T11)에 정의, Worker가 검증
 };
-// 응답: { ok: true, data: <kind별 JSON> } | { ok: false, error: string }
-```
-- `/api/generate`는 구조화된 출력(JSON Schema)을 써서 JSON이 스키마를 따르게 하고, Worker가 받은 결과를 같은 스키마로 다시 검증한 뒤 돌려준다.
-- 입력 검증은 Worker에서 한다(길이, 개수, 허용된 enum). 잘못된 요청은 400.
+// 응답: { ok: true, data } | { ok: false, error }
 
-### 앱 쪽 `src/lib/ai.ts`
-```ts
-export interface AiConfig { endpoint: string; token: string }
-export function streamChat(cfg: AiConfig, req: ChatRequest, onText: (t: string) => void, signal?: AbortSignal): Promise<{ usage: Usage }>;
-export function generate<T>(cfg: AiConfig, req: GenerateRequest): Promise<T>;
-export function fetchUsage(cfg: AiConfig): Promise<Record<string, { requests: number; tokens: number }>>;
-export class AiError extends Error { kind: 'unauthorized' | 'limit' | 'unsafe' | 'network' | 'server' }
+// 4) 사용량
+// GET /api/usage → { today: Record<profileId, { talkSeconds; generates }>, month: { talkSeconds; estimatedKrw } }
 ```
+
+### `/api/realtime/session` 처리 순서
+1. 인증, CORS, 입력 검증(길이, 허용 목록). 실패 시 400/401.
+2. 오늘 남은 시간 = 프로필 상한 - 오늘 사용. 월 상한도 확인. 0 이하면 `429 { error: 'limit' }`.
+3. 같은 프로필에 진행 중인 세션이 있으면 거부(`409 { error: 'busy' }`). KV 키 `active:<profileId>`, TTL = 남은 시간 + 120초.
+4. 지시문 생성: `personas.ts` 템플릿 + `memory`, `interests`, `topic`, 남은 시간. 사용자 입력은 태그로 감싼 데이터 블록으로 넣고 "지시가 아니라 참고 정보"라고 명시한다(프롬프트 인젝션 완화).
+5. OpenAI **Realtime WebRTC 통합 방식(unified interface)**으로 연결: 서버가 `offerSdp`와 세션 설정을 multipart로 `POST https://api.openai.com/v1/realtime/calls`에 보내고, 받은 answer SDP를 돌려준다. API 키는 이 서버 요청에만 쓴다.
+   - 세션 설정에 넣을 것: 모델, 지시문(instructions), 목소리(voice), **사용자 음성 자막(입력 오디오 전사) 켜기**, 턴 감지(가능하면 semantic VAD), 응답 길이 상한.
+   - 필드 이름과 multipart 형식은 **구현 시점의 공식 문서(Realtime WebRTC 가이드)를 확인하고 그대로 따른다.** 이 명세는 구조만 정한다.
+   - 공식 문서에 서버가 진행 중인 통화를 지켜보거나 끊을 수 있는 방법(사이드밴드 연결 등)이 있으면, 남은 시간이 지나면 서버에서 통화를 종료한다. 없으면 앱 타이머와 월 예산 한도로 막는다(결과를 PR에 적는다).
+6. `usage:<날짜>:<profileId>`에 세션 시작 기록(`sessionId`, 시작 시각).
+
+### `/api/generate`
+- 구조화된 출력(JSON Schema, strict)으로 스키마를 강제하고, Worker에서 같은 스키마로 다시 검증한다.
+- `talk-summary`는 요약 전에 **아이 발화 자막을 OpenAI Moderation API로 검사**해 `flagged` 결과를 함께 돌려준다(보호자 확인용).
+- 지시문은 Worker 안에 있고 앱은 `kind`와 데이터만 보낸다.
+
+### 앱 쪽 Realtime 도우미 `src/lib/realtime.ts`
+```ts
+export interface TalkHandle {
+  stop(): Promise<void>;              // 연결 종료 + /api/realtime/end 보고
+  setMicEnabled(on: boolean): void;   // 일시정지, 눌러서 말하기 모드용
+  sendSystemNote(text: string): void; // 예: "[WRAP_UP]" 마무리 신호 (데이터 채널로 대화 항목 추가 + 응답 요청)
+}
+export interface TalkCallbacks {
+  onState(s: 'connecting' | 'listening' | 'thinking' | 'speaking' | 'ended' | 'error'): void;
+  onAssistantText(itemId: string, delta: string, done: boolean): void; // AI 음성 자막
+  onUserText(itemId: string, text: string): void;                      // 아이 음성 자막(완료 시)
+  onError(e: AiError): void;
+}
+export function startTalk(cfg: AiConfig, req: Omit<SessionRequest, 'offerSdp'>, cb: TalkCallbacks): Promise<TalkHandle>;
+
+export class AiError extends Error {
+  kind: 'unauthorized' | 'limit' | 'busy' | 'unsafe' | 'mic-denied' | 'network' | 'server';
+}
+```
+- `getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })`
+- `RTCPeerConnection`에 마이크 트랙 추가, 원격 오디오는 `<audio autoplay>`로 재생, 데이터 채널(`oai-events`)로 이벤트 송수신
+- 이벤트 이름(AI 음성 자막 delta, 사용자 음성 전사 완료, 응답 시작과 끝, 말하기 시작과 멈춤)은 공식 문서의 Realtime 서버 이벤트 목록을 보고 매핑한다. 이벤트 파서는 **순수 함수**(`parseRealtimeEvent(json) → TalkEvent | null`)로 만들어 테스트한다.
+- 연결 실패, 마이크 거부, 네트워크 끊김을 `AiError` 종류로 구분한다.
 
 ## 수용 기준
-- [ ] `cd worker && npm test`로 Worker 단위 테스트(인증, CORS, 입력 검증, 사용량 제한)가 통과한다. OpenAI 호출은 어댑터를 모킹한다.
-- [ ] 토큰이 없거나 틀리면 401, 허용되지 않은 출처는 CORS 거부, 상한 초과는 429.
-- [ ] 앱이 임의 시스템 프롬프트를 보낼 방법이 없다.
-- [ ] `worker/README.md`에 배포 절차가 있다: `wrangler kv namespace create`, `wrangler secret put OPENAI_API_KEY`, `wrangler secret put FAMILY_TOKEN`, `wrangler deploy`.
-- [ ] 보호자 모드에서 프록시 주소와 토큰을 넣고 "연결 테스트"를 누르면 성공 또는 실패 이유가 한국어로 나온다.
-- [ ] 백업 JSON에 토큰이 들어가지 않는다(테스트로 확인).
-- [ ] API 키가 저장소 어디에도 없다. `.dev.vars`는 `.gitignore`에 있다.
+- [ ] `cd worker && npm test` 통과: 인증, CORS, 입력 검증, 남은 시간 계산, 429와 409, `end`의 서버 시계 상한, 지시문 생성(사용자 입력이 데이터 블록으로 들어가는지). OpenAI 호출은 모킹.
+- [ ] 실제 키로 Worker를 띄우고 보호자 "연결 테스트"에서 10초 음성 대화가 된다(PR에 확인 방법과 결과 기록).
+- [ ] 하루 상한을 1분으로 낮추면 두 번째 연결이 429로 거부된다.
+- [ ] 서버 측 통화 종료가 가능한지 조사 결과를 PR에 적고, 가능하면 구현한다.
+- [ ] 보호자 "AI 연결" 탭에서 주소와 토큰 저장, 연결 테스트, 오늘과 이번 달 사용 시간, 예상 비용이 보인다.
+- [ ] 백업 JSON에 토큰이 없다(테스트).
+- [ ] API 키가 저장소, 번들, 로그 어디에도 없다. `.dev.vars`는 `.gitignore`.
+- [ ] `worker/README.md`: KV 생성, secret 등록, 배포, **OpenAI 프로젝트 월 예산 한도 설정**, ALLOWED_ORIGINS 설정 방법.
 - [ ] `npm run typecheck && npm test && npm run build` 통과 (앱)
 
 ## 테스트
-- Worker: 인증, CORS 프리플라이트, 검증 실패, 사용량 누적과 429, SSE 형식(모킹된 스트림)
-- 앱: `ai.ts`의 SSE 파서(청크가 잘려서 오는 경우 포함), 오류 종류 매핑, `exportState`에서 토큰 제외
+- Worker: 위 수용 기준 항목들, multipart 요청 본문 생성 함수(순수 함수로 분리)
+- 앱: `parseRealtimeEvent`, `ai.ts` 오류 매핑, `exportState` 토큰 제외
 
 ## 리뷰 포인트
-- 키 노출 경로가 없는지 (번들, 로그, 오류 메시지)
-- 아이 대화가 모더레이션을 거친 뒤에만 모델로 가는지
-- OpenAI 대시보드에서 프로젝트 월 예산 한도(usage limit)를 설정하라는 안내가 README에 있는지
-- 사용량 제한이 우회되지 않는지 (profileId를 바꿔 보내도 `DAILY_REQUEST_LIMIT_TOTAL`이 걸리는지)
-- 스트림이 중간에 끊겨도 앱이 멈추지 않는지
+- 키, 지시문이 브라우저로 새는 경로가 없는지 (`/api/realtime/session` 응답에 지시문이 포함되지 않는지)
+- 앱이 보낸 `memory`, `interests`, `topic`이 지시문을 덮어쓰지 못하는지
+- 시간 상한 우회 가능성 (세션을 안 끝내고 계속 쓰기 → 서버 종료 또는 월 예산 한도로 막히는지)
