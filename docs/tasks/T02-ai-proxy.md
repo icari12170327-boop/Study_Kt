@@ -14,7 +14,8 @@
 
 ## 범위
 **포함**
-- `worker/` 폴더에 Cloudflare Worker 프로젝트 (TypeScript, `wrangler`, Vitest, OpenAI 공식 SDK `openai`는 텍스트 생성에 사용)
+- `worker/` 폴더에 Cloudflare Worker 프로젝트 (TypeScript, `wrangler`, Vitest, OpenAI 공식 SDK `openai`는 텍스트 생성에 사용). Worker 이름: `study-kt-proxy`
+- **Worker 자동 배포 워크플로** `.github/workflows/deploy-worker.yml`: `main`에 `worker/**` 변경이 머지되면 Worker 테스트 후 `cloudflare/wrangler-action`으로 배포. GitHub 저장소 Secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`를 사용하고, 둘 중 하나라도 없으면 배포 단계만 건너뛴다(실패로 표시하지 않음). PR에서는 테스트만 돌린다.
 - 엔드포인트 4개 (아래 "API")
 - 인증: `Authorization: Bearer <FAMILY_TOKEN>`, 상수 시간 비교
 - CORS: `ALLOWED_ORIGINS`(쉼표 구분)만 허용
@@ -29,6 +30,15 @@
 **제외**
 - 대화 화면 (T03, T04)
 - 사용자 계정, 로그인, 기기 간 동기화
+
+## Cloudflare 준비 (보호자, 이미 완료하면 체크)
+Codex는 Cloudflare 계정이나 키를 직접 다루지 않는다. 보호자가 대시보드에서 아래를 준비하고, **비밀이 아닌 값만** 이 명세에 적어 Codex에게 넘긴다.
+- [ ] Cloudflare 가입, workers.dev 서브도메인 정하기 → Worker 주소: `https://study-kt-proxy.<서브도메인>.workers.dev`
+- [ ] KV 네임스페이스 `study-kt-usage` 생성 → **네임스페이스 ID**를 `worker/wrangler.toml`의 `kv_namespaces` 바인딩(`USAGE`)에 넣는다 (ID는 비밀 아님: `<여기에 KV ID>`)
+- [ ] API 토큰 생성("Edit Cloudflare Workers" 템플릿) → GitHub Secrets `CLOUDFLARE_API_TOKEN`
+- [ ] 계정 ID → GitHub Secrets `CLOUDFLARE_ACCOUNT_ID`
+- [ ] (T02 머지 후, 첫 배포 뒤) Worker 설정의 Variables and Secrets에 **Secret**으로 `OPENAI_API_KEY`, `FAMILY_TOKEN` 등록
+- 비밀이 아닌 설정(`ALLOWED_ORIGINS=https://icari12170327-boop.github.io`, 모델, 시간 상한)은 `wrangler.toml`의 `[vars]`에 둔다. 대시보드에서 바꾼 vars는 다음 배포 때 덮어써지므로 바꿀 땐 `wrangler.toml`을 고친다. Secret은 배포해도 유지된다.
 
 ## 설계
 
@@ -128,7 +138,8 @@ export class AiError extends Error {
 - [ ] 보호자 "AI 연결" 탭에서 주소와 토큰 저장, 연결 테스트, 오늘과 이번 달 사용 시간, 예상 비용이 보인다.
 - [ ] 백업 JSON에 토큰이 없다(테스트).
 - [ ] API 키가 저장소, 번들, 로그 어디에도 없다. `.dev.vars`는 `.gitignore`.
-- [ ] `worker/README.md`: KV 생성, secret 등록, 배포, **OpenAI 프로젝트 월 예산 한도 설정**, ALLOWED_ORIGINS 설정 방법.
+- [ ] `worker/README.md`: 위 "Cloudflare 준비"를 대시보드 기준으로 설명(로컬 PC에 wrangler 설치 없이 가능해야 함), 로컬 개발용 `.dev.vars` 예시, **OpenAI 프로젝트 월 예산 한도 설정**.
+- [ ] `deploy-worker.yml`: Secrets가 없으면 배포를 건너뛰고, 있으면 `main` 머지 시 Worker가 배포된다. 권한은 `contents: read`만.
 - [ ] `npm run typecheck && npm test && npm run build` 통과 (앱)
 
 ## 테스트

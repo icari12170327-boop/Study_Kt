@@ -22,7 +22,9 @@
 
 ## T02 사전 준비 (보호자)
 - [ ] OpenAI: 프로젝트를 새로 만들고 API 키 발급, **프로젝트 월 예산 한도** 설정 (예: 월 2만 원 상당)
-- [ ] Cloudflare: 무료 계정 가입 (Workers 무료 플랜으로 충분). 키는 Codex가 아니라 보호자가 `wrangler secret put`으로 직접 넣는다
+- [x] Cloudflare: 무료 계정 가입
+- [ ] Cloudflare: workers.dev 서브도메인, KV 네임스페이스, API 토큰 → GitHub Secrets (자세한 순서는 [T02](T02-ai-proxy.md)의 "Cloudflare 준비")
+- [ ] T02 머지 후: Worker에 `OPENAI_API_KEY`, `FAMILY_TOKEN`을 대시보드에서 Secret으로 등록
 - [ ] 키와 토큰은 채팅, 저장소, PR에 절대 붙여 넣지 않는다
 
 ## 병행 진행 제안
