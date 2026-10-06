@@ -32,7 +32,7 @@ export function MathSession({ profileId, go }: { profileId: ProfileId; go: Go })
     const done = data.days[today]?.progress.math ?? 0;
     const count = Math.max(target - done, 0) || 10;
     return buildMathQueue(settings.mathSkills, data.wrongNotes, count);
-    // 세션(라운드)을 시작할 때 한 번만 만든다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 채점으로 기록이 바뀌어도 문제 순서를 유지하고 새 라운드에서만 생성한다.
   }, [round]);
 
   const [index, setIndex] = useState(0);

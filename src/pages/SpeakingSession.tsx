@@ -32,7 +32,7 @@ export function SpeakingSession({ profileId, go }: { profileId: ProfileId; go: G
     const done = data.days[today]?.progress.speaking ?? 0;
     const keys = pickSessionKeys([...byKey.keys()], data.srs, today, Math.max(target - done, 0) || 5);
     return shuffle(keys).map((key) => ({ key, sentence: byKey.get(key)! }));
-    // 라운드를 시작할 때 한 번만 만든다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 채점으로 복습 기록이 바뀌어도 문장 순서를 유지하고 새 라운드에서만 생성한다.
   }, [round]);
 
   const [index, setIndex] = useState(0);

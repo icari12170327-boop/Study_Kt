@@ -20,11 +20,42 @@
 
 ## 실행
 ```bash
-npm install
+npm ci
 npm run dev        # http://localhost:5173
+npm run lint       # 경고 없이 린트 통과
+npm run typecheck  # TypeScript 타입 검사
 npm test           # 단위 테스트
 npm run build      # 프로덕션 빌드 (dist/)
+npm run format     # Prettier로 파일 포맷 정리
 ```
+
+## GitHub Pages 배포
+
+배포 주소: [https://icari12170327-boop.github.io/Study_Kt/](https://icari12170327-boop.github.io/Study_Kt/)
+
+1. 저장소 **Settings → Pages → Build and deployment → Source**에서 **GitHub Actions**를 선택합니다.
+2. **Settings → Actions → General**에서 GitHub Actions 실행이 허용되어 있는지 확인합니다.
+3. PR을 열면 CI가 린트, 타입 검사, 테스트, 빌드를 실행합니다. 실패한 검사는 PR에 표시됩니다.
+4. PR을 `main`에 머지하면 배포 워크플로가 같은 검사를 통과한 뒤 `dist/`를 Pages에 배포합니다. **Actions → GitHub Pages 배포**에서 결과와 배포 주소를 확인합니다. 첫 배포가 성공한 뒤 위 주소로 접속할 수 있습니다.
+
+GitHub Free에서는 공개 저장소만 Pages를 사용할 수 있습니다. 비공개 저장소는 GitHub Pro, Team 또는 Enterprise 등 Pages를 지원하는 유료 플랜이 필요합니다.
+
+CI와 배포는 Node 22를 사용하며, `BASE_PATH=/Study_Kt/`로 하위 경로를 빌드합니다. 로컬에서 같은 경로를 확인하려면:
+
+```bash
+BASE_PATH=/Study_Kt/ npm run build
+BASE_PATH=/Study_Kt/ npm run preview
+# http://localhost:4173/Study_Kt/ 접속
+```
+
+Chrome 개발자 도구 **Application**에서 Manifest와 Service Workers를 확인합니다. 첫 접속 후 서비스 워커가 준비되면 비행기 모드로 바꾸고 새로고침해 오프라인 동작도 확인할 수 있습니다. 음성 인식은 브라우저와 네트워크 상태에 따라 오프라인에서 제한될 수 있습니다.
+
+## 태블릿 홈 화면에 설치
+
+- **Galaxy Fold4·Android 태블릿(Chrome)**: 배포 주소에 접속하고 메뉴 **⋮ → 홈 화면에 추가 → 설치**(또는 **앱 설치**)를 선택합니다. DeX에서도 Chrome으로 같은 주소를 열 수 있습니다.
+- **iPad(Safari)**: 배포 주소에 접속하고 **공유 → 홈 화면에 추가 → 추가**를 선택합니다.
+
+처음에는 인터넷에 연결해 앱을 열어 주세요. 이후 홈 화면 아이콘으로 실행하면 설치된 앱처럼 사용할 수 있습니다. 기록은 기기와 브라우저별로 저장되므로 다른 기기로 옮길 때는 보호자 모드의 백업·복원을 사용하세요.
 
 ## 문서
 - [기획서](docs/PLAN.md): 목표, 학습 설계, 동기부여, 로드맵
