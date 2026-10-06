@@ -203,7 +203,7 @@
 프로필, 오늘의 미션, 연산 생성기와 오답노트, 단어 SRS, 따라 말하기, 독서노트, 쿠폰, 보호자 모드, PWA
 
 ### 1.5단계 — 운영 기반
-- [ ] **[T01](tasks/T01-ci-deploy.md) CI, GitHub Pages 자동 배포, 린트**
+- [x] [T01](tasks/T01-ci-deploy.md) CI, GitHub Pages 자동 배포, 린트 (PR #4)
 
 ### 2단계 — 영어 프리토킹 (최우선)
 - [ ] **[T02](tasks/T02-ai-proxy.md) AI 프록시: Realtime 연결, 텍스트 생성, 하루 시간 상한**
