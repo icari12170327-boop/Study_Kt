@@ -5,12 +5,15 @@ import { MISSION_META, type Go } from '../route';
 import { formatKoreanDate, lastNDays, toDateKey } from '../lib/date';
 import { currentStreak, dayRatio } from '../lib/progress';
 import { countMastered } from '../lib/srs';
-import { SKILLS, SKILL_MAP, formatAnswer } from '../content/math/skills';
+import { SKILL_MAP, formatAnswer } from '../content/math/skills';
+import { defaultMathState, mathLevelsFor } from '../content/math/levels';
+import { setMathLevel } from '../content/math/adaptive';
 import { VOCAB_DECKS, VOCAB_DECK_MAP, vocabKey } from '../content/english/vocab';
 import { SENTENCE_DECKS } from '../content/english/sentences';
 import { defaultSettings, defaultState } from '../store/defaults';
 import { exportState, importState } from '../store/storage';
 import { ProgressBar, TopBar } from '../components/common';
+import { MathOverview } from '../components/MathOverview';
 
 type Tab = 'overview' | 'settings' | 'coupons' | 'backup';
 
@@ -105,6 +108,9 @@ function Overview() {
               </div>
             )}
 
+            {(p.level !== 'adult' || settings.missions.some((mission) => mission.type === 'math' && mission.enabled)) &&
+              <MathOverview data={data} today={today} />}
+
             {skillRows.length > 0 && (
               <div className="skill-table">
                 <div className="small muted">최근 2주 연산 단원별 정답률</div>
@@ -156,7 +162,7 @@ function Settings() {
       if (m) Object.assign(m, patch);
     });
 
-  const toggle = (field: 'mathSkills' | 'vocabDecks' | 'speakingDecks', id: string) =>
+  const toggle = (field: 'vocabDecks' | 'speakingDecks', id: string) =>
     update((d) => {
       const list = d.settings[pid][field];
       d.settings[pid][field] = list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
@@ -192,6 +198,7 @@ function Settings() {
                 update((d) => {
                   d.profiles.find((p) => p.id === pid)!.level = level;
                   d.settings[pid] = defaultSettings(level);
+                  d.data[pid].math = setMathLevel(d.data[pid].math, defaultMathState(level).level, level, toDateKey());
                 });
               }}
             >
@@ -218,6 +225,7 @@ function Settings() {
               {MISSION_META[m.type].icon} {MISSION_META[m.type].title}
             </label>
             <input
+              aria-label={`${MISSION_META[m.type].title} 하루 목표`}
               type="number"
               min={1}
               max={100}
@@ -230,19 +238,17 @@ function Settings() {
       </div>
 
       <div className="panel">
-        <div className="form-label">연산 단원</div>
-        {(['g3', 'g5'] as Level[]).map((level) => (
-          <div key={level}>
-            <div className="small muted">{LEVEL_LABEL[level]}</div>
-            <div className="chip-wrap">
-              {SKILLS.filter((s) => s.level === level).map((s) => (
-                <button key={s.id} className={`chip ${settings.mathSkills.includes(s.id) ? 'on' : ''}`} onClick={() => toggle('mathSkills', s.id)}>
-                  {s.term} {s.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
+        <label>
+          수학 레벨 수동 조정
+          <select value={state.data[pid].math.level} onChange={(event) => update((draft) => {
+            draft.data[pid].math = setMathLevel(draft.data[pid].math, Number(event.target.value), profile.level, toDateKey());
+          })}>
+            {mathLevelsFor(profile.level).map((row) => (
+              <option key={row.level} value={row.level}>레벨 {row.level} · {row.mainSkills.map((id) => SKILL_MAP[id].label).join(', ')}</option>
+            ))}
+          </select>
+        </label>
+        <p className="small muted">오늘은 선택한 레벨을 유지해요. 다음 학습일에 정답률과 풀이 시간으로 조정돼요.</p>
       </div>
 
       <div className="panel">
