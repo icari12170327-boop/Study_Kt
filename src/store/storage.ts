@@ -29,7 +29,11 @@ export function normalizeState(raw: unknown): AppState {
     data[p.id].days = Object.fromEntries(Object.entries(data[p.id].days).map(([date, day]) =>
       [date, { ...day, mathAttempts: Array.isArray(day.mathAttempts) ? day.mathAttempts : [] }]));
   }
-  return { version: 1, parentPin: s.parentPin, profiles, settings, data };
+  const ai = {
+    ...(typeof s.ai?.endpoint === 'string' ? { endpoint: s.ai.endpoint } : {}),
+    ...(typeof s.ai?.token === 'string' ? { token: s.ai.token } : {}),
+  };
+  return { version: 1, ai, parentPin: s.parentPin, profiles, settings, data };
 }
 
 export function loadState(): AppState {
@@ -50,11 +54,15 @@ export function saveState(state: AppState): void {
 }
 
 export function exportState(state: AppState): string {
-  return JSON.stringify(state, null, 2);
+  // 가족 토큰은 이 기기에만 두고 백업으로 복사하지 않는다.
+  return JSON.stringify({ ...state, ai: { endpoint: state.ai.endpoint } }, null, 2);
 }
 
 export function importState(text: string): AppState {
   const parsed = JSON.parse(text);
   if (!parsed || parsed.version !== 1) throw new Error('지원하지 않는 백업 파일입니다.');
-  return normalizeState(parsed);
+  const restored = normalizeState(parsed);
+  // 다른 백업에 토큰이 포함돼 있더라도 가져오지 않는다.
+  restored.ai = { endpoint: restored.ai.endpoint };
+  return restored;
 }

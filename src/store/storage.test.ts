@@ -77,3 +77,24 @@ describe('수학 도전 저장 호환', () => {
     expect(importState(exportState(state))).toEqual(state);
   });
 });
+
+describe('AI 설정과 백업', () => {
+  it('구형 기록에는 AI 기본값을 채우고 기기 저장 토큰은 보존한다', () => {
+    const state = defaultState();
+    const raw = { ...state, ai: undefined };
+    expect(normalizeState(raw).ai).toEqual({});
+    state.ai = { endpoint: 'https://worker.example', token: 'local-family-token' };
+    expect(normalizeState(state).ai).toEqual(state.ai);
+  });
+  it('백업에서 토큰을 제외하고 복원 시 외부 파일의 토큰도 가져오지 않는다', () => {
+    const state = defaultState();
+    state.ai = { endpoint: 'https://worker.example', token: 'local-family-token' };
+    const text = exportState(state);
+    expect(text).not.toContain('local-family-token');
+    expect(JSON.parse(text).ai).not.toHaveProperty('token');
+    expect(state.ai.token).toBe('local-family-token');
+    expect(importState(text).ai.endpoint).toBe('https://worker.example');
+    expect(importState(JSON.stringify(state)).ai.token).toBeUndefined();
+    expect(importState(text).data).toEqual(state.data);
+  });
+});
