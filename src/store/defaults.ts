@@ -1,10 +1,11 @@
 import type { AppState, Level, ProfileData, ProfileId, ProfileSettings } from '../types';
 import { skillsForLevel } from '../content/math/skills';
+import { defaultMathState } from '../content/math/levels';
 import { VOCAB_DECKS } from '../content/english/vocab';
 import { SENTENCE_DECKS } from '../content/english/sentences';
 
-export function emptyProfileData(): ProfileData {
-  return { stars: 0, streak: 0, days: {}, wrongNotes: [], srs: {}, coupons: [], notes: [] };
+export function emptyProfileData(level: Level = 'g3'): ProfileData {
+  return { math: defaultMathState(level), stars: 0, streak: 0, days: {}, wrongNotes: [], srs: {}, coupons: [], notes: [] };
 }
 
 /** 학년별 기본 미션. 10월 기준 2학기 단원과 1학기 복습 단원을 모두 켠다. */
@@ -16,7 +17,7 @@ export function defaultSettings(level: Level): ProfileSettings {
     case 'g3':
       return {
         missions: [
-          { type: 'math', enabled: true, target: 15 },
+          { type: 'math', enabled: true, target: 20 },
           { type: 'vocab', enabled: true, target: 8 },
           { type: 'speaking', enabled: true, target: 3 },
           { type: 'reading', enabled: false, target: 1 },
@@ -62,6 +63,6 @@ export function defaultState(): AppState {
     { id: 'parent' as const, name: '나', avatar: '🦉', level: 'adult' as const },
   ];
   const settings = Object.fromEntries(profiles.map((p) => [p.id, defaultSettings(p.level)])) as Record<ProfileId, ProfileSettings>;
-  const data = Object.fromEntries(profiles.map((p) => [p.id, emptyProfileData()])) as Record<ProfileId, ProfileData>;
+  const data = Object.fromEntries(profiles.map((p) => [p.id, emptyProfileData(p.level)])) as Record<ProfileId, ProfileData>;
   return { version: 1, profiles, settings, data };
 }

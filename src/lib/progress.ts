@@ -3,7 +3,7 @@ import { addDays } from './date';
 import { uid } from './random';
 
 export function emptyDay(date: string): DayLog {
-  return { date, progress: {}, correct: 0, total: 0, completed: false, mathBySkill: {} };
+  return { date, progress: {}, correct: 0, total: 0, completed: false, mathBySkill: {}, mathAttempts: [] };
 }
 
 /** draft를 직접 수정한다. */

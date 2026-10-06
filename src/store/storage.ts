@@ -1,5 +1,6 @@
 import type { AppState } from '../types';
 import { defaultState } from './defaults';
+import { clampMathLevel, defaultMathState } from '../content/math/levels';
 
 const KEY = 'study-kt:v1';
 
@@ -12,9 +13,21 @@ export function normalizeState(raw: unknown): AppState {
   const profiles = base.profiles.map((p) => ({ ...p, ...s.profiles?.find((x) => x.id === p.id) }));
   const settings = { ...base.settings };
   const data = { ...base.data };
-  for (const p of base.profiles) {
+  for (const p of profiles) {
     settings[p.id] = { ...base.settings[p.id], ...s.settings?.[p.id] };
     data[p.id] = { ...base.data[p.id], ...s.data?.[p.id] };
+    const math = s.data?.[p.id]?.math;
+    data[p.id].math = {
+      ...defaultMathState(p.level),
+      ...(typeof math?.lastEvaluated === 'string' ? { lastEvaluated: math.lastEvaluated } : {}),
+      level: typeof math?.level === 'number' && Number.isFinite(math.level)
+        ? clampMathLevel(math.level, p.level) : defaultMathState(p.level).level,
+      history: Array.isArray(math?.history) ? math.history.filter((row) => row && typeof row.date === 'string' &&
+        Number.isFinite(row.level) && Number.isFinite(row.counted) && Number.isFinite(row.correct) &&
+        Number.isFinite(row.guesses) && Number.isFinite(row.medianSec)).slice(-30) : [],
+    };
+    data[p.id].days = Object.fromEntries(Object.entries(data[p.id].days).map(([date, day]) =>
+      [date, { ...day, mathAttempts: Array.isArray(day.mathAttempts) ? day.mathAttempts : [] }]));
   }
   return { version: 1, parentPin: s.parentPin, profiles, settings, data };
 }

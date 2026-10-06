@@ -27,6 +27,33 @@ function properFrac(rng: Rng, maxDen = 9): Frac {
 }
 
 export const SKILLS: MathSkill[] = [
+  {
+    id: 'g2-addsub2', level: 'g3', unit: '기초 연산', term: '2학년 복습', label: '두 자리 덧셈·뺄셈',
+    generate: (rng) => {
+      const subtract = rng() < 0.5;
+      const a = randInt(subtract ? 20 : 10, subtract ? 99 : 89, rng);
+      const b = randInt(10, subtract ? a : 99 - a, rng);
+      return { skill: 'g2-addsub2', question: `${a} ${subtract ? '-' : '+'} ${b} =`,
+        answer: int(subtract ? a - b : a + b) };
+    },
+  },
+  {
+    id: 'g2-times', level: 'g3', unit: '기초 연산', term: '2학년 복습', label: '곱셈구구',
+    generate: (rng) => {
+      const a = randInt(2, 9, rng), b = randInt(1, 9, rng);
+      return { skill: 'g2-times', question: `${a} × ${b} =`, answer: int(a * b) };
+    },
+  },
+  {
+    id: 'g3-missing', level: 'g3', unit: '빈칸 추론', term: '3학년', label: '빈칸에 들어갈 수',
+    generate: (rng) => {
+      const multiply = rng() < 0.5;
+      const a = randInt(multiply ? 2 : 10, multiply ? 9 : 600, rng);
+      const b = randInt(multiply ? 2 : 10, multiply ? 9 : 399, rng);
+      return { skill: 'g3-missing', question: `□ ${multiply ? '×' : '+'} ${b} = ${multiply ? a * b : a + b}`,
+        answer: int(a), hint: '결과에서 거꾸로 생각해 봐요.' };
+    },
+  },
   // ───────── 3학년 ─────────
   {
     id: 'g3-add3',

@@ -53,6 +53,21 @@ export interface DayLog {
   total: number;
   completed: boolean;
   mathBySkill: Record<string, SkillStat>;
+  mathAttempts: MathAttempt[];
+}
+
+export interface MathAttempt {
+  skill: string;
+  correct: boolean;
+  activeMs: number;
+  guessed: boolean;
+}
+
+export interface MathLevelState {
+  level: number;
+  /** 마지막으로 평가한 학습일. history의 date는 평가가 적용된 날이다. */
+  lastEvaluated?: string;
+  history: { date: string; level: number; counted: number; correct: number; guesses: number; medianSec: number }[];
 }
 
 export interface WrongItem {
@@ -93,6 +108,7 @@ export interface ReadingNote {
 }
 
 export interface ProfileData {
+  math: MathLevelState;
   stars: number;
   streak: number;
   lastCompleted?: string;

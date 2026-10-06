@@ -300,3 +300,35 @@ textarea {
   .num-input { width: 130px; }
   .options { grid-template-columns: 1fr; }
 }
+
+/* 수학 도전: 터치와 DeX 입력 */
+.math-level { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.math-level strong { color: var(--primary); white-space: nowrap; }
+.number-answer { width: min(360px, 100%); display: flex; flex-direction: column; gap: 14px; }
+.number-answer .answer-row { gap: 8px; }
+.pad-field { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.pad-field .num-input { min-height: 64px; }
+.pad-field .num-input.short { width: 80px; }
+.num-input.active-field { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-soft); }
+.number-pad { display: grid; grid-template-columns: repeat(3, minmax(64px, 1fr)); gap: 8px; }
+.number-key { min-width: 64px; min-height: 64px; border: 1px solid var(--line); border-radius: 14px;
+  background: var(--bg); font-size: 1.6rem; font-weight: 800; cursor: pointer; touch-action: manipulation; }
+.number-key.small { font-size: 0.9rem; }
+.number-key:active { background: var(--primary-soft); transform: scale(0.97); }
+.number-key:disabled { opacity: 0.45; cursor: default; }
+.number-confirm { grid-column: 1 / -1; background: var(--primary); color: #fff; font-size: 1.15rem; }
+.guess-notice { margin: 0; font-size: 0.95rem; color: var(--muted); }
+.math-success { animation: math-pop 0.35s ease-out; }
+@keyframes math-pop { from { transform: scale(0.94); } to { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .math-success { animation: none; } }
+.math-overview { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.math-chart { width: 100%; max-height: 180px; }
+.math-chart-grid { stroke: var(--line); }
+.math-chart-label { fill: var(--muted); font-size: 11px; }
+.math-chart-line { fill: none; stroke: var(--primary); stroke-width: 2; }
+.math-chart-point { fill: var(--primary); }
+.math-history-scroll { max-width: 100%; overflow-x: auto; }
+.math-history-table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 0.8rem; text-align: center; }
+.math-history-table caption { text-align: left; color: var(--muted); margin-bottom: 6px; }
+.math-history-table th, .math-history-table td { padding: 5px; border-bottom: 1px solid var(--line); }
+.form select { min-width: 0; max-width: 100%; }
