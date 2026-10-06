@@ -50,6 +50,36 @@ describe('연산 문제 생성기', () => {
     }
   });
 
+  it('새 기초·빈칸 생성기의 식을 독립적으로 계산하고 학년 범위를 지킨다', () => {
+    const rng = seededRng(19);
+    for (const id of ['g2-addsub2', 'g2-times', 'g3-missing']) {
+      const skill = SKILLS.find((skill) => skill.id === id)!;
+      for (let i = 0; i < 300; i++) {
+        const problem = skill.generate(rng);
+        expect(problem.answer.kind).toBe('int');
+        if (problem.answer.kind !== 'int') continue;
+        if (id === 'g3-missing') {
+          const match = problem.question.match(/^□ ([+×]) (\d+) = (\d+)$/)!;
+          const operand = Number(match[2]), result = Number(match[3]);
+          expect(match[1] === '+' ? problem.answer.value + operand : problem.answer.value * operand).toBe(result);
+          expect(result).toBeLessThanOrEqual(999);
+        } else {
+          const match = problem.question.match(/^(\d+) ([+×-]) (\d+) =$/)!;
+          const a = Number(match[1]), b = Number(match[3]);
+          expect(problem.answer.value).toBe(match[2] === '+' ? a + b : match[2] === '-' ? a - b : a * b);
+          if (id === 'g2-addsub2') {
+            expect(a).toBeGreaterThanOrEqual(10); expect(a).toBeLessThanOrEqual(99);
+            expect(b).toBeGreaterThanOrEqual(10); expect(b).toBeLessThanOrEqual(99);
+            expect(problem.answer.value).toBeLessThanOrEqual(99);
+          } else {
+            expect(a).toBeGreaterThanOrEqual(2); expect(a).toBeLessThanOrEqual(9);
+            expect(b).toBeGreaterThanOrEqual(1); expect(b).toBeLessThanOrEqual(9);
+          }
+        }
+      }
+    }
+  });
+
   it('나머지 있는 나눗셈은 피제수가 두 자리 수', () => {
     const rng = seededRng(2);
     const div = SKILLS.find((s) => s.id === 'g3-div-rem')!;
