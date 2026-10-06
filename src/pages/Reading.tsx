@@ -166,6 +166,7 @@ function NoteReview({ profileId, allKeys, onDone }: { profileId: ProfileId; allK
   const { state, update } = useStore();
   const data = state.data[profileId];
   const today = useMemo(() => toDateKey(), []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 복습 중 SRS 기록이 바뀌어도 처음 선택한 카드 순서를 유지한다.
   const keys = useMemo(() => pickSessionKeys(allKeys, data.srs, today, 10), []);
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
