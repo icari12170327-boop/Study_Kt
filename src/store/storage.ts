@@ -1,4 +1,5 @@
 import type { AppState } from '../types';
+import type { AiConfig } from '../../shared/ai';
 import { defaultState } from './defaults';
 import { clampMathLevel, defaultMathState } from '../content/math/levels';
 
@@ -58,11 +59,13 @@ export function exportState(state: AppState): string {
   return JSON.stringify({ ...state, ai: { endpoint: state.ai.endpoint } }, null, 2);
 }
 
-export function importState(text: string): AppState {
+export function importState(text: string, localAi: AiConfig = {}): AppState {
   const parsed = JSON.parse(text);
   if (!parsed || parsed.version !== 1) throw new Error('지원하지 않는 백업 파일입니다.');
   const restored = normalizeState(parsed);
   // 다른 백업에 토큰이 포함돼 있더라도 가져오지 않는다.
   restored.ai = { endpoint: restored.ai.endpoint };
+  // 기존 토큰을 백업의 다른 주소로 보내지 않도록 현재 기기의 주소도 함께 유지한다.
+  if (localAi.token) restored.ai = { ...localAi };
   return restored;
 }

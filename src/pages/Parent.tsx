@@ -322,7 +322,7 @@ function Backup() {
 
   const restore = async (file: File) => {
     try {
-      const next = importState(await file.text());
+      const next = importState(await file.text(), state.ai);
       if (!confirm('지금 기록을 백업 파일 내용으로 바꿀까요?')) return;
       replace(next);
       setMessage('복원했어요.');

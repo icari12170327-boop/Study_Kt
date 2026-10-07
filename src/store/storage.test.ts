@@ -79,6 +79,26 @@ describe('수학 도전 저장 호환', () => {
 });
 
 describe('AI 설정과 백업', () => {
+  it('같은 기기에서 복원하면 현재 주소와 토큰을 보존하고 학습 기록은 백업에서 가져온다', () => {
+    const backup = defaultState();
+    backup.ai = { endpoint: 'https://backup.example', token: 'backup-token-must-not-be-used' };
+    backup.data.kid1.stars = 42;
+    const localAi = { endpoint: 'https://local-worker.example', token: 'current-device-token' };
+    const before = { ...localAi };
+    const restored = importState(JSON.stringify(backup), localAi);
+    expect(restored.ai).toEqual(localAi);
+    expect(restored.ai).not.toBe(localAi);
+    expect(restored.data.kid1.stars).toBe(42);
+    expect(localAi).toEqual(before);
+    expect(backup.ai.token).toBe('backup-token-must-not-be-used');
+    expect(exportState(restored)).not.toContain('current-device-token');
+    expect(exportState(restored)).not.toContain('backup-token-must-not-be-used');
+  });
+  it('토큰이 없는 다른 기기는 백업의 주소만 가져오고 외부 토큰은 거부한다', () => {
+    const backup = defaultState();
+    backup.ai = { endpoint: 'https://backup.example', token: 'external-token' };
+    expect(importState(JSON.stringify(backup), {}).ai).toEqual({ endpoint: 'https://backup.example' });
+  });
   it('구형 기록에는 AI 기본값을 채우고 기기 저장 토큰은 보존한다', () => {
     const state = defaultState();
     const raw = { ...state, ai: undefined };
