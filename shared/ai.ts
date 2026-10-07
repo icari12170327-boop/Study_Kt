@@ -15,6 +15,7 @@ export interface SessionRequest {
   interests?: string[];
   topic?: string;
   scenarioId?: string;
+  situation?: string;
 }
 export interface SessionResponse {
   sessionId: string;

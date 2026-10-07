@@ -12,6 +12,7 @@ export const scenarioRoles = {
   'biz-smalltalk': 'a business partner before a first meeting',
   'biz-escalation': 'a customer contact receiving a problem report',
   'biz-free': 'an industry colleague discussing AI and technology',
+  'biz-custom': 'the counterpart in the situation described in the situation tag',
 } as const;
 export const sessionSchema = z
   .strictObject({
@@ -29,6 +30,7 @@ export const sessionSchema = z
     memory: text(1500, 0).optional(),
     interests: z.array(text(80)).max(8).optional(),
     topic: text(40, 0).optional(),
+    situation: text(300, 1).optional(),
     scenarioId: z
       .enum(Object.keys(scenarioRoles) as [keyof typeof scenarioRoles, ...Array<keyof typeof scenarioRoles>])
       .optional(),
@@ -37,7 +39,8 @@ export const sessionSchema = z
     r.profileId === 'parent'
       ? r.level === 'adult' && r.mode === 'biz-talk' && !!r.scenarioId
       : r.level !== 'adult' && r.mode === 'kid-friend' && !r.scenarioId,
-  );
+  )
+  .refine((r) => r.scenarioId === 'biz-custom' ? !!r.situation?.trim() : r.situation === undefined);
 export const endSchema = z.strictObject({
   sessionId: text(100).regex(/^[\w-]+$/),
   seconds: z.number().finite().min(0).max(86400),
