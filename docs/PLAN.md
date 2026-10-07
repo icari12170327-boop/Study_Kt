@@ -219,6 +219,7 @@
 
 ### 4단계 — 과학과 읽기 콘텐츠
 - [ ] [T08](tasks/T08-science-cards.md) 과학 실험 카드(첫째, 둘째 모두), 같이 실험, 도감, 배지, 캐릭터 옷차림
+- [ ] [T17](tasks/T17-weekend-science.md) 과학 실험 미션은 주말에만 (요일별 미션)
 - [ ] [T09](tasks/T09-story-reading.md) 국어 연재 이야기 읽기
 
 ### 5단계 — 확장
