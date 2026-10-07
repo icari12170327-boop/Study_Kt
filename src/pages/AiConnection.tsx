@@ -71,7 +71,8 @@ export function AiConnection() {
   };
   const forceEnd = async (profileId: ActiveSession['profileId'] | 'all') => {
     const name = profileId === 'all' ? '모두' : state.profiles.find((p) => p.id === profileId)?.name ?? profileId;
-    if (!confirm(`${name}의 대화를 끝낼까요? 아이가 대화 중이면 바로 끊겨요.`)) return;
+    const question = profileId === 'all' ? '진행 중인 모든 대화를 끝낼까요?' : `${name}의 대화를 끝낼까요?`;
+    if (!confirm(`${question} 아이가 대화 중이면 바로 끊겨요.`)) return;
     setEnding(true);
     setError('');
     try {

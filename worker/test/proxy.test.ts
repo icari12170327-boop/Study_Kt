@@ -389,9 +389,37 @@ describe('보호자 강제 종료', () => {
     expect((await start()).status).toBe(200);
     expect((await readUsage(await req('/api/usage'))).today.kid1.talkSeconds).toBe(10);
     failHangup = false;
+    vi.setSystemTime(now + 15000);
     await family.alarm();
     expect((storage.get('ledger') as Ledger).sessions[old.id].needsHangup).toBe(false);
-    expect(outgoing.mock.calls.filter(([url]) => String(url).endsWith('/rtc_1/hangup')).length).toBeGreaterThan(1);
+    expect(outgoing.mock.calls.filter(([url]) => String(url).endsWith('/rtc_1/hangup')).length).toBe(2);
+  });
+  it('강제 종료 재시도는 5초·1분·10분으로 늦추고 재시작 뒤에도 대기를 유지한다', async () => {
+    await start();
+    failHangup = true;
+    await req('/api/realtime/end-active', { profileId: 'all' });
+    const id = Object.keys((storage.get('ledger') as Ledger).sessions)[0];
+    expect((storage.get('ledger') as Ledger).sessions[id].nextHangupAt).toBe(now + 5000);
+    await req('/api/usage');
+    expect(outgoing.mock.calls.filter(([url]) => String(url).endsWith('/hangup'))).toHaveLength(1);
+    vi.setSystemTime(now + 5000);
+    await family.alarm();
+    expect((storage.get('ledger') as Ledger).sessions[id].nextHangupAt).toBe(now + 65000);
+    family = new FamilyUsage(durableState, env);
+    vi.setSystemTime(now + 60000);
+    await family.alarm();
+    expect(outgoing.mock.calls.filter(([url]) => String(url).endsWith('/hangup'))).toHaveLength(2);
+    vi.setSystemTime(now + 65000);
+    await family.alarm();
+    expect((storage.get('ledger') as Ledger).sessions[id].nextHangupAt).toBe(now + 665000);
+    vi.setSystemTime(now + 665000);
+    await family.alarm();
+    expect((storage.get('ledger') as Ledger).sessions[id].nextHangupAt).toBe(now + 1265000);
+    failHangup = false;
+    vi.setSystemTime(now + 1265000);
+    await family.alarm();
+    expect((storage.get('ledger') as Ledger).sessions[id]).toMatchObject({ ended: true, needsHangup: false });
+    expect((storage.get('ledger') as Ledger).sessions[id]).not.toHaveProperty('nextHangupAt');
   });
   it('모든 프로필을 한 번만 종료하고 limit·busy·invalid는 잠금 밖에서 그대로 전달한다', async () => {
     await start();
@@ -510,7 +538,7 @@ describe('저장 잠금 밖의 연결과 종료', () => {
     await family.alarm();
     expect(Object.values((storage.get('ledger') as Ledger).sessions)).toHaveLength(1);
     failHangup = false;
-    vi.setSystemTime(now + 2 * 86400000 + 5000);
+    vi.setSystemTime(now + 2 * 86400000 + 60000);
     await family.alarm();
     expect(Object.values((storage.get('ledger') as Ledger).sessions)).toHaveLength(0);
     expect((storage.get('ledger') as Ledger).months['2026-10']).toBe(60);

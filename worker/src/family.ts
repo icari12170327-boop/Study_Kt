@@ -66,7 +66,9 @@ export class FamilyUsage {
     const deadlines = Object.values(ledger.sessions)
       .filter((s) => !s.ended || s.needsHangup)
       .map((s) =>
-        s.needsHangup || this.closing.has(s.id)
+        s.needsHangup
+          ? Math.max(Date.now() + 1000, s.nextHangupAt ?? Date.now() + 5000)
+          : this.closing.has(s.id)
           ? Date.now() + 5000
           : Math.max(Date.now() + 1000, s.start + s.remaining * 1000),
       );
@@ -109,7 +111,21 @@ export class FamilyUsage {
       if (!snapshot) throw new ProxyError('invalid', 400);
       if (snapshot.ended && !snapshot.needsHangup) return snapshot.charged ?? 0;
       // OpenAI를 기다리는 동안 다른 프로필·사용량 조회·알람의 저장 잠금을 막지 않는다.
-      if (snapshot.callId) await hangup(this.env, snapshot.callId);
+      if (snapshot.callId) {
+        try {
+          await hangup(this.env, snapshot.callId);
+        } catch (error) {
+          await this.update((ledger) => {
+            const current = ledger.sessions[id];
+            if (!current?.ended || !current.needsHangup) return;
+            current.hangupFailures = (current.hangupFailures ?? 0) + 1;
+            // 계속 실패할 때 호출 비용을 줄이도록 5초 → 1분 → 최대 10분으로 늦춘다.
+            const delay = current.hangupFailures === 1 ? 5000 : current.hangupFailures === 2 ? 60000 : 600000;
+            current.nextHangupAt = Date.now() + delay;
+          });
+          throw error;
+        }
+      }
       const charged = await this.update((ledger) => {
         const current = ledger.sessions[id];
         if (!current) throw new ProxyError('invalid', 400);
@@ -117,6 +133,8 @@ export class FamilyUsage {
         if (current.callId !== snapshot.callId) return;
         chargeSession(ledger, current, Date.now());
         current.needsHangup = false;
+        delete current.hangupFailures;
+        delete current.nextHangupAt;
         return current.charged ?? 0;
       });
       if (charged !== undefined) return charged;
@@ -138,7 +156,7 @@ export class FamilyUsage {
       Object.values(ledger.sessions)
         .filter(
           (session) =>
-            session.needsHangup || (!session.ended && Date.now() >= session.start + session.remaining * 1000),
+            (session.needsHangup && Date.now() >= (session.nextHangupAt ?? 0)) || (!session.ended && Date.now() >= session.start + session.remaining * 1000),
         )
         .map((session) => session.id),
     );
@@ -165,7 +183,7 @@ export class FamilyUsage {
       try {
         await this.closeSession(id);
       } catch {
-        // needsHangup과 5초 재시도 알람은 이미 저장돼 있다.
+        // needsHangup과 점진적 대기 알람은 이미 저장돼 있다.
       }
     }));
     return Response.json({ ok: true, closed: closed.length, chargedSeconds: closed.reduce((sum, s) => sum + s.seconds, 0) });

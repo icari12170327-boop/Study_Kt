@@ -37,6 +37,8 @@ OpenAI Platform에서 가족 전용 프로젝트를 만들고 **Settings → Pro
 - `GET /api/usage`: 오늘 3개 프로필 시간·생성 횟수와 이번 달 시간·추정 원화 비용. 진행 중인 경과 시간도 표시합니다.
 - `GET /api/realtime/active`: 인증된 보호자가 진행 중인 세션의 프로필·세션 ID·시작 시각·경과/남은 초를 조회합니다. OpenAI 통화 ID는 공개하지 않습니다.
 - `POST /api/realtime/end-active`: `{profileId:'kid1'|'kid2'|'parent'|'all'}`. 보호자 **AI 연결 → 진행 중인 대화**에서 확인 후 강제 종료합니다. 서버 경과 시간을 한 번만 기록하고 예약을 해제합니다. hangup 실패는 `needsHangup`과 알람으로 재시도하며 새 대화의 `busy`를 막지 않습니다. 실제 외부 통화가 끊기는 데 지연이 생길 수 있으므로 사용량도 확인합니다.
+
+강제 종료 후 hangup 재시도가 계속 실패하면 저장된 실패 횟수에 따라 **5초 → 1분 → 10분**으로 대기를 늘립니다. 이후에는 10분 간격으로 재시도하며, 객체 재시작이나 사용량 조회가 대기를 초기화하지 않습니다. 성공하면 재시도 정보를 지웁니다. 외부 통화 정리 기록은 성공할 때까지 보존합니다.
 - `POST /api/generate`: `{ profileId, level, kind, input }`. 결과 `{ ok:true,data }` 또는 `{ ok:false,error }`.
 
 다음은 T03/T04가 필드 이름을 확정하지 않은 부분을 구체화한 입력 계약입니다. 후속 작업은 이 형식에 맞춥니다. 입력·출력 모두 Zod로 검증하고 출력 Zod에서 만든 같은 JSON Schema를 OpenAI strict 구조화 출력에도 사용합니다.
