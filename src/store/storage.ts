@@ -1,3 +1,4 @@
+import { normalizeBingoData, normalizeBingoSettings } from '../content/math/bingo';
 import { normalizeScience, normalizeScienceDay } from '../content/science/session';
 import type { AppState } from '../types';
 import type { AiConfig } from '../../shared/ai';
@@ -25,6 +26,7 @@ export function normalizeState(raw: unknown): AppState {
       if (science.target === 1) science.target = 5;
     }
     settings[p.id].scienceV2 = true;
+    settings[p.id].bingo = normalizeBingoSettings(s.settings?.[p.id]?.bingo, p.level);
     const talk = normalizeTalkSettings(settings[p.id].talk, p.level, p.id);
     settings[p.id].talk = talk;
     const mission = settings[p.id].missions.find((m) => m.type === 'talk');
@@ -33,6 +35,7 @@ export function normalizeState(raw: unknown): AppState {
       talk.dailyMinutes = mission.target;
     } else settings[p.id].missions = [...settings[p.id].missions, { type: 'talk', enabled: p.level !== 'adult', target: talk.dailyMinutes }];
     data[p.id] = { ...base.data[p.id], ...s.data?.[p.id] };
+    data[p.id].bingo = normalizeBingoData(s.data?.[p.id]?.bingo);
     data[p.id].science = normalizeScience(s.data?.[p.id]?.science);
     data[p.id].talks = normalizeTalkLogs(s.data?.[p.id]?.talks);
     data[p.id].friendMemory = typeof s.data?.[p.id]?.friendMemory === 'string' ? s.data[p.id].friendMemory.slice(0, 1500) : '';

@@ -1,3 +1,4 @@
+import { normalizeBingoSettings, type ProductMix } from '../content/math/bingo';
 import { useRef, useState } from 'react';
 import { useStore } from '../store/StoreContext';
 import type { Level, MissionType, ProfileId } from '../types';
@@ -165,6 +166,7 @@ function Settings() {
   const [pid, setPid] = useState<ProfileId>('kid1');
   const profile = state.profiles.find((p) => p.id === pid)!;
   const settings = state.settings[pid];
+  const bingo = normalizeBingoSettings(settings.bingo, profile.level);
 
   const setMission = (type: MissionType, patch: { enabled?: boolean; target?: number }) =>
     update((d) => {
@@ -247,6 +249,33 @@ function Settings() {
           </div>
         ))}
       </div>
+
+      {profile.level !== 'adult' && <div className="panel">
+        <label className="check">
+          <input type="checkbox" checked={bingo.enabled} onChange={(event) => update((draft) => {
+            draft.settings[pid].bingo = { ...bingo, enabled: event.target.checked };
+          })} />
+          🎯 수학 빙고: 켜기/끄기
+        </label>
+        <div className="form-grid">
+          <label>빙고 제한 시간
+            <select value={bingo.limitSec} onChange={(event) => update((draft) => {
+              draft.settings[pid].bingo = { ...bingo, limitSec: Number(event.target.value) };
+            })}>
+              {Array.from({ length: 9 }, (_, i) => 60 + i * 30).map(sec => <option key={sec} value={sec}>{Math.floor(sec / 60)}분{sec % 60 ? ' 30초' : ''}</option>)}
+            </select>
+          </label>
+          {profile.level === 'g5' && <label>곱셈 문제 양
+            <select value={bingo.productMix} onChange={(event) => update((draft) => {
+              draft.settings[pid].bingo = { ...bingo, productMix: event.target.value as ProductMix };
+            })}>
+              <option value="off">끄기 · 0개</option><option value="few">적게 · 1개</option>
+              <option value="normal">보통 · 2~3개</option><option value="many">많이 · 4개</option>
+            </select>
+          </label>}
+        </div>
+        <p className="small muted">다음 게임부터 적용해요. 별과 쿠폰 없이 자유롭게 놀아요.</p>
+      </div>}
 
       <div className="panel">
         <label>
