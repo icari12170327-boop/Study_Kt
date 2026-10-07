@@ -1,4 +1,4 @@
-import type { Level } from '../../types';
+import type { Level, ProfileData } from '../../types';
 
 export interface VocabCard {
   id: string;
@@ -141,3 +141,7 @@ export const VOCAB_DECKS: VocabDeck[] = [
 export const VOCAB_DECK_MAP: Record<string, VocabDeck> = Object.fromEntries(VOCAB_DECKS.map((d) => [d.id, d]));
 
 export const vocabKey = (deckId: string, cardId: string) => `vocab:${deckId}:${cardId}`;
+
+export function getVocabCards(deckId: string, data: Pick<ProfileData, 'customCards'> = {}): VocabCard[] {
+  return deckId === 'my-phrases' ? (data.customCards ?? []).map(card => ({ id: card.id, en: card.en, ko: card.ko, emoji: '⭐' })) : VOCAB_DECK_MAP[deckId]?.cards ?? [];
+}

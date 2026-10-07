@@ -44,6 +44,7 @@ export interface MissionConfig {
 }
 
 export interface ProfileSettings {
+  bizTalkEnabledOnce?: true;
   bingo?: { enabled: boolean; productMix: 'off' | 'few' | 'normal' | 'many'; limitSec: number };
   /** 배포된 실험 미션의 단위를 한 번만 문제로 바꾼 표시. */
   scienceV2?: true;
@@ -80,7 +81,16 @@ export interface TalkLog {
   englishRatio: number;
   summary?: TalkSummary;
   flagged?: boolean;
+  scenarioId?: string;
+  situation?: string;
+  feedback?: BizFeedback;
 }
+export interface BizFeedback {
+  overallKo: string;
+  corrections: { said: string; better: string; why: string }[];
+  nextExpressions: { en: string; ko: string }[];
+}
+export interface CustomCard { id: string; en: string; ko: string; source: string; createdAt: string }
 
 export type Answer =
   | { kind: 'int'; value: number }
@@ -176,6 +186,8 @@ export interface BingoRecord {
 }
 
 export interface ProfileData {
+  customCards?: CustomCard[];
+  bizSituations?: string[];
   bingo?: { recent: BingoRecord[]; best: Record<string, BingoRecord> };
   science: ScienceData;
   talks: TalkLog[];

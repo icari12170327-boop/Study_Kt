@@ -1,3 +1,4 @@
+import { BUSINESS_SCENARIOS, isBizFeedback } from './business';
 import type { AppState, Level, ProfileData, ProfileId, ProfileSettings, TalkLine, TalkLog, TalkSettings, TalkSummary } from '../types';
 import { normalizeAiConfig, type AiConfig, type SessionRequest } from './ai';
 import { seededRng } from './random';
@@ -16,7 +17,7 @@ export function defaultTalkSettings(level: Level, id?: ProfileId): TalkSettings 
     friendName: level === 'adult' ? 'Alex' : first ? 'Max' : 'Lily',
     personaId: first ? 'funny' : 'cheerful',
     voice: first ? 'marin' : 'coral',
-    dailyMinutes: level === 'adult' ? 30 : level === 'g5' ? 20 : 15,
+    dailyMinutes: level === 'adult' ? 15 : level === 'g5' ? 20 : 15,
     interests: first ? ['Roblox', 'building games', 'science experiments'] : ['Animal Crossing', 'animals', 'fishing and bug catching', 'decorating my island'],
     friendHobbies: first ? 'loves Roblox obbies and building tycoon games, always trying to beat a hard level' : 'loves Animal Crossing, decorating an island, catching bugs and fish, and taking care of animals',
     subtitleHidePercent: 0,
@@ -118,6 +119,9 @@ export function normalizeTalkLogs(raw: unknown): TalkLog[] {
     englishRatio: Math.max(0, Math.min(1, Number.isFinite(log.englishRatio) ? log.englishRatio : englishRatio(lines))),
     ...(isTalkSummary(log.summary) ? { summary: structuredClone(log.summary) } : {}),
     ...(typeof log.flagged === 'boolean' ? { flagged: log.flagged } : {}),
+    ...(BUSINESS_SCENARIOS.some(row => row.id === log.scenarioId) ? { scenarioId: log.scenarioId } : {}),
+    ...(log.scenarioId === 'biz-custom' && typeof log.situation === 'string' && log.situation.trim() && log.situation.length <= 300 ? { situation: log.situation.trim() } : {}),
+    ...(isBizFeedback(log.feedback) ? { feedback: structuredClone(log.feedback) } : {}),
   }; });
 }
 /** 정규화된 v1을 깊은 복사해 미션만 전환한다. 기존 학습 기록은 수정하지 않는다. */

@@ -1,3 +1,4 @@
+import { enableBusinessTalkOnce, normalizeBizSituations, normalizeCustomCards } from '../lib/business';
 import { normalizeBingoData, normalizeBingoSettings } from '../content/math/bingo';
 import { normalizeScience, normalizeScienceDay } from '../content/science/session';
 import type { AppState } from '../types';
@@ -35,6 +36,8 @@ export function normalizeState(raw: unknown): AppState {
       talk.dailyMinutes = mission.target;
     } else settings[p.id].missions = [...settings[p.id].missions, { type: 'talk', enabled: p.level !== 'adult', target: talk.dailyMinutes }];
     data[p.id] = { ...base.data[p.id], ...s.data?.[p.id] };
+    data[p.id].customCards = normalizeCustomCards(s.data?.[p.id]?.customCards);
+    data[p.id].bizSituations = normalizeBizSituations(s.data?.[p.id]?.bizSituations);
     data[p.id].bingo = normalizeBingoData(s.data?.[p.id]?.bingo);
     data[p.id].science = normalizeScience(s.data?.[p.id]?.science);
     data[p.id].talks = normalizeTalkLogs(s.data?.[p.id]?.talks);
@@ -57,7 +60,9 @@ export function normalizeState(raw: unknown): AppState {
     ...(typeof s.ai?.token === 'string' ? { token: s.ai.token } : {}),
   };
   const state = { ai, parentPin: s.parentPin, profiles, settings, data };
-  return s.version === 1 ? migrateV1toV2({ ...state, version: 1 }) : { ...state, version: 2 };
+  const normalized: AppState = s.version === 1 ? migrateV1toV2({ ...state, version: 1 }) : { ...state, version: 2 };
+  enableBusinessTalkOnce(normalized.settings.parent, s.settings?.parent?.bizTalkEnabledOnce === true);
+  return normalized;
 }
 
 export function loadState(): AppState {
