@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import type { Answer } from '../types';
 import type { AnswerInput } from '../content/math/grading';
 import { applyNumberKey, mapKeyToAction } from '../lib/numberPad';
@@ -9,6 +9,7 @@ interface Props {
   onChange: (value: AnswerInput) => void;
   onSubmit: () => void;
   onNext: () => void;
+  nextButtonRef: RefObject<HTMLButtonElement | null>;
   onActivity: () => void;
   disabled?: boolean;
 }
@@ -28,8 +29,9 @@ const FIELDS: Record<Answer['kind'], Field[]> = {
   ],
 };
 
-export function NumberPad({ kind, value, onChange, onSubmit, onNext, onActivity, disabled }: Props) {
+export function NumberPad({ kind, value, onChange, onSubmit, onNext, nextButtonRef, onActivity, disabled }: Props) {
   const [active, setActive] = useState(0);
+  const root = useRef<HTMLDivElement>(null);
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
   const fields = FIELDS[kind];
   const press = useCallback((key: string) => {
@@ -55,6 +57,9 @@ export function NumberPad({ kind, value, onChange, onSubmit, onNext, onActivity,
       for (const element of [target, document.activeElement]) {
         const editable = element?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]');
         if (editable && !inputs.current.some((input) => input === editable)) return;
+        // 다른 버튼·링크의 Enter는 기본 활성화에 맡긴다. 숫자·삭제 키는 계속 받을 수 있다.
+        const control = element?.closest('button, a[href], [role="button"], [role="link"]');
+        if (event.key === 'Enter' && control && !root.current?.contains(control) && control !== nextButtonRef.current) return;
       }
       const action = mapKeyToAction(event.key, { kind, phase: disabled ? 'feedback' : 'answering', shiftKey: event.shiftKey });
       if (!action) return;
@@ -68,10 +73,10 @@ export function NumberPad({ kind, value, onChange, onSubmit, onNext, onActivity,
     };
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
-  }, [kind, disabled, press, moveField, onSubmit, onNext]);
+  }, [kind, disabled, press, moveField, onSubmit, onNext, nextButtonRef]);
 
   return (
-    <div className="number-answer">
+    <div className="number-answer" ref={root}>
       <div className={`answer-row ${kind === 'fraction' ? 'fraction-row' : ''}`}>
         {fields.map((field, index) => (
           <label key={field.key} className="pad-field">
