@@ -22,19 +22,11 @@ export interface ScienceCard {
   safety?: string;
   adultNeeded: boolean;
 }
-export interface ScienceRecord {
-  date: string;
-  predicted: string;
-  observed: string;
-  thinkAnswer?: string;
-  together?: boolean;
-}
 export interface ScienceData {
-  done: Record<string, ScienceRecord>;
+  collected: Record<string, string>;
+  experiments: Record<string, { date: string; predicted?: string; observed?: string }>;
   badges: string[];
-  /** 도감은 남기고, 이번 순환에서 한 카드만 별도로 추적한다. */
-  cycleDone: string[];
-  today?: { date: string; cardId: string };
+  recentWrong: { id: string; chosen: number; date: string }[];
 }
 
 export interface Profile {
@@ -52,6 +44,8 @@ export interface MissionConfig {
 }
 
 export interface ProfileSettings {
+  /** 배포된 실험 미션의 단위를 한 번만 문제로 바꾼 표시. */
+  scienceV2?: true;
   talk?: TalkSettings;
   missions: MissionConfig[];
   mathSkills: string[];
@@ -106,6 +100,8 @@ export interface SkillStat {
 }
 
 export interface DayLog {
+  /** 과학만의 정답률과 오늘 푼 단원. 기존 전체 정답 통계와 별도로 둔다. */
+  science?: { correct: number; total: number; units: string[] };
   date: string;
   /** 짧은 대화의 남은 초도 다음 대화와 합쳐 분 단위 진행으로 바꾼다. */
   talkSeconds?: number;

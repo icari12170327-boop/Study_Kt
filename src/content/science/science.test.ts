@@ -1,209 +1,204 @@
 import { describe, expect, it } from 'vitest';
-import { SCIENCE_CARDS, SCIENCE_CARD_MAP } from './cards';
-import { badgeThresholds, cardsFor, chooseCard, normalizeScience, OTHER_OBSERVATIONS, pendingCards, recordScience, scienceBadges, scienceTalkTopics, togetherCard } from './session';
+import { SCIENCE_CARDS, SCIENCE_CARD_MAP } from './experiments';
+import { SCIENCE_QUESTIONS } from './questions';
+import { SCIENCE_UNITS } from './units';
+import { gradeAnswer, newBadges, normalizeScience, normalizeScienceDay, OTHER_OBSERVATIONS, pickScienceSession, questionsFor, recordExperiment, recordScienceAnswer, scienceSummary, scienceTalkTopics } from './session';
+import { scienceKeyAction } from './keyboard';
 import { defaultState } from '../../store/defaults';
 import { exportState, importState, normalizeState } from '../../store/storage';
-import { emptyDay } from '../../lib/progress';
+import { applyProgress, dayRatio, emptyDay, isDayComplete } from '../../lib/progress';
 import { addDays } from '../../lib/date';
-import { seededRng } from '../../lib/random';
 import { outfitFor } from '../../lib/outfit';
+import type { SrsCard } from '../../types';
 
-const date = '2026-10-07';
-const card = SCIENCE_CARD_MAP['science-apple'];
+const date = '2026-10-07', card = SCIENCE_CARD_MAP['science-apple'];
 const observation = { date, predicted: card.result, observed: card.result };
-const entry = (profileId: 'kid1' | 'kid2', predicted = card.result, observed = card.result) => ({ profileId, predicted, observed, thinkAnswer: '물보다 전체 밀도가 작아서요.' });
+const question = SCIENCE_QUESTIONS[0];
+const emptyScience = { collected: {}, experiments: {}, badges: [], recentWrong: [] };
 
-describe('보호자 확인 필요: 콘텐츠 검증', () => {
-  it('함께 20·초3 10·초5 10장이고 고유 id를 쓴다', () => {
-    expect(SCIENCE_CARDS).toHaveLength(40);
-    expect(new Set(SCIENCE_CARDS.map(c => c.id)).size).toBe(40);
-    expect(SCIENCE_CARDS.filter(c => c.audience === 'both')).toHaveLength(20);
-    expect(SCIENCE_CARDS.filter(c => c.audience === 'g3')).toHaveLength(10);
-    expect(SCIENCE_CARDS.filter(c => c.audience === 'g5')).toHaveLength(10);
+describe('보호자 확인 필요: 문제 100개', () => {
+  it('공통 20·초3 40·초5 40문제이고 고유 id, 단원, 모든 실험 연결이 유효하다', () => {
+    expect(SCIENCE_QUESTIONS).toHaveLength(100);
+    expect(new Set(SCIENCE_QUESTIONS.map(q => q.id)).size).toBe(100);
+    for (const [audience, count] of [['both', 20], ['g3', 40], ['g5', 40]] as const) expect(SCIENCE_QUESTIONS.filter(q => q.audience === audience)).toHaveLength(count);
+    const linked = new Set(SCIENCE_QUESTIONS.map(q => q.experimentId).filter(Boolean));
+    expect(linked.size).toBe(40);
+    expect([...linked].sort()).toEqual(SCIENCE_CARDS.map(c => c.id).sort());
+    for (const q of SCIENCE_QUESTIONS) {
+      expect(SCIENCE_UNITS[q.unit]).toBeDefined();
+      if (q.experimentId) expect([q.audience, 'both']).toContain(SCIENCE_CARD_MAP[q.experimentId].audience);
+    }
   });
-  for (const c of SCIENCE_CARDS) it(`${c.id}: 형식·보기·안전 문구·학년별 깊이`, () => {
-    expect(c.predictions.length).toBeGreaterThanOrEqual(2);
-    expect(c.predictions.length).toBeLessThanOrEqual(4);
-    expect(new Set(c.predictions).size).toBe(c.predictions.length);
-    expect(c.predictions).toContain(c.result);
-    expect(c.steps.length).toBeGreaterThanOrEqual(3);
-    expect(c.steps.length).toBeLessThanOrEqual(6);
-    expect(c.materials.length).toBeGreaterThan(0);
-    expect(c.title && c.question && c.explain && c.safety).toBeTruthy();
-    expect(c.adultNeeded).toBe(true);
-    if (c.audience !== 'g3') expect(c.deeper?.think && c.deeper.vary && c.deeper.explain).toBeTruthy();
-    // 단독 '불'은 '불다'와 구분하고, 위험한 재료·행위는 주의 문구에도 넣지 않는다.
-    const text = JSON.stringify(c);
-    expect(text).not.toMatch(/끓는|가열|칼|콘센트|표백제|세제|불꽃|촛불|성냥|라이터|(?:^|[\s"·])불(?:[\s".,]|을|로|에)/u);
-    if (/따뜻한|미지근한/.test(text)) expect(c.safety).toMatch(/보호자.*(?:온도|물)/);
-    if (/동전|자석|클립/.test(c.materials.join(' '))) expect(c.safety).toMatch(/입에 넣지/);
+  for (const q of SCIENCE_QUESTIONS) it(`${q.id}: 보기·채점·짧은 질문·해설`, () => {
+    expect(q.question && q.emoji && q.card).toBeTruthy();
+    expect(q.choices.length).toBeGreaterThanOrEqual(q.kind === 'ox' ? 2 : 3);
+    expect(q.choices.length).toBeLessThanOrEqual(4);
+    expect(new Set(q.choices).size).toBe(q.choices.length);
+    expect(Number.isInteger(q.answer)).toBe(true);
+    expect(q.answer).toBeGreaterThanOrEqual(0);
+    expect(q.answer).toBeLessThan(q.choices.length);
+    if (q.kind === 'ox') expect(q.choices).toEqual(['O', 'X']);
+    if (q.audience !== 'g5') expect(q.question.split(/[.!?]/u).filter(s => s.trim()).length).toBeLessThanOrEqual(2);
+    expect(q.explain.split(/[.!?]/u).filter(s => s.trim()).length).toBeGreaterThanOrEqual(2);
+    expect(q.explain.split(/[.!?]/u).filter(s => s.trim()).length).toBeLessThanOrEqual(3);
+    expect(JSON.stringify(q)).not.toMatch(/로블록스|동물의 숲|포켓몬|마인크래프트/);
+    for (let i = 0; i < q.choices.length; i++) expect(gradeAnswer(q, i)).toBe(i === q.answer);
+  });
+  it('학년별 2학기가 절반 이상이고 객관식 정답 위치가 고르게 배치돼 있다', () => {
+    for (const audience of ['g3', 'g5'] as const) {
+      const own = SCIENCE_QUESTIONS.filter(q => q.audience === audience);
+      expect(own.filter(q => SCIENCE_UNITS[q.unit].semester === 2).length).toBeGreaterThanOrEqual(20);
+    }
+    for (const audience of ['both', 'g3', 'g5'] as const) {
+      const own = SCIENCE_QUESTIONS.filter(q => q.audience === audience && q.kind === 'choice');
+      const counts = [0, 1, 2, 3].map(n => own.filter(q => q.answer === n).length);
+      expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(1);
+      const ox = SCIENCE_QUESTIONS.filter(q => q.audience === audience && q.kind === 'ox');
+      expect(Math.abs(ox.filter(q => q.answer === 0).length - ox.filter(q => q.answer === 1).length)).toBeLessThanOrEqual(1);
+    }
   });
 });
 
-describe('날짜·학년·함께 카드 선택', () => {
-  it('초3·초5는 30장, 보호자는 0장이고 다른 학년 카드는 제외한다', () => {
-    expect(cardsFor('g3')).toHaveLength(30);
-    expect(cardsFor('g5')).toHaveLength(30);
-    expect(cardsFor('adult')).toEqual([]);
-    expect(cardsFor('g3').some(c => c.audience === 'g5')).toBe(false);
-    expect(cardsFor('g5').some(c => c.audience === 'g3')).toBe(false);
-  });
-  it('시드·날짜가 같으면 같고 연속 날짜에는 다르다', () => {
-    const data = defaultState().data.kid2.science;
-    for (let i = 0; i < 30; i++) {
-      const day = addDays(date, i);
-      expect(chooseCard('g3', data, day, seededRng(808))).toEqual(chooseCard('g3', data, day, seededRng(808)));
-      expect(chooseCard('g3', data, day)?.id).not.toBe(chooseCard('g3', data, addDays(day, 1))?.id);
-    }
-  });
-  it('30장 완료 전 중복이 없고 다음 순환에서도 도감·배지는 유지한다', () => {
-    const state = defaultState(), seen = new Set<string>();
-    for (let i = 0; i < 30; i++) {
-      const day = addDays(date, i), next = chooseCard('g3', state.data.kid2.science, day)!;
-      expect(seen.has(next.id)).toBe(false);
-      seen.add(next.id);
-      expect(recordScience(state, next.id, day, [{ profileId: 'kid2', predicted: next.result, observed: next.result }])).toBe(true);
-    }
-    expect(seen.size).toBe(30);
-    const badges = [...state.data.kid2.science.badges], repeatDate = addDays(date, 30);
-    const repeat = chooseCard('g3', state.data.kid2.science, repeatDate)!;
-    expect(seen.has(repeat.id)).toBe(true);
-    recordScience(state, repeat.id, repeatDate, [{ profileId: 'kid2', predicted: repeat.result, observed: repeat.result }]);
-    expect(state.data.kid2.science.cycleDone).toEqual([repeat.id]);
-    expect(Object.keys(state.data.kid2.science.done)).toHaveLength(30);
-    expect(state.data.kid2.science.badges).toEqual(badges);
-  });
-  it('당일 보호자 선택은 새로고침 후 유지하고 완료 카드는 다음 날짜의 풀에서 빠진다', () => {
-    const state = defaultState();
-    state.data.kid2.science.today = { date, cardId: card.id };
-    expect(chooseCard('g3', normalizeState(state).data.kid2.science, date)?.id).toBe(card.id);
-    state.data.kid2.science.cycleDone = [card.id];
-    expect(chooseCard('g3', state.data.kid2.science, addDays(date, 1))?.id).not.toBe(card.id);
-    expect(pendingCards('g3', state.data.kid2.science).some(c => c.id === card.id)).toBe(false);
-  });
-  it('두 아이 모두 미완료인 함께용만 고르고 공통 카드가 없으면 반복하지 않는다', () => {
-    const state = defaultState(), next = togetherCard(state, date)!;
-    expect(next.audience).toBe('both');
-    state.data.kid1.science.cycleDone.push(next.id);
-    expect(togetherCard(state, date)?.id).not.toBe(next.id);
-    state.data.kid1.science.cycleDone = SCIENCE_CARDS.filter(c => c.audience === 'both').map(c => c.id);
-    expect(togetherCard(state, date)).toBeUndefined();
-    state.profiles.find(p => p.id === 'kid2')!.level = 'adult';
-    expect(togetherCard(state, date)).toBeUndefined();
-  });
-});
-
-describe('실험 기록·별·배지', () => {
-  it('두 도감에 각자 예상·관찰·생각을 저장하고 별·쿠폰은 한 번만 준다', () => {
-    const state = defaultState();
-    for (const id of ['kid1', 'kid2'] as const) state.settings[id].missions = [{ type: 'science', target: 1, enabled: true }];
-    const wrong = card.predictions.find(p => p !== card.result)!;
-    expect(recordScience(state, card.id, date, [entry('kid1'), entry('kid2', wrong)], true)).toBe(true);
-    expect(state.data.kid1.science.done[card.id]).toMatchObject({ ...observation, together: true, thinkAnswer: entry('kid1').thinkAnswer });
-    expect(state.data.kid2.science.done[card.id].predicted).toBe(wrong);
-    expect(state.data.kid1.stars).toBe(2);
-    expect(state.data.kid2.stars).toBe(1);
-    for (const id of ['kid1', 'kid2'] as const) {
-      expect(state.data[id].days[date]).toMatchObject({ progress: { science: 1 }, correct: 0, total: 0, completed: true });
-      expect(state.data[id].coupons).toHaveLength(1);
-      expect(state.data[id].streak).toBe(1);
-    }
-    const before = structuredClone(state);
-    expect(recordScience(state, card.id, date, [entry('kid1'), entry('kid2')], true)).toBe(false);
-    expect(state).toEqual(before);
-  });
-  it('교과 예상 결과와 달라도 실제 관찰이 예상과 같으면 보너스를 준다', () => {
-    const state = defaultState(), other = card.predictions.find(p => p !== card.result)!;
-    recordScience(state, card.id, date, [entry('kid2', other, other)]);
-    expect(state.data.kid2.stars).toBe(2);
-    expect(state.data.kid2.science.done[card.id].observed).toBe(other);
-  });
-  it('관찰이 어려워도 참여를 기록하고 이미 기록한 형제의 답·별은 바꾸지 않는다', () => {
-    const state = defaultState();
-    recordScience(state, card.id, date, [entry('kid1')]);
-    const first = structuredClone(state.data.kid1);
-    expect(recordScience(state, card.id, date, [entry('kid1'), entry('kid2', card.result, OTHER_OBSERVATIONS[1])], true)).toBe(true);
-    expect(state.data.kid1).toEqual(first);
-    expect(state.data.kid2.stars).toBe(1);
-  });
-  it('생각 답·참여자·보기·학년을 검증하고 잘못된 요청은 아무것도 변경하지 않는다', () => {
-    const state = defaultState(), before = structuredClone(state);
-    expect(recordScience(state, card.id, date, [{ ...entry('kid1'), thinkAnswer: ' ' }, entry('kid2')], true)).toBe(false);
-    expect(recordScience(state, card.id, date, [entry('kid2'), entry('kid2')], true)).toBe(false);
-    expect(recordScience(state, card.id, date, [entry('kid2')], true)).toBe(false);
-    expect(recordScience(state, card.id, date, [entry('kid1'), entry('kid2')])).toBe(false);
-    expect(recordScience(state, card.id, date, [entry('kid2', '없는 보기')])).toBe(false);
-    expect(recordScience(state, '없는 카드', date, [entry('kid2')])).toBe(false);
-    const g5 = SCIENCE_CARDS.find(c => c.audience === 'g5')!;
-    expect(recordScience(state, g5.id, date, [{ profileId: 'kid2', predicted: g5.result, observed: g5.result }])).toBe(false);
-    expect(state).toEqual(before);
-  });
-  it('3·6·10장 주제별 배지를 계산하고 반복은 고유 카드 수를 늘리지 않는다', () => {
-    expect(badgeThresholds(2)).toEqual([]);
-    expect(badgeThresholds(3)).toEqual([3]);
-    expect(badgeThresholds(6)).toEqual([3, 6]);
-    expect(badgeThresholds(10)).toEqual([3, 6, 10]);
-    const cards = SCIENCE_CARDS.filter(c => c.topic === 'mixing');
-    const done = Object.fromEntries(cards.slice(0, 6).map(c => [c.id, observation]));
-    expect(scienceBadges(done)).toEqual(['mixing:3', 'mixing:6']);
-    done[cards[0].id] = { ...observation, date: addDays(date, 1) };
-    expect(scienceBadges(done)).toEqual(['mixing:3', 'mixing:6']);
-  });
-  it('현재 학년별 30장을 모두 모아도 6장·10장 배지는 아직 얻지 못한다', () => {
+describe('학년·SRS·채점·배지', () => {
+  it('학년별 공통 포함 60문제이고 다른 학년이 섞이지 않는다', () => {
     for (const level of ['g3', 'g5'] as const) {
-      const eligible = cardsFor(level);
-      const done = Object.fromEntries(eligible.map(c => [c.id, observation]));
-      const badges = scienceBadges(done);
-      expect(badges.length).toBeGreaterThan(0);
-      expect(badges.every(id => id.endsWith(':3'))).toBe(true);
-      expect(eligible.filter(c => c.topic === 'mixing')).toHaveLength(level === 'g3' ? 5 : 4);
+      expect(questionsFor(level)).toHaveLength(60);
+      expect(questionsFor(level).every(q => q.audience === 'both' || q.audience === level)).toBe(true);
+      expect(pickScienceSession(level, {}, date, 5)).toHaveLength(5);
+    }
+  });
+  it('복습이 새 문제보다 먼저 나오고 단어 SRS와 과학 SRS는 겹치지 않는다', () => {
+    const fresh = questionsFor('g3'), due = fresh[20], future = fresh[0];
+    const srs = { [`sci:${due.id}`]: { box: 1, due: addDays(date, -1), seen: 2, lapses: 1 },
+      [`sci:${future.id}`]: { box: 2, due: addDays(date, 1), seen: 1, lapses: 0 },
+      [fresh[1].id]: { box: 5, due: addDays(date, 30), seen: 10, lapses: 0 } };
+    const session = pickScienceSession('g3', srs, date, 5);
+    expect(session[0].id).toBe(due.id);
+    expect(session.some(q => q.id === future.id)).toBe(false);
+    expect(session.some(q => q.id === fresh[1].id)).toBe(true);
+    expect(new Set(session.map(q => q.id)).size).toBe(5);
+  });
+  it('오답은 다음 날, 연속 정답은 3·7·14·30일 간격으로 복습한다', () => {
+    const state = defaultState(), data = state.data.kid2, wrong = (question.answer + 1) % question.choices.length;
+    recordScienceAnswer(state, 'kid2', question.id, wrong, date);
+    expect(data.srs[`sci:${question.id}`]).toMatchObject({ box: 1, due: addDays(date, 1), lapses: 1 });
+    expect(pickScienceSession('g3', data.srs, date, 60).some(q => q.id === question.id)).toBe(false);
+    expect(pickScienceSession('g3', data.srs, addDays(date, 1), 5)[0]).toBe(question);
+    let today = addDays(date, 1);
+    for (const days of [3, 7, 14, 30]) {
+      recordScienceAnswer(state, 'kid2', question.id, question.answer, today);
+      expect(data.srs[`sci:${question.id}`].due).toBe(addDays(today, days));
+      today = addDays(today, days);
+    }
+    expect(data.srs[`sci:${question.id}`].box).toBe(5);
+  });
+  it('모두 복습일 전이면 당일 오답을 연습으로 다시 내지 않는다', () => {
+    const srs: Record<string, SrsCard> = Object.fromEntries(questionsFor('g3').map(q => [`sci:${q.id}`, { box: 1, seen: 1, lapses: 1, due: addDays(date, 1) }]));
+    expect(pickScienceSession('g3', srs, date, 5)).toEqual([]);
+  });
+  it('잘못된 답·학년·보호자 요청은 기록을 바꾸지 않는다', () => {
+    const state = defaultState(), before = structuredClone(state);
+    for (const chosen of [-1, 0.5, Infinity, NaN, question.choices.length]) {
+      expect(gradeAnswer(question, chosen)).toBe(false);
+      expect(recordScienceAnswer(state, 'kid2', question.id, chosen, date)).toBe(false);
+    }
+    expect(recordScienceAnswer(state, 'parent', question.id, 0, date)).toBe(false);
+    expect(recordScienceAnswer(state, 'kid2', SCIENCE_QUESTIONS.find(q => q.audience === 'g5')!.id, 0, date)).toBe(false);
+    expect(recordScienceAnswer(state, 'kid2', 'toString', 0, date)).toBe(false);
+    expect(state).toEqual(before);
+  });
+  it('5문제 참여로 미션 완료, 정답만 별·도감에 반영하고 첫 날짜를 보존한다', () => {
+    const state = defaultState();
+    state.settings.kid2.missions = [{ type: 'science', enabled: true, target: 5 }];
+    const qs = pickScienceSession('g3', {}, date, 5);
+    for (let i = 0; i < 5; i++) {
+      recordScienceAnswer(state, 'kid2', qs[i].id, i === 0 ? (qs[i].answer + 1) % qs[i].choices.length : qs[i].answer, date);
+      expect(state.data.kid2.days[date].completed).toBe(i === 4);
+    }
+    const data = state.data.kid2;
+    expect(data.days[date]).toMatchObject({ progress: { science: 5 }, science: { correct: 4, total: 5 }, correct: 4, total: 5, completed: true });
+    expect(data.stars).toBe(4); expect(data.coupons).toHaveLength(1); expect(data.streak).toBe(1);
+    expect(Object.keys(data.science.collected)).toHaveLength(4);
+    expect(data.science.recentWrong[0]).toMatchObject({ id: qs[0].id, date });
+    recordScienceAnswer(state, 'kid2', qs[1].id, qs[1].answer, addDays(date, 1));
+    expect(data.science.collected[qs[1].id]).toBe(date);
+  });
+  it('오답 30개 제한, 같은 단원 5·10·전체 배지는 중복하지 않는다', () => {
+    const state = defaultState(), data = state.data.kid2;
+    for (let i = 0; i < 35; i++) recordScienceAnswer(state, 'kid2', question.id, (question.answer + 1) % question.choices.length, addDays(date, i));
+    expect(data.science.recentWrong).toHaveLength(30);
+    expect(data.science.recentWrong[0].date).toBe(addDays(date, 34));
+    const qs = SCIENCE_QUESTIONS.filter(q => q.unit === 'life');
+    const collected = Object.fromEntries(qs.slice(0, 5).map(q => [q.id, date]));
+    expect(newBadges(collected, [])).toEqual(['life:5']);
+    expect(newBadges(collected, ['life:5'])).toEqual([]);
+    for (const q of qs.slice(5, 10)) collected[q.id] = date;
+    expect(newBadges(collected, ['life:5'])).toEqual(['life:10']);
+    for (const q of qs.slice(10)) collected[q.id] = date;
+    expect(newBadges(collected, ['life:5', 'life:10'])).toEqual(['life:all']);
+  });
+  it('두 학년 모두 단원 전체 배지에 도달할 수 있고 미등록 id는 배지를 늘리지 않는다', () => {
+    for (const level of ['g3', 'g5'] as const) {
+      const qs = questionsFor(level), collected = Object.fromEntries(qs.map(q => [q.id, date]));
+      const badges = newBadges({ ...collected, future: date }, []);
+      const units = new Set(qs.map(q => q.unit));
+      expect(badges.filter(id => id.endsWith(':all')).length).toBe(units.size);
+      expect(newBadges({ future: date }, [])).toEqual([]);
     }
   });
 });
 
-describe('저장 호환·백업·AI 주제·소품', () => {
-  for (const version of [1, 2]) it(`v${version} 기존 기록·미션 목표를 보존하고 과학 기본값을 채운다`, () => {
-    const state = defaultState();
-    for (const id of ['kid1', 'kid2', 'parent'] as const) {
-      state.settings[id].missions = state.settings[id].missions.filter(m => m.type !== 'science');
-      state.settings[id].missions.find(m => m.type === 'math')!.target = 13;
-      state.data[id].stars = 41;
-      state.data[id].days[date] = { ...emptyDay(date), progress: { math: 13 }, completed: true };
-      state.data[id].coupons = [{ id: 'kept', label: '기존 쿠폰', earnedAt: date }];
-      state.data[id].notes = [{ id: 'note', title: '책', author: '작가', date, summary: '내 생각', cards: [] }];
-      state.data[id].srs = { 'kept-vocab': { box: 3, seen: 7, lapses: 2, due: date } };
-    }
-    const raw = { ...state, version, data: Object.fromEntries(Object.entries(state.data).map(([id, data]) => [id, { ...data, science: undefined }])) };
-    const before = structuredClone(raw), restored = normalizeState(raw);
-    for (const id of ['kid1', 'kid2', 'parent'] as const) {
-      for (const field of ['stars', 'days', 'coupons', 'notes', 'srs', 'math', 'talks'] as const) expect(restored.data[id][field]).toEqual(state.data[id][field]);
-      expect(restored.data[id].science).toEqual({ done: {}, badges: [], cycleDone: [] });
-      expect(restored.settings[id].missions.find(m => m.type === 'math')?.target).toBe(13);
-      expect(restored.settings[id].missions.find(m => m.type === 'science')).toEqual({ type: 'science', enabled: id !== 'parent', target: 1 });
-    }
-    expect(raw).toEqual(before);
+describe('선택 실험·현황·키보드·AI 칩', () => {
+  it('실험은 처음만 별 1개, 미션·도감·정답률·쿠폰·연속일은 그대로', () => {
+    const state = defaultState(), data = state.data.kid2;
+    data.stars = 40; data.streak = 8; data.lastCompleted = date;
+    data.days[date] = { ...emptyDay(date), progress: { science: 5, math: 20 }, completed: false };
+    const before = structuredClone(data);
+    expect(recordExperiment(state, 'kid2', card.id, date, card.result, OTHER_OBSERVATIONS[1])).toBe(true);
+    expect(data.stars).toBe(41);
+    for (const field of ['days', 'coupons', 'streak', 'lastCompleted', 'srs'] as const) expect(data[field]).toEqual(before[field]);
+    expect(data.science.collected).toEqual({});
+    const saved = structuredClone(state);
+    expect(recordExperiment(state, 'kid2', card.id, addDays(date, 1), card.result, card.result)).toBe(false);
+    expect(state).toEqual(saved);
+    expect(recordExperiment(state, 'parent', card.id, date, card.result, card.result)).toBe(false);
+    expect(recordExperiment(state, 'kid2', 'toString', date, '', '')).toBe(false);
+    expect(recordExperiment(state, 'kid2', card.id, date, '없는 보기', card.result)).toBe(false);
+    const g5 = SCIENCE_CARDS.find(c => c.audience === 'g5')!;
+    expect(recordExperiment(state, 'kid2', g5.id, date, g5.result, g5.result)).toBe(false);
   });
-  it('새 실험 기록·생각 답·당일 선택·수동 꺼짐은 백업 복원 후에도 같다', () => {
+  it('학습하지 않은 날의 실험도 학습일을 만들지 않는다', () => {
     const state = defaultState();
-    recordScience(state, card.id, date, [entry('kid1'), entry('kid2')], true);
-    state.settings.kid2.missions.find(m => m.type === 'science')!.enabled = false;
-    expect(importState(exportState(state))).toEqual(state);
-    expect(normalizeState(state).settings.kid2.missions.find(m => m.type === 'science')?.enabled).toBe(false);
+    recordExperiment(state, 'kid2', card.id, date, card.result, card.result);
+    expect(state.data.kid2.days).toEqual({});
   });
-  it('손상된 필드를 보완하고 알 수 없는 유효 도감 id는 보존한다', () => {
-    expect(normalizeScience(null)).toEqual({ done: {}, badges: [], cycleDone: [] });
-    const data = normalizeScience({ done: { future: observation, broken: null, 'science-coin': { date, predicted: 3 } }, badges: ['fake:10'], cycleDone: ['future', 'future', 3], today: { date, cardId: '없는 카드' } });
-    expect(data.done).toEqual({ future: observation });
-    expect(data.cycleDone).toEqual(['future']);
-    expect(data.badges).toEqual([]);
-    expect(data.today).toBeUndefined();
-    expect(normalizeScience({ done: { [card.id]: observation } }).cycleDone).toEqual([card.id]);
+  it('최근 7일 정답률·최근 30개에서 가장 자주 틀린 5문제와 최근 답', () => {
+    const state = defaultState(), data = state.data.kid2, qs = questionsFor('g3');
+    for (let n = 0; n < 8; n++) data.days[addDays(date, -n)] = { ...emptyDay(addDays(date, -n)), science: { correct: 2, total: 4, units: [] } };
+    data.science.recentWrong = qs.slice(0, 7).flatMap((q, n) => Array.from({ length: n + 1 }, () => ({ id: q.id, chosen: 0, date })));
+    data.science.recentWrong.unshift({ id: qs[6].id, chosen: 1, date });
+    const summary = scienceSummary(data, date);
+    expect(summary).toMatchObject({ correct: 14, total: 28 });
+    expect(summary.frequentWrong).toHaveLength(5);
+    expect(summary.frequentWrong[0]).toMatchObject({ id: qs[6].id, chosen: 1, count: 8 });
   });
-  it('오늘 기록한 제목만 데이터 칩으로 보내고 생각 답·과거 기록은 제외한다', () => {
+  it('오늘 풀어 본 단원만 중복 없이 칩에 보내고 문제나 오답은 보내지 않는다', () => {
     const state = defaultState();
-    recordScience(state, card.id, date, [entry('kid1')]);
-    expect(scienceTalkTopics(state.data.kid1.science, date)).toEqual([`오늘 실험: ${card.title}`]);
-    expect(scienceTalkTopics(state.data.kid1.science, addDays(date, 1))).toEqual([]);
+    recordScienceAnswer(state, 'kid2', question.id, 0, date);
+    recordScienceAnswer(state, 'kid2', question.id, 1, date);
+    expect(scienceTalkTopics(state.data.kid2, date)).toEqual(['오늘 과학: 생활 속 과학']);
+    expect(scienceTalkTopics(state.data.kid2, addDays(date, 1))).toEqual([]);
+  });
+  it('1~4·O/X로 선택하고 해설 뒤에만 Enter를 받는다', () => {
+    const ox = SCIENCE_QUESTIONS.find(q => q.kind === 'ox')!;
+    for (const key of ['o', 'O', '1']) expect(scienceKeyAction(key, ox, false)).toEqual({ type: 'choose', chosen: 0 });
+    for (const key of ['x', 'X', '2']) expect(scienceKeyAction(key, ox, false)).toEqual({ type: 'choose', chosen: 1 });
+    expect(scienceKeyAction('4', question, false)).toEqual({ type: 'choose', chosen: 3 });
+    for (const key of ['3', '4', 'Enter', 'ArrowLeft']) expect(scienceKeyAction(key, ox, false)).toBeUndefined();
+    expect(scienceKeyAction('Enter', ox, true)).toEqual({ type: 'next' });
+    expect(scienceKeyAction('1', ox, true)).toBeUndefined();
+    expect(scienceKeyAction('o', question, false)).toBeUndefined();
+    expect(scienceKeyAction('Enter', undefined, true)).toBeUndefined();
   });
   it('소품은 날짜·프로필에 대해 결정적이며 연속 날짜에는 달라진다', () => {
     for (const id of ['kid1', 'kid2', 'parent'] as const) {
@@ -211,5 +206,94 @@ describe('저장 호환·백업·AI 주제·소품', () => {
       expect(outfitFor(date, id)).not.toBe(outfitFor(addDays(date, 1), id));
     }
     expect(outfitFor(date, 'kid1')).not.toBe(outfitFor(date, 'kid2'));
+  });
+});
+
+describe('PR #21 데이터 이전·백업 호환', () => {
+  it('옛 실험 기록만 옮기고 생각·같이·주기·당일 선택·옛 배지는 버린다', () => {
+    const raw = { done: { [card.id]: { ...observation, thinkAnswer: '생각', together: true }, future: observation }, badges: ['mixing:3'], cycleDone: [card.id], today: { date, cardId: card.id } };
+    const before = structuredClone(raw);
+    expect(normalizeScience(raw)).toEqual({ ...emptyScience, experiments: { [card.id]: observation, future: observation } });
+    expect(raw).toEqual(before);
+  });
+  it('신·구 혼합은 새 유효 항목 우선, unknown id 보존, 손상된 항목 제외', () => {
+    const collected = Object.fromEntries(SCIENCE_QUESTIONS.filter(q => q.unit === 'life').slice(0, 5).map(q => [q.id, date]));
+    const raw = { collected: { ...collected, unknown: date, broken: 3, badDate: '2026-02-30' },
+      done: { [card.id]: observation, future: observation, broken: { date: 'no' }, missingAnswers: { date } },
+      experiments: { [card.id]: { date: addDays(date, 1) }, future: null, unknown: { date }, malformed: { date, observed: 3 } },
+      badges: ['mixing:3', 'fake:5'],
+      recentWrong: [{ id: 'future', chosen: 99, date }, { id: 'toString', chosen: 1, date }, { id: question.id, chosen: 99, date }, { id: 'bad', chosen: -1, date }, { id: 'bad', chosen: 0.5, date }, { id: 'bad', chosen: 1, date: '2026-02-30' }, null] };
+    const normalized = normalizeScience(raw);
+    expect(normalized.collected).toEqual({ ...collected, unknown: date });
+    expect(normalized.experiments).toEqual({ [card.id]: { date: addDays(date, 1) }, future: observation, unknown: { date } });
+    expect(normalized.badges).toEqual(['life:5']);
+    expect(normalized.recentWrong).toEqual([{ id: 'future', chosen: 99, date }, { id: 'toString', chosen: 1, date }]);
+    expect(normalizeScience(normalized)).toEqual(normalized);
+    expect(normalizeScience(null)).toEqual(emptyScience);
+  });
+  it('최신 오답 30개만 유지하며 날짜 순서를 바로잡고 프로토타입 키를 받지 않는다', () => {
+    const raw = JSON.parse('{"collected":{"__proto__":"2026-10-07","constructor":"2026-10-07"},"experiments":{"prototype":{"date":"2026-10-07"}}}');
+    raw.recentWrong = Array.from({ length: 40 }, (_, n) => ({ id: `future-${n}`, chosen: 0, date: addDays(date, n) }));
+    const normalized = normalizeScience(raw);
+    expect(normalized.collected).toEqual({}); expect(normalized.experiments).toEqual({});
+    expect(normalized.recentWrong).toHaveLength(30);
+    expect(normalized.recentWrong[0].id).toBe('future-39');
+    expect(normalized.recentWrong[29].id).toBe('future-10');
+  });
+  for (const version of [1, 2]) for (const enabled of [true, false]) it(`v${version}·science enabled=${enabled}: target1→5는 한 번만, 모든 보상·학습 기록 보존`, () => {
+    const base = defaultState();
+    const data = base.data.kid2;
+    data.stars = 41; data.streak = 9; data.lastCompleted = date;
+    data.days[date] = { ...emptyDay(date), progress: { science: 1, math: 20 }, completed: true };
+    data.coupons = [{ id: 'kept', label: '기존 쿠폰', earnedAt: date }];
+    data.notes = [{ id: 'note', title: '책', author: '작가', date, summary: '내 생각', cards: [] }];
+    data.srs = { 'kept-vocab': { box: 3, seen: 7, lapses: 2, due: date } };
+    base.settings.kid2.missions = [{ type: 'science', enabled, target: 1 }, { type: 'math', enabled: true, target: 20 }];
+    const raw = { ...base, version, settings: { ...base.settings, kid2: { ...base.settings.kid2, scienceV2: undefined } }, data: { ...base.data, kid2: { ...data, science: { done: { [card.id]: observation }, badges: ['states:3'], cycleDone: [card.id], today: { date, cardId: card.id } } } } };
+    const before = structuredClone(raw), restored = normalizeState(raw);
+    expect(restored.version).toBe(2);
+    expect(restored.settings.kid2.scienceV2).toBe(true);
+    expect(restored.settings.kid2.missions.find(m => m.type === 'science')).toEqual({ type: 'science', target: 5, enabled });
+    expect(restored.data.kid2.science).toEqual({ ...emptyScience, experiments: { [card.id]: observation } });
+    for (const field of ['stars', 'streak', 'lastCompleted', 'days', 'coupons', 'notes', 'srs', 'math', 'talks'] as const) expect(restored.data.kid2[field]).toEqual(data[field]);
+    expect(raw).toEqual(before);
+    expect(importState(JSON.stringify(raw))).toEqual(restored);
+    const mission = restored.settings.kid2.missions.find(m => m.type === 'science')!;
+    mission.target = 1;
+    expect(normalizeState(restored).settings.kid2.missions.find(m => m.type === 'science')).toEqual({ type: 'science', target: 1, enabled });
+  });
+  it('이전 쿠폰·연속일은 재계산하지 않고 추가 문제에도 이중 발행하지 않는다', () => {
+    const raw = defaultState();
+    raw.settings.kid2.scienceV2 = undefined;
+    raw.settings.kid2.missions = [{ type: 'science', enabled: true, target: 1 }];
+    raw.data.kid2.days[date] = { ...emptyDay(date), progress: { science: 1 }, completed: true };
+    raw.data.kid2.streak = 6; raw.data.kid2.lastCompleted = date;
+    raw.data.kid2.coupons = [{ id: 'old', label: '기존 쿠폰', earnedAt: date }];
+    const state = normalizeState(raw), data = state.data.kid2;
+    expect(isDayComplete(data.days[date], state.settings.kid2, { aiReady: false })).toBe(false);
+    expect(dayRatio(data.days[date], state.settings.kid2, { aiReady: false })).toBe(0.2);
+    for (let n = 0; n < 4; n++) applyProgress(data, state.settings.kid2, date, { type: 'science', correct: 1, total: 1 }, { aiReady: false });
+    expect(data.days[date].completed).toBe(true); expect(data.coupons).toHaveLength(1); expect(data.streak).toBe(6);
+  });
+  it('과학 미션이 없으면은 학년 기본5를 채우며 다른 목표·켜짐은 보존', () => {
+    const state = defaultState();
+    state.settings.kid2.scienceV2 = undefined;
+    state.settings.kid2.missions = [{ type: 'math', target: 13, enabled: false }];
+    expect(normalizeState(state).settings.kid2.missions).toContainEqual({ type: 'science', target: 5, enabled: true });
+    expect(normalizeState(state).settings.kid2.missions).toContainEqual({ type: 'math', target: 13, enabled: false });
+    state.settings.kid2.missions.push({ type: 'science', target: 8, enabled: false });
+    const normalized = normalizeState(state);
+    expect(normalized.settings.kid2.missions).toContainEqual({ type: 'science', target: 8, enabled: false });
+    expect(normalized.settings.kid2.scienceV2).toBe(true);
+  });
+  it('새 도감·실험·오답·일별 과학 통계를 백업에서 유지하고 다른 통계와 혼합하지 않는다', () => {
+    const state = defaultState();
+    recordScienceAnswer(state, 'kid2', question.id, question.answer, date);
+    recordExperiment(state, 'kid2', card.id, date, card.result, card.result);
+    expect(importState(exportState(state))).toEqual(state);
+    expect(normalizeScienceDay({ correct: 3, total: 1, units: [] })).toBeUndefined();
+    expect(normalizeScienceDay({ correct: NaN, total: 3, units: [] })).toBeUndefined();
+    expect(normalizeScienceDay({ correct: 1, total: 3, units: ['future', 'future', 3] })).toEqual({ correct: 1, total: 3, units: ['future'] });
+    expect(Object.values(SCIENCE_UNITS).filter(u => u.semester === 2)).toHaveLength(8);
   });
 });

@@ -44,7 +44,9 @@ export interface ProgressEvent {
   amount?: number;
   correct?: number;
   total?: number;
-  /** 실험 참여 별·예상 보너스는 퀴즈 정답률에 합치지 않는다. */
+  /** 선택 실험의 별만 지급하고 학습일·미션·쿠폰에는 관여하지 않는다. */
+  rewardOnly?: boolean;
+  /** 정답 별 외의 참여 보너스 */
   stars?: number;
   /** 연산 단원별 통계 */
   skill?: string;
@@ -66,6 +68,10 @@ export function applyProgress(
   ev: ProgressEvent,
   options: ProgressOptions,
 ): ProgressResult {
+  if (ev.rewardOnly) {
+    data.stars += ev.stars ?? 0;
+    return { justCompleted: false };
+  }
   const day = ensureDay(data, today);
   const before = day.progress[ev.type] ?? 0;
   day.progress[ev.type] = (day.progress[ev.type] ?? 0) + (ev.amount ?? 1);
