@@ -3,6 +3,10 @@ main = "src/index.ts"
 compatibility_date = "2026-06-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Cloudflare 대시보드 Workers Logs에서 오류 로그를 볼 수 있게 한다.
+[observability]
+enabled = true
+
 [vars]
 ALLOWED_ORIGINS = "https://icari12170327-boop.github.io"
 REALTIME_MODEL = "gpt-realtime-2.1-mini"
