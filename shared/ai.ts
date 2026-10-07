@@ -9,7 +9,8 @@ export interface SessionRequest {
   level: AiLevel;
   mode: 'kid-friend' | 'biz-talk';
   offerSdp: string;
-  persona: { friendName: string; personaId: string; voice: string };
+  persona: { friendName: string; personaId: string; voice: string; friendHobbies?: string };
+  pushToTalk?: boolean;
   memory?: string;
   interests?: string[];
   topic?: string;
@@ -40,6 +41,7 @@ export interface GenerateRequest {
   input: unknown;
 }
 export interface Usage {
+  remainingSeconds?: Record<AiProfileId, number>;
   today: Record<AiProfileId, { talkSeconds: number; generates: number }>;
   month: { talkSeconds: number; estimatedKrw: number };
 }

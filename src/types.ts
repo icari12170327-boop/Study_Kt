@@ -3,7 +3,7 @@ export type ProfileId = 'kid1' | 'kid2' | 'parent';
 /** g3: 초등 3학년, g5: 초등 5학년, adult: 보호자 */
 export type Level = 'g3' | 'g5' | 'adult';
 
-export type MissionType = 'math' | 'vocab' | 'speaking' | 'reading';
+export type MissionType = 'math' | 'vocab' | 'speaking' | 'reading' | 'talk';
 
 export interface Profile {
   id: ProfileId;
@@ -15,17 +15,44 @@ export interface Profile {
 export interface MissionConfig {
   type: MissionType;
   enabled: boolean;
-  /** 하루 목표량 (문제 수, 카드 수, 문장 수, 독서 활동 수) */
+  /** 하루 목표량 (문제 수, 카드 수, 문장 수, 독서 활동 수, 대화 분) */
   target: number;
 }
 
 export interface ProfileSettings {
+  talk?: TalkSettings;
   missions: MissionConfig[];
   mathSkills: string[];
   vocabDecks: string[];
   speakingDecks: string[];
   /** 하루 미션을 모두 끝내면 받는 쿠폰 문구 */
   rewardLabel: string;
+}
+export interface TalkSettings {
+  friendName: string;
+  personaId: 'cheerful' | 'calm' | 'funny';
+  voice: string;
+  dailyMinutes: number;
+  interests: string[];
+  friendHobbies: string;
+  subtitleHidePercent: number;
+  pushToTalk: boolean;
+}
+export interface TalkLine { role: 'kid' | 'friend'; text: string; at: number; peeked?: boolean }
+export interface TalkSummary {
+  highlightKo: string;
+  topicsKo: string[];
+  newExpressions: { en: string; ko: string }[];
+  nextTopics: string[];
+}
+export interface TalkLog {
+  id: string;
+  date: string;
+  seconds: number;
+  lines: TalkLine[];
+  englishRatio: number;
+  summary?: TalkSummary;
+  flagged?: boolean;
 }
 
 export type Answer =
@@ -48,6 +75,8 @@ export interface SkillStat {
 
 export interface DayLog {
   date: string;
+  /** 짧은 대화의 남은 초도 다음 대화와 합쳐 분 단위 진행으로 바꾼다. */
+  talkSeconds?: number;
   progress: Partial<Record<MissionType, number>>;
   correct: number;
   total: number;
@@ -108,6 +137,8 @@ export interface ReadingNote {
 }
 
 export interface ProfileData {
+  talks: TalkLog[];
+  friendMemory: string;
   math: MathLevelState;
   stars: number;
   streak: number;
@@ -120,7 +151,7 @@ export interface ProfileData {
 }
 
 export interface AppState {
-  version: 1;
+  version: 2;
   ai: import('../shared/ai').AiConfig;
   parentPin?: string;
   profiles: Profile[];

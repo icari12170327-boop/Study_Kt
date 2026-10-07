@@ -1,7 +1,8 @@
 import type { AppState } from '../types';
 import type { AiConfig } from '../../shared/ai';
-import { defaultState } from './defaults';
+import { defaultSettings, defaultState } from './defaults';
 import { clampMathLevel, defaultMathState } from '../content/math/levels';
+import { migrateV1toV2, normalizeTalkLogs, normalizeTalkSettings } from '../lib/talk';
 
 const KEY = 'study-kt:v1';
 
@@ -9,14 +10,24 @@ const KEY = 'study-kt:v1';
 export function normalizeState(raw: unknown): AppState {
   const base = defaultState();
   if (!raw || typeof raw !== 'object') return base;
-  const s = raw as Partial<AppState>;
-  if (s.version !== 1) return base;
+  const s = raw as Partial<Omit<AppState, 'version'>> & { version?: number };
+  if (s.version !== 1 && s.version !== 2) return base;
   const profiles = base.profiles.map((p) => ({ ...p, ...s.profiles?.find((x) => x.id === p.id) }));
   const settings = { ...base.settings };
   const data = { ...base.data };
   for (const p of profiles) {
-    settings[p.id] = { ...base.settings[p.id], ...s.settings?.[p.id] };
+    settings[p.id] = { ...defaultSettings(p.level, p.id), ...s.settings?.[p.id] };
+    settings[p.id].missions = settings[p.id].missions.map((m) => ({ ...m }));
+    const talk = normalizeTalkSettings(settings[p.id].talk, p.level, p.id);
+    settings[p.id].talk = talk;
+    const mission = settings[p.id].missions.find((m) => m.type === 'talk');
+    if (mission) {
+      mission.target = Math.max(1, Math.min(100, Math.round(mission.target) || talk.dailyMinutes));
+      talk.dailyMinutes = mission.target;
+    } else settings[p.id].missions = [...settings[p.id].missions, { type: 'talk', enabled: p.level !== 'adult', target: talk.dailyMinutes }];
     data[p.id] = { ...base.data[p.id], ...s.data?.[p.id] };
+    data[p.id].talks = normalizeTalkLogs(s.data?.[p.id]?.talks);
+    data[p.id].friendMemory = typeof s.data?.[p.id]?.friendMemory === 'string' ? s.data[p.id].friendMemory.slice(0, 1500) : '';
     const math = s.data?.[p.id]?.math;
     data[p.id].math = {
       ...defaultMathState(p.level),
@@ -28,13 +39,14 @@ export function normalizeState(raw: unknown): AppState {
         Number.isFinite(row.guesses) && Number.isFinite(row.medianSec)).slice(-30) : [],
     };
     data[p.id].days = Object.fromEntries(Object.entries(data[p.id].days).map(([date, day]) =>
-      [date, { ...day, mathAttempts: Array.isArray(day.mathAttempts) ? day.mathAttempts : [] }]));
+      [date, { ...day, talkSeconds: typeof day.talkSeconds === 'number' && Number.isFinite(day.talkSeconds) && day.talkSeconds >= 0 ? Math.floor(day.talkSeconds) : (day.progress.talk ?? 0) * 60, mathAttempts: Array.isArray(day.mathAttempts) ? day.mathAttempts : [] }]));
   }
   const ai = {
     ...(typeof s.ai?.endpoint === 'string' ? { endpoint: s.ai.endpoint } : {}),
     ...(typeof s.ai?.token === 'string' ? { token: s.ai.token } : {}),
   };
-  return { version: 1, ai, parentPin: s.parentPin, profiles, settings, data };
+  const state = { ai, parentPin: s.parentPin, profiles, settings, data };
+  return s.version === 1 ? migrateV1toV2({ ...state, version: 1 }) : { ...state, version: 2 };
 }
 
 export function loadState(): AppState {
@@ -61,7 +73,7 @@ export function exportState(state: AppState): string {
 
 export function importState(text: string, localAi: AiConfig = {}): AppState {
   const parsed = JSON.parse(text);
-  if (!parsed || parsed.version !== 1) throw new Error('지원하지 않는 백업 파일입니다.');
+  if (!parsed || ![1, 2].includes(parsed.version)) throw new Error('지원하지 않는 백업 파일입니다.');
   const restored = normalizeState(parsed);
   // 다른 백업에 토큰이 포함돼 있더라도 가져오지 않는다.
   restored.ai = { endpoint: restored.ai.endpoint };

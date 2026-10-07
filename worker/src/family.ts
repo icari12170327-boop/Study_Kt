@@ -297,6 +297,7 @@ export class FamilyUsage {
           }
           return Response.json({
             today,
+            remainingSeconds: Object.fromEntries((['kid1', 'kid2', 'parent'] as const).map((id) => [id, remainingSeconds(ledger, this.env, id, now)])),
             month: {
               talkSeconds: monthSeconds,
               estimatedKrw: Math.round((monthSeconds / 60) * setting(this.env.KRW_PER_TALK_MINUTE, 15)),
