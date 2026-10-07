@@ -26,7 +26,7 @@ export function buildCallBody(req: SessionRequest, model: string, remaining: num
       audio: {
         input: {
           transcription: { model: 'gpt-4o-mini-transcribe' },
-          turn_detection: { type: 'semantic_vad', eagerness: 'auto' },
+          turn_detection: req.pushToTalk ? null : { type: 'semantic_vad', eagerness: 'auto' },
         },
         output: { voice: req.persona.voice },
       },
@@ -46,15 +46,17 @@ export async function openCall(
     signal: AbortSignal.timeout(15000),
   });
   if (!response.ok) {
-    // OpenAI 오류 원인(권한, 크레딧, 설정 오류)을 Cloudflare 로그에서 볼 수 있게 남긴다. 키는 포함되지 않는다.
-    const detail = (await response.text().catch(() => '')).slice(0, 500);
-    console.error('openai realtime/calls failed', response.status, detail);
+    // 아이의 참고 데이터가 오류에 포함돼도 로그에 남지 않도록 상태와 알려진 코드만 기록한다.
+    const detail = await response.json().catch(() => null) as { error?: { code?: unknown } } | null;
+    const codes = ['invalid_api_key', 'insufficient_quota', 'model_not_found', 'unsupported_parameter', 'invalid_request_error', 'rate_limit_exceeded'];
+    const code = typeof detail?.error?.code === 'string' && codes.includes(detail.error.code) ? detail.error.code : 'unknown';
+    console.error('openai realtime/calls failed', response.status, code);
     throw new ProxyError('server', 502);
   }
   const location = response.headers.get('location') ?? '';
   const callId = location.match(/\/realtime\/calls\/([\w-]+)(?:\?|$)/)?.[1];
   if (!callId) {
-    console.error('openai realtime/calls: call id missing in location header', location);
+    console.error('openai realtime/calls: call id missing in location header');
     throw new ProxyError('server', 502);
   }
   return { callId, answerSdp: await response.text() };

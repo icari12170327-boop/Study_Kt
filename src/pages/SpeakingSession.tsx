@@ -4,6 +4,7 @@ import type { ProfileId } from '../types';
 import type { Go } from '../route';
 import { toDateKey } from '../lib/date';
 import { applyProgress } from '../lib/progress';
+import { aiReady } from '../lib/talk';
 import { pickSessionKeys, reviewCard } from '../lib/srs';
 import { shuffle } from '../lib/random';
 import { canRecognize, listenOnce, speak, type ListenHandle } from '../lib/speech';
@@ -86,7 +87,7 @@ export function SpeakingSession({ profileId, go }: { profileId: ProfileId; go: G
     update((draft) => {
       const d = draft.data[profileId];
       d.srs[item.key] = reviewCard(d.srs[item.key], passed, today);
-      applyProgress(d, draft.settings[profileId], today, { type: 'speaking', correct: passed ? 1 : 0, total: 1 });
+      applyProgress(d, draft.settings[profileId], today, { type: 'speaking', correct: passed ? 1 : 0, total: 1 }, { aiReady: aiReady(draft.ai) });
     });
     setBest(null);
     setHeard('');

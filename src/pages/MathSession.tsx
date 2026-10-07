@@ -4,6 +4,7 @@ import type { ProfileId } from '../types';
 import type { Go } from '../route';
 import { toDateKey } from '../lib/date';
 import { applyProgress } from '../lib/progress';
+import { aiReady } from '../lib/talk';
 import { uid } from '../lib/random';
 import { buildLevelQueue } from '../content/math/session';
 import { evaluateLevel, latestMathDay, mathAttempt } from '../content/math/adaptive';
@@ -100,7 +101,7 @@ export function MathSession({ profileId, go }: { profileId: ProfileId; go: Go })
         correct: correct ? 1 : 0,
         total: 1,
         skill: item.problem.skill,
-      });
+      }, { aiReady: aiReady(draft.ai) });
       d.days[today].mathAttempts.push(attempt);
       if (correct && item.wrongId) {
         d.wrongNotes = d.wrongNotes.filter((w) => w.id !== item.wrongId);

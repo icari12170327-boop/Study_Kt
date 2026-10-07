@@ -89,7 +89,8 @@ export function isUsage(value: unknown): value is Usage {
       return !!record && nonnegative(record.talkSeconds) && nonnegative(record.generates);
     }) &&
     nonnegative(month.talkSeconds) &&
-    nonnegative(month.estimatedKrw)
+    nonnegative(month.estimatedKrw) &&
+    (!('remainingSeconds' in value) || (!!value.remainingSeconds && typeof value.remainingSeconds === 'object' && ['kid1', 'kid2', 'parent'].every((id) => nonnegative((value.remainingSeconds as Record<string, unknown>)[id]))))
   );
 }
 export async function fetchUsage(cfg: AiConfig): Promise<Usage> {

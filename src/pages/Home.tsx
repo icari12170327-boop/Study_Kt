@@ -4,6 +4,7 @@ import { MISSION_META, type Go } from '../route';
 import { formatKoreanDate, lastNDays, parseDateKey, toDateKey } from '../lib/date';
 import { currentStreak, enabledMissions } from '../lib/progress';
 import { ProgressBar, TopBar } from '../components/common';
+import { aiReady } from '../lib/talk';
 
 export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
   const { state } = useStore();
@@ -12,7 +13,8 @@ export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
   const data = state.data[profileId];
   const settings = state.settings[profileId];
   const day = data.days[today];
-  const missions = enabledMissions(settings);
+  // 홈에는 연결 전 안내를 위한 대화 카드도 표시한다. 시작 가능 여부는 아래에서 확인한다.
+  const missions = enabledMissions(settings, { aiReady: true });
   const unusedCoupons = data.coupons.filter((c) => !c.usedAt).length;
 
   return (
@@ -64,6 +66,7 @@ export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
             <button
               key={m.type}
               className={`mission-card ${finished ? 'finished' : ''}`}
+              disabled={m.type === 'talk' && !aiReady(state.ai)}
               onClick={() => go({ name: m.type, profileId })}
             >
               <div className="mission-icon" style={{ background: meta.color }}>
@@ -83,6 +86,7 @@ export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
           );
         })}
       </div>
+      {missions.some((m) => m.type === 'talk') && !aiReady(state.ai) && <p className="panel">보호자에게 AI 연결을 부탁하세요. 지금은 다른 미션만 끝내도 쿠폰을 받을 수 있어요.</p>}
 
       {missions.every((m) => m.type !== 'reading') && (
         <button className="btn btn-ghost" onClick={() => go({ name: 'reading', profileId })}>

@@ -3,23 +3,26 @@ import { skillsForLevel } from '../content/math/skills';
 import { defaultMathState } from '../content/math/levels';
 import { VOCAB_DECKS } from '../content/english/vocab';
 import { SENTENCE_DECKS } from '../content/english/sentences';
+import { defaultTalkSettings } from '../lib/talk';
 
 export function emptyProfileData(level: Level = 'g3'): ProfileData {
-  return { math: defaultMathState(level), stars: 0, streak: 0, days: {}, wrongNotes: [], srs: {}, coupons: [], notes: [] };
+  return { math: defaultMathState(level), stars: 0, streak: 0, days: {}, wrongNotes: [], srs: {}, coupons: [], notes: [], talks: [], friendMemory: '' };
 }
 
 /** 학년별 기본 미션. 10월 기준 2학기 단원과 1학기 복습 단원을 모두 켠다. */
-export function defaultSettings(level: Level): ProfileSettings {
+export function defaultSettings(level: Level, id?: ProfileId): ProfileSettings {
   const vocabDecks = VOCAB_DECKS.filter((d) => d.level === level).map((d) => d.id);
   const speakingDecks = SENTENCE_DECKS.filter((d) => d.level === level).map((d) => d.id);
   const mathSkills = skillsForLevel(level).map((s) => s.id);
   switch (level) {
     case 'g3':
       return {
+        talk: defaultTalkSettings(level, id),
         missions: [
           { type: 'math', enabled: true, target: 20 },
-          { type: 'vocab', enabled: true, target: 8 },
-          { type: 'speaking', enabled: true, target: 3 },
+          { type: 'vocab', enabled: false, target: 8 },
+          { type: 'speaking', enabled: false, target: 3 },
+          { type: 'talk', enabled: true, target: 15 },
           { type: 'reading', enabled: false, target: 1 },
         ],
         mathSkills,
@@ -29,10 +32,12 @@ export function defaultSettings(level: Level): ProfileSettings {
       };
     case 'g5':
       return {
+        talk: defaultTalkSettings(level, id),
         missions: [
           { type: 'math', enabled: true, target: 20 },
-          { type: 'vocab', enabled: true, target: 10 },
-          { type: 'speaking', enabled: true, target: 5 },
+          { type: 'vocab', enabled: false, target: 10 },
+          { type: 'speaking', enabled: false, target: 5 },
+          { type: 'talk', enabled: true, target: 20 },
           { type: 'reading', enabled: false, target: 1 },
         ],
         mathSkills,
@@ -42,8 +47,10 @@ export function defaultSettings(level: Level): ProfileSettings {
       };
     case 'adult':
       return {
+        talk: defaultTalkSettings(level, id),
         missions: [
           { type: 'math', enabled: false, target: 10 },
+          { type: 'talk', enabled: false, target: 30 },
           { type: 'vocab', enabled: true, target: 10 },
           { type: 'speaking', enabled: true, target: 10 },
           { type: 'reading', enabled: true, target: 1 },
@@ -62,7 +69,7 @@ export function defaultState(): AppState {
     { id: 'kid2' as const, name: '둘째', avatar: '🐰', level: 'g3' as const },
     { id: 'parent' as const, name: '나', avatar: '🦉', level: 'adult' as const },
   ];
-  const settings = Object.fromEntries(profiles.map((p) => [p.id, defaultSettings(p.level)])) as Record<ProfileId, ProfileSettings>;
+  const settings = Object.fromEntries(profiles.map((p) => [p.id, defaultSettings(p.level, p.id)])) as Record<ProfileId, ProfileSettings>;
   const data = Object.fromEntries(profiles.map((p) => [p.id, emptyProfileData(p.level)])) as Record<ProfileId, ProfileData>;
-  return { version: 1, ai: {}, profiles, settings, data };
+  return { version: 2, ai: {}, profiles, settings, data };
 }

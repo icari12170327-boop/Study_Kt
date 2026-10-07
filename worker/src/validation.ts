@@ -23,9 +23,11 @@ export const sessionSchema = z
       friendName: z.enum(['Max', 'Lily', 'Alex']),
       personaId: z.enum(['cheerful', 'calm', 'funny']),
       voice: z.enum(['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse', 'marin', 'cedar']),
+      friendHobbies: text(400, 0).optional(),
     }),
+    pushToTalk: z.boolean().optional(),
     memory: text(1500, 0).optional(),
-    interests: z.array(text(20)).max(8).optional(),
+    interests: z.array(text(80)).max(8).optional(),
     topic: text(40, 0).optional(),
     scenarioId: z
       .enum(Object.keys(scenarioRoles) as [keyof typeof scenarioRoles, ...Array<keyof typeof scenarioRoles>])

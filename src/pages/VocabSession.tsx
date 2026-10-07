@@ -4,6 +4,7 @@ import type { ProfileId } from '../types';
 import type { Go } from '../route';
 import { toDateKey } from '../lib/date';
 import { applyProgress } from '../lib/progress';
+import { aiReady } from '../lib/talk';
 import { reviewCard } from '../lib/srs';
 import { speak } from '../lib/speech';
 import { buildVocabSession } from '../content/english/session';
@@ -83,7 +84,7 @@ export function VocabSession({ profileId, go }: { profileId: ProfileId; go: Go }
     update((draft) => {
       const d = draft.data[profileId];
       d.srs[item.key] = reviewCard(d.srs[item.key], correct, today);
-      applyProgress(d, draft.settings[profileId], today, { type: 'vocab', correct: correct ? 1 : 0, total: 1 });
+      applyProgress(d, draft.settings[profileId], today, { type: 'vocab', correct: correct ? 1 : 0, total: 1 }, { aiReady: aiReady(draft.ai) });
     });
     if (item.mode !== 'meaning') void speak(item.card.en);
   };

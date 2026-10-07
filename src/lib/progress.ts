@@ -3,7 +3,7 @@ import { addDays } from './date';
 import { uid } from './random';
 
 export function emptyDay(date: string): DayLog {
-  return { date, progress: {}, correct: 0, total: 0, completed: false, mathBySkill: {}, mathAttempts: [] };
+  return { date, talkSeconds: 0, progress: {}, correct: 0, total: 0, completed: false, mathBySkill: {}, mathAttempts: [] };
 }
 
 /** draft를 직접 수정한다. */
@@ -12,19 +12,21 @@ export function ensureDay(data: ProfileData, date: string): DayLog {
   return data.days[date];
 }
 
-export function enabledMissions(settings: ProfileSettings) {
-  return settings.missions.filter((m) => m.enabled && m.target > 0);
+export interface ProgressOptions { aiReady: boolean }
+
+export function enabledMissions(settings: ProfileSettings, options: ProgressOptions) {
+  return settings.missions.filter((m) => m.enabled && m.target > 0 && (m.type !== 'talk' || options.aiReady));
 }
 
-export function isDayComplete(day: DayLog | undefined, settings: ProfileSettings): boolean {
-  const missions = enabledMissions(settings);
+export function isDayComplete(day: DayLog | undefined, settings: ProfileSettings, options: ProgressOptions): boolean {
+  const missions = enabledMissions(settings, options);
   if (!day || missions.length === 0) return false;
   return missions.every((m) => (day.progress[m.type] ?? 0) >= m.target);
 }
 
 /** 0~1 */
-export function dayRatio(day: DayLog | undefined, settings: ProfileSettings): number {
-  const missions = enabledMissions(settings);
+export function dayRatio(day: DayLog | undefined, settings: ProfileSettings, options: ProgressOptions): number {
+  const missions = enabledMissions(settings, options);
   if (missions.length === 0) return 0;
   const sum = missions.reduce((s, m) => s + Math.min(1, (day?.progress[m.type] ?? 0) / m.target), 0);
   return sum / missions.length;
@@ -60,21 +62,26 @@ export function applyProgress(
   settings: ProfileSettings,
   today: string,
   ev: ProgressEvent,
+  options: ProgressOptions,
 ): ProgressResult {
   const day = ensureDay(data, today);
+  const before = day.progress[ev.type] ?? 0;
   day.progress[ev.type] = (day.progress[ev.type] ?? 0) + (ev.amount ?? 1);
   const correct = ev.correct ?? 0;
   const total = ev.total ?? 0;
   day.correct += correct;
   day.total += total;
-  data.stars += correct;
+  if (ev.type === 'talk') {
+    const target = settings.missions.find((m) => m.type === 'talk')?.target ?? 0;
+    data.stars += Math.max(0, Math.min(target, day.progress.talk ?? 0) - Math.min(target, before));
+  } else data.stars += correct;
   if (ev.skill) {
     const s = (day.mathBySkill[ev.skill] ??= { correct: 0, total: 0 });
     s.correct += correct;
     s.total += total;
   }
 
-  if (!day.completed && isDayComplete(day, settings)) {
+  if (!day.completed && isDayComplete(day, settings, options)) {
     day.completed = true;
     data.streak = data.lastCompleted === addDays(today, -1) ? data.streak + 1 : 1;
     data.lastCompleted = today;

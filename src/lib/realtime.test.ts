@@ -106,11 +106,71 @@ beforeEach(() => {
     );
   vi.stubGlobal('fetch', fetcher);
 });
-afterEach(() => {
+afterEach(async () => {
+  await stopLocalTalks(cfg, 'all');
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 describe('WebRTC 연결과 자원 해제', () => {
+  it('종료 응답의 서버 기록 시간을 한 번만 전달한다', async () => {
+    cb.onCharged = vi.fn();
+    const handle = await startTalk(cfg, req, cb);
+    fetcher.mockResolvedValueOnce(Response.json({ ok: true, seconds: 65 }));
+    await Promise.all([handle.stop(), handle.stop()]);
+    expect(cb.onCharged).toHaveBeenCalledExactlyOnceWith(65);
+  });
+  it('눌러서 말하기는 처음 마이크를 끄고 누름·해제에 버퍼 커밋과 응답을 한 번만 요청한다', async () => {
+    cb.onConnected = vi.fn(); cb.onUserSpeaking = vi.fn();
+    const handle = await startTalk(cfg, { ...req, pushToTalk: true }, cb);
+    expect(track.enabled).toBe(false);
+    expect(cb.onConnected).toHaveBeenCalledWith(60);
+    handle.beginPushToTalk(); handle.beginPushToTalk();
+    expect(track.enabled).toBe(true);
+    await vi.advanceTimersByTimeAsync(250);
+    handle.endPushToTalk(); handle.endPushToTalk();
+    expect(track.enabled).toBe(false);
+    expect(FakePeer.instance.channel.send.mock.calls.map(([text]) => JSON.parse(text).type)).toEqual(['input_audio_buffer.clear', 'input_audio_buffer.commit', 'response.create']);
+    expect(cb.onUserSpeaking).toHaveBeenCalledTimes(1);
+    await handle.stop();
+  });
+  it('짧게 누른 빈 오디오는 커밋하지 않고 창이 흐려지면 눌러서 말하기 마이크를 끈다', async () => {
+    const handle = await startTalk(cfg, { ...req, pushToTalk: true }, cb);
+    handle.beginPushToTalk(); handle.endPushToTalk();
+    expect(FakePeer.instance.channel.send.mock.calls.map(([text]) => JSON.parse(text).type)).toEqual(['input_audio_buffer.clear', 'input_audio_buffer.clear']);
+    handle.beginPushToTalk();
+    await vi.advanceTimersByTimeAsync(250);
+    win.dispatchEvent(new Event('blur'));
+    expect(track.enabled).toBe(false);
+    expect(FakePeer.instance.channel.send.mock.calls.some(([text]) => JSON.parse(text).type === 'input_audio_buffer.commit')).toBe(true);
+    await handle.stop();
+  });
+  it('응답 생성·재생 중 시스템 신호는 다음 응답까지 기다려 대화 중 오류를 피한다', async () => {
+    cb.onUserSpeaking = vi.fn(); cb.onFriendFinished = vi.fn();
+    const handle = await startTalk(cfg, req, cb);
+    const emit = (type: string) => FakePeer.instance.channel.onmessage?.({ data: JSON.stringify({ type }) });
+    emit('response.created'); emit('output_audio_buffer.started');
+    handle.sendSystemNote('[STUCK]');
+    expect(FakePeer.instance.channel.send).toHaveBeenCalledTimes(1);
+    emit('response.done');
+    expect(FakePeer.instance.channel.send).toHaveBeenCalledTimes(1);
+    emit('output_audio_buffer.stopped');
+    expect(FakePeer.instance.channel.send).toHaveBeenCalledTimes(2);
+    expect(cb.onFriendFinished).toHaveBeenCalledTimes(1);
+    emit('input_audio_buffer.speech_started');
+    expect(cb.onUserSpeaking).toHaveBeenCalledTimes(1);
+    await handle.stop();
+  });
+  it('권한 대기 중 화면 이탈하면 늦게 받은 마이크를 끄고 외부 세션을 만들지 않는다', async () => {
+    let resolve!: (stream: unknown) => void;
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: () => new Promise((done) => { resolve = done; }) } });
+    const abort = new AbortController();
+    const opening = startTalk(cfg, req, cb, abort.signal);
+    abort.abort();
+    resolve({ getTracks: () => [track], getAudioTracks: () => [track] });
+    await expect(opening).rejects.toMatchObject({ kind: 'network' });
+    expect(track.stop).toHaveBeenCalledTimes(1);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
   it('보호자 강제 종료는 같은 Worker·프로필의 로컬 마이크만 종료한다', async () => {
     const handle = await startTalk(cfg, req, cb);
     await stopLocalTalks({ ...cfg, endpoint: 'https://other-worker.example' }, 'all');
