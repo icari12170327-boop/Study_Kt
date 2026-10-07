@@ -13,6 +13,7 @@ import { SENTENCE_DECKS } from '../content/english/sentences';
 import { defaultSettings, defaultState } from '../store/defaults';
 import { exportState, importState } from '../store/storage';
 import { ProgressBar, TopBar } from '../components/common';
+import { ScienceOverview } from '../components/ScienceOverview';
 import { MathOverview } from '../components/MathOverview';
 import { AiConnection } from './AiConnection';
 import { aiReady } from '../lib/talk';
@@ -132,6 +133,8 @@ function Overview() {
                 ))}
               </div>
             )}
+
+            {p.level !== 'adult' && <ScienceOverview data={data.science} />}
 
             {data.wrongNotes.length > 0 && (
               <>

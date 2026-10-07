@@ -3,7 +3,39 @@ export type ProfileId = 'kid1' | 'kid2' | 'parent';
 /** g3: 초등 3학년, g5: 초등 5학년, adult: 보호자 */
 export type Level = 'g3' | 'g5' | 'adult';
 
-export type MissionType = 'math' | 'vocab' | 'speaking' | 'reading' | 'talk';
+export type MissionType = 'math' | 'vocab' | 'speaking' | 'reading' | 'talk' | 'science';
+
+export type ScienceTopic = 'float-sink' | 'electricity' | 'light' | 'sound' | 'magnet' | 'states' | 'mixing' | 'air' | 'living' | 'heat' | 'weather' | 'motion' | 'acid-base' | 'space';
+export interface ScienceCard {
+  id: string;
+  audience: 'both' | 'g3' | 'g5';
+  topic: ScienceTopic;
+  curriculum?: string;
+  title: string;
+  question: string;
+  predictions: string[];
+  materials: string[];
+  steps: string[];
+  result: string;
+  explain: string;
+  deeper?: { think: string; vary: string; explain: string };
+  safety?: string;
+  adultNeeded: boolean;
+}
+export interface ScienceRecord {
+  date: string;
+  predicted: string;
+  observed: string;
+  thinkAnswer?: string;
+  together?: boolean;
+}
+export interface ScienceData {
+  done: Record<string, ScienceRecord>;
+  badges: string[];
+  /** 도감은 남기고, 이번 순환에서 한 카드만 별도로 추적한다. */
+  cycleDone: string[];
+  today?: { date: string; cardId: string };
+}
 
 export interface Profile {
   id: ProfileId;
@@ -137,6 +169,7 @@ export interface ReadingNote {
 }
 
 export interface ProfileData {
+  science: ScienceData;
   talks: TalkLog[];
   friendMemory: string;
   math: MathLevelState;

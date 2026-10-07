@@ -113,7 +113,7 @@ describe('저장 데이터 복원', () => {
     expect(s.profiles.find((p) => p.id === 'kid1')?.avatar).toBe('🦁');
     expect(s.data.kid1.stars).toBe(5);
     expect(s.data.kid1.coupons).toEqual([]);
-    expect(s.settings.kid2.missions.length).toBe(5);
+    expect(s.settings.kid2.missions.length).toBe(6);
   });
   it('알 수 없는 버전은 기본 상태', () => {
     expect(normalizeState({ version: 99 }).profiles).toHaveLength(3);

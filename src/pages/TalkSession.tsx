@@ -8,6 +8,7 @@ import { AiError, fetchUsage, generate, type AiConfig } from '../lib/ai';
 import { startTalk, type TalkHandle, type TalkState } from '../lib/realtime';
 import { aiReady, defaultTalkSettings, englishRatio, isTalkSummary, maskSubtitle, recordTalkSeconds, summaryLines, talkRequest, talkSignals, talkTopics } from '../lib/talk';
 import { toDateKey } from '../lib/date';
+import { scienceTalkTopics } from '../content/science/session';
 import { uid } from '../lib/random';
 
 type StreamLine = TalkLine & { itemId: string; done: boolean };
@@ -239,7 +240,7 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
       <div className="talk-avatar" aria-hidden="true">{profileId === 'kid1' ? '🤖' : '🐻'}</div>
       <h2>{settings.friendName}와 무슨 이야기 할까요?</h2>
       <p>{remaining === undefined ? '오늘 남은 시간을 확인하고 있어요.' : `오늘 남은 시간 ${duration(remaining)}`}</p>
-      <div className="chip-wrap">{talkTopics(settings, state.data[profileId].talks).map((value) => <button key={value} className={`chip ${topic === value ? 'on' : ''}`} lang="en" onClick={() => setTopic(value)}>{value}</button>)}<button className={`chip ${!topic ? 'on' : ''}`} onClick={() => setTopic('')}>아무 얘기나</button></div>
+      <div className="chip-wrap">{[...new Set([...scienceTalkTopics(state.data[profileId].science, toDateKey()), ...talkTopics(settings, state.data[profileId].talks)])].map((value) => <button key={value} className={`chip ${topic === value ? 'on' : ''}`} lang={value.startsWith('오늘 실험:') ? 'ko' : 'en'} onClick={() => setTopic(value)}>{value}</button>)}<button className={`chip ${!topic ? 'on' : ''}`} onClick={() => setTopic('')}>아무 얘기나</button></div>
       <p>처음에는 마이크 사용을 허용해 주세요. 헤드셋을 쓰면 더 잘 들려요.</p>
       {!aiReady(state.ai) && <p>보호자에게 AI 연결을 부탁하세요.</p>}
       {remaining === 0 && <p>오늘 대화 시간을 다 썼어요. 내일 다시 친구를 만나요!</p>}
