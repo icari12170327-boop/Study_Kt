@@ -250,7 +250,7 @@ function Settings() {
         ))}
       </div>
 
-      {profile.level !== 'adult' && <div className="panel">
+      {pid !== 'parent' && profile.level !== 'adult' && <div className="panel">
         <label className="check">
           <input type="checkbox" checked={bingo.enabled} onChange={(event) => update((draft) => {
             draft.settings[pid].bingo = { ...bingo, enabled: event.target.checked };
