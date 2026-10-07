@@ -240,27 +240,27 @@ describe('PR #21 데이터 이전·백업 호환', () => {
     expect(normalized.recentWrong[0].id).toBe('future-39');
     expect(normalized.recentWrong[29].id).toBe('future-10');
   });
-  for (const version of [1, 2]) for (const enabled of [true, false]) it(`v${version}·science enabled=${enabled}: target1→5는 한 번만, 모든 보상·학습 기록 보존`, () => {
+  for (const profileId of ['kid1', 'kid2'] as const) for (const version of [1, 2]) for (const enabled of [true, false]) it(`${profileId}·v${version}·science enabled=${enabled}: target1→5는 한 번만, 모든 보상·학습 기록 보존`, () => {
     const base = defaultState();
-    const data = base.data.kid2;
+    const data = base.data[profileId];
     data.stars = 41; data.streak = 9; data.lastCompleted = date;
     data.days[date] = { ...emptyDay(date), progress: { science: 1, math: 20 }, completed: true };
     data.coupons = [{ id: 'kept', label: '기존 쿠폰', earnedAt: date }];
     data.notes = [{ id: 'note', title: '책', author: '작가', date, summary: '내 생각', cards: [] }];
     data.srs = { 'kept-vocab': { box: 3, seen: 7, lapses: 2, due: date } };
-    base.settings.kid2.missions = [{ type: 'science', enabled, target: 1 }, { type: 'math', enabled: true, target: 20 }];
-    const raw = { ...base, version, settings: { ...base.settings, kid2: { ...base.settings.kid2, scienceV2: undefined } }, data: { ...base.data, kid2: { ...data, science: { done: { [card.id]: observation }, badges: ['states:3'], cycleDone: [card.id], today: { date, cardId: card.id } } } } };
+    base.settings[profileId].missions = [{ type: 'science', enabled, target: 1 }, { type: 'math', enabled: true, target: 20 }];
+    const raw = { ...base, version, settings: { ...base.settings, [profileId]: { ...base.settings[profileId], scienceV2: undefined } }, data: { ...base.data, [profileId]: { ...data, science: { done: { [card.id]: observation }, badges: ['states:3'], cycleDone: [card.id], today: { date, cardId: card.id } } } } };
     const before = structuredClone(raw), restored = normalizeState(raw);
     expect(restored.version).toBe(2);
-    expect(restored.settings.kid2.scienceV2).toBe(true);
-    expect(restored.settings.kid2.missions.find(m => m.type === 'science')).toEqual({ type: 'science', target: 5, enabled });
-    expect(restored.data.kid2.science).toEqual({ ...emptyScience, experiments: { [card.id]: observation } });
-    for (const field of ['stars', 'streak', 'lastCompleted', 'days', 'coupons', 'notes', 'srs', 'math', 'talks'] as const) expect(restored.data.kid2[field]).toEqual(data[field]);
+    expect(restored.settings[profileId].scienceV2).toBe(true);
+    expect(restored.settings[profileId].missions.find(m => m.type === 'science')).toEqual({ type: 'science', target: 5, enabled });
+    expect(restored.data[profileId].science).toEqual({ ...emptyScience, experiments: { [card.id]: observation } });
+    for (const field of ['stars', 'streak', 'lastCompleted', 'days', 'coupons', 'notes', 'srs', 'math', 'talks'] as const) expect(restored.data[profileId][field]).toEqual(data[field]);
     expect(raw).toEqual(before);
     expect(importState(JSON.stringify(raw))).toEqual(restored);
-    const mission = restored.settings.kid2.missions.find(m => m.type === 'science')!;
+    const mission = restored.settings[profileId].missions.find(m => m.type === 'science')!;
     mission.target = 1;
-    expect(normalizeState(restored).settings.kid2.missions.find(m => m.type === 'science')).toEqual({ type: 'science', target: 1, enabled });
+    expect(normalizeState(restored).settings[profileId].missions.find(m => m.type === 'science')).toEqual({ type: 'science', target: 1, enabled });
   });
   it('이전 쿠폰·연속일은 재계산하지 않고 추가 문제에도 이중 발행하지 않는다', () => {
     const raw = defaultState();

@@ -1,7 +1,7 @@
 import { useStore } from '../store/StoreContext';
 import type { Go } from '../route';
 import { toDateKey, formatKoreanDate } from '../lib/date';
-import { currentStreak, dayRatio } from '../lib/progress';
+import { currentStreak, dayRatio, isDayComplete } from '../lib/progress';
 import { outfitFor } from '../lib/outfit';
 import { aiReady } from '../lib/talk';
 import { ProgressBar } from '../components/common';
@@ -21,7 +21,7 @@ export function ProfileSelect({ go }: { go: Go }) {
           const data = state.data[p.id];
           const settings = state.settings[p.id];
           const ratio = dayRatio(data.days[today], settings, { aiReady: aiReady(state.ai) });
-          const done = data.days[today]?.completed;
+          const done = isDayComplete(data.days[today], settings, { aiReady: aiReady(state.ai) });
           return (
             <button key={p.id} className="profile-card" onClick={() => go({ name: 'home', profileId: p.id })}>
               <div className="profile-avatar">{p.avatar}<span className="profile-outfit" aria-label="오늘의 소품">{outfitFor(today, p.id)}</span></div>

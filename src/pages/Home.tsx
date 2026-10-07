@@ -2,7 +2,7 @@ import { useStore } from '../store/StoreContext';
 import type { ProfileId } from '../types';
 import { MISSION_META, type Go } from '../route';
 import { formatKoreanDate, lastNDays, parseDateKey, toDateKey } from '../lib/date';
-import { currentStreak, enabledMissions } from '../lib/progress';
+import { currentStreak, enabledMissions, isDayComplete } from '../lib/progress';
 import { ProgressBar, TopBar } from '../components/common';
 import { outfitFor } from '../lib/outfit';
 import { aiReady } from '../lib/talk';
@@ -16,6 +16,7 @@ export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
   const day = data.days[today];
   // 홈에는 연결 전 안내를 위한 대화 카드도 표시한다. 시작 가능 여부는 아래에서 확인한다.
   const missions = enabledMissions(settings, { aiReady: true });
+  const completeNow = isDayComplete(day, settings, { aiReady: aiReady(state.ai) });
   const unusedCoupons = data.coupons.filter((c) => !c.usedAt).length;
 
   return (
@@ -50,7 +51,7 @@ export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
         <div className="celebrate">
           <div className="celebrate-emoji">🎉</div>
           <div>
-            <strong>오늘 미션을 모두 끝냈어요!</strong>
+            <strong>{completeNow ? '오늘 미션을 모두 끝냈어요!' : '오늘 받은 쿠폰이 있어요. 새 목표도 도전해 볼까요?'}</strong>
             <div>쿠폰을 받았어요: {settings.rewardLabel}</div>
           </div>
         </div>
