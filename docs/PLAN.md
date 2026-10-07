@@ -218,7 +218,7 @@
 - [ ] [T07](tasks/T07-reward-games.md) 오늘의 문제 게임과 형제 대결
 
 ### 4단계 — 과학과 읽기 콘텐츠
-- [ ] [T08](tasks/T08-science-cards.md) 과학 문제(첫째, 둘째 모두), 도감, 배지, 캐릭터 옷차림 (v2: 문제 중심)
+- [x] [T08](tasks/T08-science-cards.md) 과학 문제(첫째, 둘째 모두), 도감, 배지, 캐릭터 옷차림 (v2: 문제 중심)
 - [ ] [T09](tasks/T09-story-reading.md) 국어 연재 이야기 읽기
 
 ### 5단계 — 확장
