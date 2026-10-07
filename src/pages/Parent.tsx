@@ -1,3 +1,4 @@
+import { MyPhrases } from '../components/MyPhrases';
 import { normalizeBingoSettings, type ProductMix } from '../content/math/bingo';
 import { useRef, useState } from 'react';
 import { useStore } from '../store/StoreContext';
@@ -235,10 +236,10 @@ function Settings() {
           <div key={m.type} className="mission-setting">
             <label className="check">
               <input type="checkbox" checked={m.enabled} onChange={(e) => setMission(m.type, { enabled: e.target.checked })} />
-              {MISSION_META[m.type].icon} {MISSION_META[m.type].title}
+              {pid === 'parent' && m.type === 'talk' ? '💼 비즈니스 프리토킹' : `${MISSION_META[m.type].icon} ${MISSION_META[m.type].title}`}
             </label>
             <input
-              aria-label={`${MISSION_META[m.type].title} 하루 목표`}
+              aria-label={`${pid === 'parent' && m.type === 'talk' ? '비즈니스 프리토킹' : MISSION_META[m.type].title} 하루 목표`}
               type="number"
               min={1}
               max={100}
@@ -309,6 +310,7 @@ function Settings() {
           ))}
         </div>
       </div>
+      {pid === 'parent' && profile.level === 'adult' && <MyPhrases />}
     </div>
   );
 }
