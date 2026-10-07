@@ -165,6 +165,8 @@ export async function startTalk(
     channel = pc.createDataChannel('oai-events');
     channel.onmessage = (e) => {
       const event = parseRealtimeEvent(e.data);
+      // OpenAI가 보낸 오류 이벤트 원문을 개발자 도구 콘솔에 남겨 원인을 확인할 수 있게 한다(비밀값 없음).
+      if (event?.type === 'error') console.error('realtime error event', e.data);
       if (!event || stopped) return;
       if (event.type === 'state') cb.onState(event.state);
       if (event.type === 'assistant') cb.onAssistantText(event.itemId, event.text, event.done);
