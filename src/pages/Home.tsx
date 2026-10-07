@@ -4,6 +4,7 @@ import { MISSION_META, type Go } from '../route';
 import { formatKoreanDate, lastNDays, parseDateKey, toDateKey } from '../lib/date';
 import { currentStreak, enabledMissions } from '../lib/progress';
 import { ProgressBar, TopBar } from '../components/common';
+import { outfitFor } from '../lib/outfit';
 import { aiReady } from '../lib/talk';
 
 export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
@@ -22,7 +23,7 @@ export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
       <TopBar
         title={
           <>
-            {profile.avatar} {profile.name}
+            {profile.avatar}<span aria-label="오늘의 소품">{outfitFor(today, profileId)}</span> {profile.name}
           </>
         }
         onBack={() => go({ name: 'profiles' })}
@@ -93,6 +94,8 @@ export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
           📚 {profile.level === 'adult' ? '독서노트' : '독서록'} 열기
         </button>
       )}
+
+      {profile.level !== 'adult' && <button className="btn btn-soft" onClick={() => go({ name: 'science-collection', profileId })}>🔬 {profile.level === 'g5' ? '실험실 빌드' : '나의 과학 박물관'} 열기 · {Object.keys(data.science.done).length}장 · 🏅 {data.science.badges.length}</button>}
 
       <h2 className="section-title">최근 2주 도장</h2>
       <div className="stamp-grid">

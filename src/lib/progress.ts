@@ -44,6 +44,8 @@ export interface ProgressEvent {
   amount?: number;
   correct?: number;
   total?: number;
+  /** 실험 참여 별·예상 보너스는 퀴즈 정답률에 합치지 않는다. */
+  stars?: number;
   /** 연산 단원별 통계 */
   skill?: string;
 }
@@ -74,7 +76,7 @@ export function applyProgress(
   if (ev.type === 'talk') {
     const target = settings.missions.find((m) => m.type === 'talk')?.target ?? 0;
     data.stars += Math.max(0, Math.min(target, day.progress.talk ?? 0) - Math.min(target, before));
-  } else data.stars += correct;
+  } else data.stars += ev.stars ?? correct;
   if (ev.skill) {
     const s = (day.mathBySkill[ev.skill] ??= { correct: 0, total: 0 });
     s.correct += correct;

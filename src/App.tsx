@@ -9,6 +9,8 @@ import { Reading } from './pages/Reading';
 import { Rewards } from './pages/Rewards';
 import { Parent } from './pages/Parent';
 import { PinGate } from './components/PinGate';
+import { ScienceSession } from './pages/ScienceSession';
+import { ScienceCollection } from './pages/ScienceCollection';
 import { TalkSession } from './pages/TalkSession';
 
 export function App() {
@@ -33,6 +35,10 @@ export function App() {
       return <SpeakingSession profileId={route.profileId} go={setRoute} />;
     case 'reading':
       return <Reading profileId={route.profileId} go={setRoute} />;
+    case 'science':
+      return <ScienceSession key={route.profileId} profileId={route.profileId} go={setRoute} />;
+    case 'science-collection':
+      return <ScienceCollection profileId={route.profileId} go={setRoute} />;
     case 'talk':
       return <TalkSession profileId={route.profileId} go={setRoute} />;
     case 'rewards':
