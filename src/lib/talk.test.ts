@@ -118,6 +118,7 @@ describe('대화 미션과 보상', () => {
   it.each([false, true])('AI 연결 상태 %s를 목록·완료·비율·보상에 같은 기준으로 반영한다', (ready) => {
     const state = defaultState(), settings = state.settings.kid1, data = emptyProfileData('g5');
     const options = { aiReady: ready }, date = '2026-10-07';
+    applyProgress(data, settings, date, { type: 'science' }, options);
     expect(enabledMissions(settings, options).some((m) => m.type === 'talk')).toBe(ready);
     expect(applyProgress(data, settings, date, { type: 'math', amount: 20 }, options).justCompleted).toBe(!ready);
     expect(isDayComplete(data.days[date], settings, options)).toBe(!ready);
@@ -147,6 +148,7 @@ describe('대화 미션과 보상', () => {
   });
   it('AI 설정이 없으면 대화를 완료 조건·진행 비율에서 빼고 쿠폰은 한 번 지급한다', () => {
     const state = defaultState(), settings = state.settings.kid1, data = emptyProfileData('g5');
+    applyProgress(data, settings, '2026-10-07', { type: 'science' }, { aiReady: false });
     expect(aiReady({})).toBe(false);
     expect(aiReady({ endpoint: 'https://worker.example', token: 'x'.repeat(32) })).toBe(true);
     expect(applyProgress(data, settings, '2026-10-07', { type: 'math', amount: 20 }, { aiReady: false }).justCompleted).toBe(true);
@@ -159,6 +161,7 @@ describe('대화 미션과 보상', () => {
   it('대화 진행은 분마다 오르고 목표를 초과한 추가 대화에는 별을 더 주지 않는다', () => {
     const state = defaultState(), settings = state.settings.kid2, data = emptyProfileData('g3');
     const day = '2026-10-07';
+    applyProgress(data, settings, day, { type: 'science' }, { aiReady: true });
     applyProgress(data, settings, day, { type: 'math', amount: 20 }, { aiReady: true });
     for (let i = 0; i < 14; i++) applyProgress(data, settings, day, { type: 'talk', amount: 1 }, { aiReady: true });
     expect(data.stars).toBe(14);

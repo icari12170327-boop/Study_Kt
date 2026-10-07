@@ -1,3 +1,4 @@
+import { normalizeScience } from '../content/science/session';
 import type { AppState } from '../types';
 import type { AiConfig } from '../../shared/ai';
 import { defaultSettings, defaultState } from './defaults';
@@ -18,6 +19,7 @@ export function normalizeState(raw: unknown): AppState {
   for (const p of profiles) {
     settings[p.id] = { ...defaultSettings(p.level, p.id), ...s.settings?.[p.id] };
     settings[p.id].missions = settings[p.id].missions.map((m) => ({ ...m }));
+    if (!settings[p.id].missions.some(m => m.type === 'science')) settings[p.id].missions.push({ type: 'science', enabled: p.level !== 'adult', target: 1 });
     const talk = normalizeTalkSettings(settings[p.id].talk, p.level, p.id);
     settings[p.id].talk = talk;
     const mission = settings[p.id].missions.find((m) => m.type === 'talk');
@@ -26,6 +28,7 @@ export function normalizeState(raw: unknown): AppState {
       talk.dailyMinutes = mission.target;
     } else settings[p.id].missions = [...settings[p.id].missions, { type: 'talk', enabled: p.level !== 'adult', target: talk.dailyMinutes }];
     data[p.id] = { ...base.data[p.id], ...s.data?.[p.id] };
+    data[p.id].science = normalizeScience(s.data?.[p.id]?.science);
     data[p.id].talks = normalizeTalkLogs(s.data?.[p.id]?.talks);
     data[p.id].friendMemory = typeof s.data?.[p.id]?.friendMemory === 'string' ? s.data[p.id].friendMemory.slice(0, 1500) : '';
     const math = s.data?.[p.id]?.math;
