@@ -276,7 +276,7 @@ describe('대화 시간 제한과 서버 종료', () => {
   });
   it('동시에 같은 프로필로 요청해도 하나만 연결하고 다른 요청은 409다', async () => {
     const results = await Promise.all([start(), start()]);
-    expect(results.map((r) => r.status)).toEqual([200, 409]);
+    expect(results.map((r) => r.status).sort((a, b) => a - b)).toEqual([200, 409]);
     expect(calls).toBe(1);
   });
   it('1분 상한 후 알람이 통화를 종료하며 종료 보고가 없어도 두 번째 시작은 429다', async () => {
@@ -580,7 +580,7 @@ describe('KV 반영과 생성 동시성', () => {
       input: { title: '책', author: '', summary: '가'.repeat(40), level: 'adult' },
     };
     const results = await Promise.all([req('/api/generate', body), req('/api/generate', body)]);
-    expect(results.map((r) => r.status)).toEqual([200, 429]);
+    expect(results.map((r) => r.status).sort((a, b) => a - b)).toEqual([200, 429]);
   });
 });
 
