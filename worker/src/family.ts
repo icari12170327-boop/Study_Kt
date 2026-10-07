@@ -74,18 +74,34 @@ export class FamilyUsage {
 
   private closing = new Map<string, Promise<number>>();
 
+  // blockConcurrencyWhile 안에서 예외가 나면 Durable Object가 초기화되고 호출 전체가 502로 바뀐다.
+  // 그래서 콜백 안에서는 예외를 결과로 감싸 돌려주고, 잠금 밖에서 다시 던진다(busy, limit 등이 그대로 전달됨).
   private async snapshot<T>(read: (ledger: Ledger) => T): Promise<T> {
-    return this.state.blockConcurrencyWhile(async () =>
-      read((await this.state.storage.get<Ledger>('ledger')) ?? emptyLedger()),
-    );
+    const outcome = await this.state.blockConcurrencyWhile(async () => {
+      try {
+        return { ok: true as const, value: read((await this.state.storage.get<Ledger>('ledger')) ?? emptyLedger()) };
+      } catch (error) {
+        return { ok: false as const, error };
+      }
+    });
+    if (!outcome.ok) throw outcome.error;
+    return outcome.value;
   }
   private async update<T>(change: (ledger: Ledger) => T): Promise<T> {
-    return this.state.blockConcurrencyWhile(async () => {
+    const outcome = await this.state.blockConcurrencyWhile(async () => {
       const ledger = (await this.state.storage.get<Ledger>('ledger')) ?? emptyLedger();
-      const result = change(ledger);
+      let value: T;
+      try {
+        value = change(ledger);
+      } catch (error) {
+        // 변경 도중 실패하면 저장하지 않는다.
+        return { ok: false as const, error };
+      }
       await this.save(ledger);
-      return result;
+      return { ok: true as const, value };
     });
+    if (!outcome.ok) throw outcome.error;
+    return outcome.value;
   }
   private async closeOnce(id: string): Promise<number> {
     for (;;) {
