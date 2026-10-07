@@ -62,7 +62,7 @@ export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
 
       <div className="mission-list">
         {missions.map((m) => {
-          const meta = MISSION_META[m.type];
+          const meta = profileId === 'parent' && profile.level === 'adult' && m.type === 'talk' ? { ...MISSION_META.talk, icon: '💼', title: '비즈니스 프리토킹' } : MISSION_META[m.type];
           const done = day?.progress[m.type] ?? 0;
           const finished = done >= m.target;
           return (
@@ -92,7 +92,7 @@ export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
       {profileId !== 'parent' && profile.level !== 'adult' && normalizeBingoSettings(settings.bingo, profile.level).enabled && <button className="mission-card bingo-home" onClick={() => go({ name: 'bingo', profileId })}>
         <span className="mission-icon">🎯</span><span className="mission-body"><span className="mission-title">수학 빙고</span><span className="small muted">숫자 3칸을 찾는 자유 놀이</span></span><span className="mission-go">놀기</span>
       </button>}
-      {missions.some((m) => m.type === 'talk') && !aiReady(state.ai) && <p className="panel">보호자에게 AI 연결을 부탁하세요. 지금은 다른 미션만 끝내도 쿠폰을 받을 수 있어요.</p>}
+      {missions.some((m) => m.type === 'talk') && !aiReady(state.ai) && <p className="panel">{profileId === 'parent' ? '보호자 모드에서 AI 연결을 설정해 주세요. 지금은 다른 미션만 끝내도 쿠폰을 받을 수 있어요.' : '보호자에게 AI 연결을 부탁하세요. 지금은 다른 미션만 끝내도 쿠폰을 받을 수 있어요.'}</p>}
 
       {missions.every((m) => m.type !== 'reading') && (
         <button className="btn btn-ghost" onClick={() => go({ name: 'reading', profileId })}>
@@ -101,6 +101,8 @@ export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
       )}
 
       {profile.level !== 'adult' && <button className="btn btn-soft" onClick={() => go({ name: 'science-collection', profileId })}>🔬 {profile.level === 'g5' ? '실험실 빌드' : '나의 과학 박물관'} 열기 · {Object.keys(data.science.collected).length}장 · 🏅 {data.science.badges.length}</button>}
+
+      {profileId === 'parent' && <button className="btn btn-soft" onClick={() => go({ name: 'parent' })}>🔒 보호자 모드 · 대화 기록과 내 표현 관리</button>}
 
       <h2 className="section-title">최근 2주 도장</h2>
       <div className="stamp-grid">

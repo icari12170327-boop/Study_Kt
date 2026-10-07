@@ -5,11 +5,10 @@ import type { Go } from '../route';
 import { toDateKey } from '../lib/date';
 import { applyProgress } from '../lib/progress';
 import { aiReady } from '../lib/talk';
-import { pickSessionKeys, reviewCard } from '../lib/srs';
-import { shuffle } from '../lib/random';
+import { reviewCard } from '../lib/srs';
 import { canRecognize, listenOnce, speak, type ListenHandle } from '../lib/speech';
 import { scoreSpeech, type SpeechScore } from '../lib/similarity';
-import { SENTENCE_DECK_MAP, speakKey, type Sentence } from '../content/english/sentences';
+import { buildSpeakingSession } from '../content/english/session';
 import { ProgressBar, TopBar } from '../components/common';
 import { SessionDone } from './SessionDone';
 
@@ -25,14 +24,8 @@ export function SpeakingSession({ profileId, go }: { profileId: ProfileId; go: G
   const supported = useMemo(canRecognize, []);
 
   const items = useMemo(() => {
-    const byKey = new Map<string, Sentence>();
-    for (const id of settings.speakingDecks) {
-      const deck = SENTENCE_DECK_MAP[id];
-      if (deck) for (const s of deck.sentences) byKey.set(speakKey(id, s.id), s);
-    }
     const done = data.days[today]?.progress.speaking ?? 0;
-    const keys = pickSessionKeys([...byKey.keys()], data.srs, today, Math.max(target - done, 0) || 5);
-    return shuffle(keys).map((key) => ({ key, sentence: byKey.get(key)! }));
+    return buildSpeakingSession(settings.speakingDecks, data.srs, today, Math.max(target - done, 0) || 5, undefined, data);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 채점으로 복습 기록이 바뀌어도 문장 순서를 유지하고 새 라운드에서만 생성한다.
   }, [round]);
 

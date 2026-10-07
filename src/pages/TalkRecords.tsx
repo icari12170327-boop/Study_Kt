@@ -1,3 +1,5 @@
+import { BusinessFeedback } from '../components/BusinessFeedback';
+import { scenarioTitle } from '../lib/business';
 import { useState } from 'react';
 import { useStore } from '../store/StoreContext';
 import type { ProfileId, TalkSettings } from '../types';
@@ -31,42 +33,45 @@ function FriendSettings({ profileId }: { profileId: ProfileId }) {
 function ProfileRecords({ profileId }: { profileId: ProfileId }) {
   const { state, update } = useStore();
   const data = state.data[profileId];
+  const business = profileId === 'parent' && state.profiles.find(p => p.id === profileId)?.level === 'adult';
   const [selected, setSelected] = useState<string>();
   const [memory, setMemory] = useState(data.friendMemory);
   const [message, setMessage] = useState('');
   const log = data.talks.find((talk) => talk.id === selected);
   return <div className="form">
-    <FriendSettings profileId={profileId} />
+    {!business && <FriendSettings profileId={profileId} />}
     <div className="panel form">
-      <h2>친구 기억</h2>
+      <h2>{business ? '대화 기억' : '친구 기억'}</h2>
       <label><span id={`friend-memory-${profileId}`}>기억 내용</span><textarea aria-labelledby={`friend-memory-${profileId}`} rows={5} maxLength={1500} value={memory} onChange={(e) => setMemory(e.target.value)} /></label>
       <p className="small muted">{memory.length} / 1500자 · 실명·학교·주소·연락처는 남기지 마세요.</p>
-      <div className="row-center"><button className="btn btn-primary" onClick={() => { update((draft) => { draft.data[profileId].friendMemory = memory; }); setMessage('친구 기억을 저장했어요.'); }}>기억 저장</button><button className="btn" onClick={() => {
-        if (!confirm('친구 기억을 지울까요? 대화 기록은 유지돼요.')) return;
-        update((draft) => { draft.data[profileId].friendMemory = ''; }); setMemory(''); setMessage('친구 기억을 지웠어요.');
-      }}>기억 지우기</button></div>
+      <div className="row-center"><button className="btn btn-primary" onClick={() => { update((draft) => { draft.data[profileId].friendMemory = memory; }); setMessage(business ? '대화 기억을 저장했어요.' : '친구 기억을 저장했어요.'); }}>기억 저장</button><button className="btn" onClick={() => {
+        if (!confirm(business ? '대화 기억을 지울까요? 대화 기록은 유지돼요.' : '친구 기억을 지울까요? 대화 기록은 유지돼요.')) return;
+        update((draft) => { draft.data[profileId].friendMemory = ''; }); setMemory(''); setMessage(business ? '대화 기억을 지웠어요.' : '친구 기억을 지웠어요.');
+      }}>{business ? '대화 기억 지우기' : '기억 지우기'}</button></div>
       {message && <p role="status">{message}</p>}
     </div>
     <div className="panel form">
-      <h2>대화 기록</h2><p className="small muted">최근 60개를 기기에 저장해요. 영어 비율은 아이가 말한 라틴 단어와 한글 어절로 계산해요.</p>
+      <h2>대화 기록</h2><p className="small muted">{business ? '상황과 길이, 피드백을 최근 60개까지 기기에 저장해요.' : '최근 60개를 기기에 저장해요. 영어 비율은 아이가 말한 라틴 단어와 한글 어절로 계산해요.'}</p>
       {data.talks.length === 0 && <p>아직 대화 기록이 없어요.</p>}
       {[...data.talks].reverse().map((talk) => <button key={talk.id} className="talk-record" aria-expanded={selected === talk.id} onClick={() => setSelected(selected === talk.id ? undefined : talk.id)}>
-        <strong>{talk.date} · {Math.floor(talk.seconds / 60)}분 {talk.seconds % 60}초 · 영어 {Math.round(talk.englishRatio * 100)}% {talk.flagged && <span aria-label="보호자 확인 필요">⚠️</span>}</strong>
-        <span>{talk.summary?.highlightKo ?? '요약이 없는 대화예요.'}</span>
+        <strong>{business && `${scenarioTitle(talk.scenarioId)} · `}{talk.date} · {Math.floor(talk.seconds / 60)}분 {talk.seconds % 60}초 · 영어 {Math.round(talk.englishRatio * 100)}% {talk.flagged && <span aria-label="보호자 확인 필요">⚠️</span>}</strong>
+        <span>{business ? talk.feedback?.overallKo ?? '피드백을 다시 받을 수 있어요.' : talk.summary?.highlightKo ?? '요약이 없는 대화예요.'}</span>
       </button>)}
     </div>
     {log && <div className="panel form">
-      <h2>{log.date} 대화 상세</h2>
+      <h2>{business && `${scenarioTitle(log.scenarioId)} · `}{log.date} 대화 상세</h2>
+      {business && log.situation && <p className="pre">{log.situation}</p>}
       {log.flagged && <p className="bad-text">⚠️ 보호자 확인이 필요한 대화예요.</p>}
-      <h3>전체 자막</h3>{log.lines.map((line, index) => <p className="talk-record-line" key={index}><strong>{line.role === 'kid' ? '아이' : '친구'}:</strong> {line.text}{line.peeked && <span className="small muted"> (자막을 봤어요)</span>}</p>)}
+      <h3>전체 자막</h3>{log.lines.map((line, index) => <p className="talk-record-line" key={index}><strong>{business ? line.role === 'kid' ? '나' : '상대' : line.role === 'kid' ? '아이' : '친구'}:</strong> {line.text}{line.peeked && <span className="small muted"> (자막을 봤어요)</span>}</p>)}
       {!log.lines.length && <p>저장된 자막이 없어요.</p>}
-      {log.summary && <><h3>요약</h3><p>{log.summary.highlightKo}</p><div className="chip-wrap">{log.summary.topicsKo.map((topic) => <span className="chip" key={topic}>{topic}</span>)}</div><h3>새 표현</h3>{log.summary.newExpressions.map((expression, index) => <p key={index}><span lang="en">{expression.en}</span> · {expression.ko}</p>)}<h3>다음 주제</h3><div className="chip-wrap">{log.summary.nextTopics.map((topic) => <span className="chip" key={topic}>{topic}</span>)}</div></>}
+      {business && <BusinessFeedback key={log.id} log={log} />}
+      {!business && log.summary && <><h3>요약</h3><p>{log.summary.highlightKo}</p><div className="chip-wrap">{log.summary.topicsKo.map((topic) => <span className="chip" key={topic}>{topic}</span>)}</div><h3>새 표현</h3>{log.summary.newExpressions.map((expression, index) => <p key={index}><span lang="en">{expression.en}</span> · {expression.ko}</p>)}<h3>다음 주제</h3><div className="chip-wrap">{log.summary.nextTopics.map((topic) => <span className="chip" key={topic}>{topic}</span>)}</div></>}
     </div>}
   </div>;
 }
 export function TalkRecords() {
   const { state } = useStore();
-  const children = state.profiles.filter((profile) => profile.level !== 'adult');
-  const [profileId, setProfileId] = useState<ProfileId>(children[0]?.id ?? 'kid1');
-  return <div className="form"><div className="tabs">{children.map((profile) => <button className={`tab ${profileId === profile.id ? 'active' : ''}`} key={profile.id} onClick={() => setProfileId(profile.id)}>{profile.avatar} {profile.name}</button>)}</div>{children.some((p) => p.id === profileId) ? <ProfileRecords key={profileId} profileId={profileId} /> : <p>아이 프로필을 설정해 주세요.</p>}</div>;
+  const profiles = state.profiles;
+  const [profileId, setProfileId] = useState<ProfileId>(profiles[0]?.id ?? 'kid1');
+  return <div className="form"><div className="tabs">{profiles.map((profile) => <button className={`tab ${profileId === profile.id ? 'active' : ''}`} key={profile.id} onClick={() => setProfileId(profile.id)}>{profile.avatar} {profile.name}</button>)}</div>{profiles.some((p) => p.id === profileId) ? <ProfileRecords key={profileId} profileId={profileId} /> : <p>프로필을 설정해 주세요.</p>}</div>;
 }

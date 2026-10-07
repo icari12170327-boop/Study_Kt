@@ -1,3 +1,4 @@
+import { MY_PHRASES } from '../lib/business';
 import type { AppState, Level, ProfileData, ProfileId, ProfileSettings } from '../types';
 import { skillsForLevel } from '../content/math/skills';
 import { defaultMathState } from '../content/math/levels';
@@ -7,13 +8,13 @@ import { defaultBingoSettings } from '../content/math/bingo';
 import { defaultTalkSettings } from '../lib/talk';
 
 export function emptyProfileData(level: Level = 'g3'): ProfileData {
-  return { bingo: { recent: [], best: {} }, science: { collected: {}, experiments: {}, badges: [], recentWrong: [] }, math: defaultMathState(level), stars: 0, streak: 0, days: {}, wrongNotes: [], srs: {}, coupons: [], notes: [], talks: [], friendMemory: '' };
+  return { customCards: [], bizSituations: [], bingo: { recent: [], best: {} }, science: { collected: {}, experiments: {}, badges: [], recentWrong: [] }, math: defaultMathState(level), stars: 0, streak: 0, days: {}, wrongNotes: [], srs: {}, coupons: [], notes: [], talks: [], friendMemory: '' };
 }
 
 /** 학년별 기본 미션. 10월 기준 2학기 단원과 1학기 복습 단원을 모두 켠다. */
 export function defaultSettings(level: Level, id?: ProfileId): ProfileSettings {
-  const vocabDecks = VOCAB_DECKS.filter((d) => d.level === level).map((d) => d.id);
-  const speakingDecks = SENTENCE_DECKS.filter((d) => d.level === level).map((d) => d.id);
+  const vocabDecks = VOCAB_DECKS.filter((d) => d.level === level).map((d) => d.id).concat(level === 'adult' ? [MY_PHRASES] : []);
+  const speakingDecks = SENTENCE_DECKS.filter((d) => d.level === level).map((d) => d.id).concat(level === 'adult' ? [MY_PHRASES] : []);
   const mathSkills = skillsForLevel(level).map((s) => s.id);
   switch (level) {
     case 'g3':
@@ -54,13 +55,14 @@ export function defaultSettings(level: Level, id?: ProfileId): ProfileSettings {
       };
     case 'adult':
       return {
+        bizTalkEnabledOnce: true,
         scienceV2: true,
         bingo: defaultBingoSettings(level),
         talk: defaultTalkSettings(level, id),
         missions: [
           { type: 'science', enabled: false, target: 5 },
           { type: 'math', enabled: false, target: 10 },
-          { type: 'talk', enabled: false, target: 30 },
+          { type: 'talk', enabled: true, target: 15 },
           { type: 'vocab', enabled: true, target: 10 },
           { type: 'speaking', enabled: true, target: 10 },
           { type: 'reading', enabled: true, target: 1 },

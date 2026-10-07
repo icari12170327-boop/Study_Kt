@@ -21,7 +21,7 @@ export function VocabSession({ profileId, go }: { profileId: ProfileId; go: Go }
 
   const items = useMemo(() => {
     const done = data.days[today]?.progress.vocab ?? 0;
-    return buildVocabSession(settings.vocabDecks, data.srs, today, Math.max(target - done, 0) || 10);
+    return buildVocabSession(settings.vocabDecks, data.srs, today, Math.max(target - done, 0) || 10, undefined, data);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 복습 기록이 바뀌어도 단어 순서를 유지하고 새 라운드에서만 생성한다.
   }, [round]);
 
