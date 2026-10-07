@@ -134,7 +134,7 @@ function Overview() {
               </div>
             )}
 
-            {p.level !== 'adult' && <ScienceOverview data={data.science} />}
+            {p.level !== 'adult' && <ScienceOverview data={data} />}
 
             {data.wrongNotes.length > 0 && (
               <>

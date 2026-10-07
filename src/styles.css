@@ -378,3 +378,15 @@ button.science-choice { flex-direction: column; align-items: flex-start; }
 .science-overview summary { min-height: 48px; padding: 12px 0; cursor: pointer; font-weight: 700; }
 .science-record { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding: 12px 0; overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) { .science-acquired { animation: none; } }
+
+/* 과학 문제는 큰 보기와 항상 펼쳐지는 해설을 사용한다. */
+.science-question { font-size: clamp(1.25rem, 3vw, 1.8rem); line-height: 1.55; }
+button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .65rem; }
+.science-choice.selected { border-color: var(--primary); }
+.science-choice.science-correct { border: 2px solid var(--primary); opacity: 1; }
+.science-feedback { display: grid; gap: 1rem; }
+.science-feedback summary { cursor: pointer; min-height: 44px; padding: .6rem 0; }
+.science-feedback h3, .science-feedback p { margin: 0; }
+.science-tile .small { display: block; }
+.science-detail fieldset { min-width: 0; }
+.science-detail .science-choice { overflow-wrap: anywhere; }

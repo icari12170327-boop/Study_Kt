@@ -95,7 +95,7 @@ export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
         </button>
       )}
 
-      {profile.level !== 'adult' && <button className="btn btn-soft" onClick={() => go({ name: 'science-collection', profileId })}>🔬 {profile.level === 'g5' ? '실험실 빌드' : '나의 과학 박물관'} 열기 · {Object.keys(data.science.done).length}장 · 🏅 {data.science.badges.length}</button>}
+      {profile.level !== 'adult' && <button className="btn btn-soft" onClick={() => go({ name: 'science-collection', profileId })}>🔬 {profile.level === 'g5' ? '실험실 빌드' : '나의 과학 박물관'} 열기 · {Object.keys(data.science.collected).length}장 · 🏅 {data.science.badges.length}</button>}
 
       <h2 className="section-title">최근 2주 도장</h2>
       <div className="stamp-grid">
