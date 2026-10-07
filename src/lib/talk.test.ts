@@ -6,6 +6,38 @@ import { applyProgress, dayRatio, emptyDay, enabledMissions, isDayComplete } fro
 import type { TalkLine } from '../types';
 
 describe('대화 저장 마이그레이션', () => {
+  it('세 프로필의 v1 형식 기록을 정규화·백업 복원해도 오답·SRS·독서·연산 기록을 유지한다', () => {
+    const state = defaultState(), date = '2026-10-06';
+    for (const profile of state.profiles) {
+      const data = state.data[profile.id], settings = state.settings[profile.id];
+      settings.missions = settings.missions.filter((mission) => mission.type !== 'talk');
+      Reflect.deleteProperty(settings, 'talk');
+      data.stars = 31; data.streak = 3; data.lastCompleted = date;
+      data.wrongNotes = [{ id: 'wrong-1', addedAt: date, given: '3', problem: { skill: 'g3-add3', question: '123 + 456', answer: { kind: 'int', value: 579 } } }];
+      data.srs = { '기존 카드 id': { box: 4, due: '2026-10-08', seen: 5, lapses: 1 } };
+      data.coupons = [{ id: 'used-coupon', label: '기존 쿠폰', earnedAt: date, usedAt: date }];
+      data.notes = [{ id: 'reading-1', title: '기존 책', author: '저자', date, summary: '기존 독서 기록', cards: [{ id: 'qa-1', q: '질문', a: '답' }] }];
+      data.math.lastEvaluated = date;
+      data.math.history = [{ date, level: data.math.level, counted: 20, correct: 18, guesses: 1, medianSec: 9 }];
+      data.days[date] = { ...emptyDay(date), progress: { math: 20, vocab: 8 }, completed: true, correct: 18, total: 20,
+        mathBySkill: { 'g3-add3': { correct: 18, total: 20 } }, mathAttempts: [{ skill: 'g3-add3', correct: true, activeMs: 9000, guessed: false }] };
+      Reflect.deleteProperty(data.days[date], 'talkSeconds');
+      Reflect.deleteProperty(data, 'talks'); Reflect.deleteProperty(data, 'friendMemory');
+    }
+    const legacy = { ...state, version: 1 as const }, before = structuredClone(legacy);
+    const normalized = normalizeState(legacy), restored = importState(JSON.stringify(legacy));
+    for (const next of [normalized, restored, importState(exportState(normalized))]) {
+      expect(next.version).toBe(2);
+      for (const profile of state.profiles) {
+        const data = next.data[profile.id], old = before.data[profile.id];
+        for (const field of ['stars', 'streak', 'lastCompleted', 'wrongNotes', 'srs', 'coupons', 'notes', 'math'] as const)
+          expect(data[field]).toEqual(old[field]);
+        expect(data.days[date]).toEqual({ ...old.days[date], talkSeconds: 0 });
+        expect(data.talks).toEqual([]); expect(data.friendMemory).toBe('');
+      }
+    }
+    expect(legacy).toEqual(before);
+  });
   it('대화 필드가 없는 실제 v1 구조에도 빈 기록과 기억을 채운다', () => {
     const state = defaultState();
     const oldData = { ...state.data.kid1 };
