@@ -9,12 +9,18 @@ export interface TalkHandle {
   stop(): Promise<void>;
   setMicEnabled(on: boolean): void;
   sendSystemNote(text: string): void;
+  beginPushToTalk(): void;
+  endPushToTalk(): void;
 }
 export interface TalkCallbacks {
   onState(state: TalkState): void;
   onAssistantText(itemId: string, delta: string, done: boolean): void;
   onUserText(itemId: string, text: string): void;
   onError(error: AiError): void;
+  onConnected?(remainingSeconds: number): void;
+  onUserSpeaking?(): void;
+  onFriendFinished?(): void;
+  onCharged?(seconds: number): void;
 }
 const localTalks = new Set<{ profileId: SessionRequest['profileId']; cfg: AiConfig; stop: () => Promise<void> }>();
 export async function stopLocalTalks(cfg: AiConfig, profileId: SessionRequest['profileId'] | 'all'): Promise<void> {
@@ -84,6 +90,7 @@ export async function startTalk(
   cfg: AiConfig,
   req: Omit<SessionRequest, 'offerSdp'>,
   cb: TalkCallbacks,
+  signal?: AbortSignal,
 ): Promise<TalkHandle> {
   normalizeAiConfig(cfg);
   cb.onState('connecting');
@@ -97,11 +104,39 @@ export async function startTalk(
   let stopping: Promise<void> | undefined;
   let capTimer: ReturnType<typeof setTimeout> | undefined;
   let connectTimer: ReturnType<typeof setTimeout> | undefined;
+  let connected = false;
+  let expiresAt = Infinity;
+  let pressing = false;
+  let pressStarted = 0;
+  let responseActive = false;
+  let audioPlaying = false;
+  let pendingResponse = false;
+  const requestResponse = () => {
+    pendingResponse = true;
+    if (!responseActive && !audioPlaying && !stopped && channel?.readyState === 'open') {
+      pendingResponse = false;
+      responseActive = true;
+      channel.send(JSON.stringify({ type: 'response.create' }));
+    }
+  };
+  const releasePress = () => {
+    if (!req.pushToTalk) return;
+    stream?.getAudioTracks().forEach((track) => { track.enabled = false; });
+    if (!pressing || stopped || channel?.readyState !== 'open') { pressing = false; return; }
+    pressing = false;
+    // 아주 짧은 탭은 빈 오디오 커밋 오류 대신 버퍼만 비운다.
+    if (performance.now() - pressStarted < 200) channel.send(JSON.stringify({ type: 'input_audio_buffer.clear' }));
+    else { channel.send(JSON.stringify({ type: 'input_audio_buffer.commit' })); requestResponse(); }
+  };
+  const hidden = () => { if (document.hidden) releasePress(); };
   const cleanup = () => {
     localTalks.delete(localTalk);
     clearTimeout(capTimer);
     clearTimeout(connectTimer);
     window.removeEventListener('pagehide', pagehide);
+    signal?.removeEventListener('abort', pagehide);
+    window.removeEventListener('blur', releasePress);
+    document.removeEventListener?.('visibilitychange', hidden);
     stream?.getTracks().forEach((track) => track.stop());
     if (pc) {
       pc.onconnectionstatechange = null;
@@ -125,13 +160,16 @@ export async function startTalk(
       stopped = true;
       cleanup();
       try {
-        if (session)
-          await aiRequest(
+        if (session) {
+          const receipt = await aiRequest(
             cfg,
             '/api/realtime/end',
             { sessionId: session.sessionId, seconds: Math.max(0, Math.floor((performance.now() - started) / 1000)) },
             true,
           );
+          if (receipt && typeof receipt === 'object' && 'ok' in receipt && receipt.ok === true && 'seconds' in receipt && typeof receipt.seconds === 'number' && Number.isFinite(receipt.seconds) && receipt.seconds >= 0 && receipt.seconds <= 86400)
+            cb.onCharged?.(Math.floor(receipt.seconds));
+        }
       } catch (e) {
         cb.onError(e instanceof AiError ? e : new AiError('server'));
       } finally {
@@ -151,6 +189,10 @@ export async function startTalk(
   };
   try {
     window.addEventListener('pagehide', pagehide);
+    signal?.addEventListener('abort', pagehide, { once: true });
+    window.addEventListener('blur', releasePress);
+    document.addEventListener?.('visibilitychange', hidden);
+    if (signal?.aborted) throw new AiError('network');
     if (!navigator.mediaDevices?.getUserMedia) throw new AiError('mic-denied');
     try {
       stream = await navigator.mediaDevices.getUserMedia({
@@ -160,9 +202,9 @@ export async function startTalk(
       throw new AiError('mic-denied');
     }
     if (stopped) {
-      stream.getTracks().forEach((track) => track.stop());
       throw new AiError('network');
     }
+    if (req.pushToTalk) stream.getAudioTracks().forEach((track) => { track.enabled = false; });
     pc = new RTCPeerConnection();
     audio = document.createElement('audio');
     audio.autoplay = true;
@@ -176,9 +218,18 @@ export async function startTalk(
     channel = pc.createDataChannel('oai-events');
     channel.onmessage = (e) => {
       const event = parseRealtimeEvent(e.data);
-      // OpenAI가 보낸 오류 이벤트 원문을 개발자 도구 콘솔에 남겨 원인을 확인할 수 있게 한다(비밀값 없음).
-      if (event?.type === 'error') console.error('realtime error event', e.data);
-      if (!event || stopped) return;
+      if (stopped) return;
+      try {
+        const raw = JSON.parse(e.data) as { type?: string };
+        if (raw.type === 'response.created') responseActive = true;
+        if (raw.type === 'response.done') responseActive = false;
+        if (raw.type === 'output_audio_buffer.started') audioPlaying = true;
+        if (raw.type === 'output_audio_buffer.stopped' || raw.type === 'output_audio_buffer.cleared') audioPlaying = false;
+        if (raw.type === 'input_audio_buffer.speech_started') cb.onUserSpeaking?.();
+        if (raw.type === 'output_audio_buffer.stopped') cb.onFriendFinished?.();
+        if (pendingResponse) requestResponse();
+      } catch { /* 잘못된 이벤트는 파서가 걸러낸다. */ }
+      if (!event) return;
       if (event.type === 'state') cb.onState(event.state);
       if (event.type === 'assistant') cb.onAssistantText(event.itemId, event.text, event.done);
       if (event.type === 'user') cb.onUserText(event.itemId, event.text);
@@ -189,12 +240,17 @@ export async function startTalk(
     pc.onconnectionstatechange = () => {
       if (pc?.connectionState === 'connected') {
         clearTimeout(connectTimer);
+        if (!connected && session) {
+          connected = true;
+          cb.onConnected?.(Math.max(0, Math.ceil((expiresAt - performance.now()) / 1000)));
+        }
         cb.onState('listening');
       }
       if (['failed', 'disconnected', 'closed'].includes(pc?.connectionState ?? '')) fail(new AiError('network'));
     };
     await pc.setLocalDescription(await pc.createOffer());
     await waitForIce(pc);
+    if (stopped) throw new AiError('network');
     const result = await aiRequest(cfg, '/api/realtime/session', { ...req, offerSdp: pc.localDescription?.sdp ?? '' });
     if (
       !result ||
@@ -210,6 +266,7 @@ export async function startTalk(
     )
       throw new AiError('server');
     session = result as SessionResponse;
+    expiresAt = performance.now() + session.remainingSeconds * 1000;
     if (stopped) {
       await aiRequest(cfg, '/api/realtime/end', { sessionId: session.sessionId, seconds: 0 }, true);
       throw new AiError('network');
@@ -219,14 +276,21 @@ export async function startTalk(
     }, session.remainingSeconds * 1000);
     connectTimer = setTimeout(() => fail(new AiError('network')), 15000);
     await pc.setRemoteDescription({ type: 'answer', sdp: session.answerSdp });
+    const mic = (on: boolean) => {
+      if (!stopped) stream?.getAudioTracks().forEach((track) => { track.enabled = on; });
+    };
     return {
       stop,
-      setMicEnabled: (on) => {
-        if (!stopped)
-          stream?.getAudioTracks().forEach((track) => {
-            track.enabled = on;
-          });
+      setMicEnabled: mic,
+      beginPushToTalk: () => {
+        if (!req.pushToTalk || stopped || pressing || channel?.readyState !== 'open') return;
+        pressing = true;
+        pressStarted = performance.now();
+        channel.send(JSON.stringify({ type: 'input_audio_buffer.clear' }));
+        mic(true);
+        cb.onUserSpeaking?.();
       },
+      endPushToTalk: releasePress,
       sendSystemNote: (text) => {
         if (stopped || channel?.readyState !== 'open' || !['[WRAP_UP]', '[STUCK]'].includes(text)) return;
         // 시스템 역할을 새로 만들지 않고 서버가 허용한 신호만 사용자 항목으로 보낸다.
@@ -236,7 +300,7 @@ export async function startTalk(
             item: { type: 'message', role: 'user', content: [{ type: 'input_text', text }] },
           }),
         );
-        channel.send(JSON.stringify({ type: 'response.create' }));
+        requestResponse();
       },
     };
   } catch (e) {

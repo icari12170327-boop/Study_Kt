@@ -2,6 +2,7 @@ import { useStore } from '../store/StoreContext';
 import type { Go } from '../route';
 import { toDateKey, formatKoreanDate } from '../lib/date';
 import { currentStreak, dayRatio } from '../lib/progress';
+import { aiReady } from '../lib/talk';
 import { ProgressBar } from '../components/common';
 
 export function ProfileSelect({ go }: { go: Go }) {
@@ -18,7 +19,7 @@ export function ProfileSelect({ go }: { go: Go }) {
         {state.profiles.map((p) => {
           const data = state.data[p.id];
           const settings = state.settings[p.id];
-          const ratio = dayRatio(data.days[today], settings);
+          const ratio = dayRatio(data.days[today], settings, { aiReady: aiReady(state.ai) });
           const done = data.days[today]?.completed;
           return (
             <button key={p.id} className="profile-card" onClick={() => go({ name: 'home', profileId: p.id })}>

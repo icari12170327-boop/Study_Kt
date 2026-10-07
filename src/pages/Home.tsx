@@ -4,6 +4,7 @@ import { MISSION_META, type Go } from '../route';
 import { formatKoreanDate, lastNDays, parseDateKey, toDateKey } from '../lib/date';
 import { currentStreak, enabledMissions } from '../lib/progress';
 import { ProgressBar, TopBar } from '../components/common';
+import { aiReady } from '../lib/talk';
 
 export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
   const { state } = useStore();
@@ -64,6 +65,7 @@ export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
             <button
               key={m.type}
               className={`mission-card ${finished ? 'finished' : ''}`}
+              disabled={m.type === 'talk' && !aiReady(state.ai)}
               onClick={() => go({ name: m.type, profileId })}
             >
               <div className="mission-icon" style={{ background: meta.color }}>
@@ -83,6 +85,7 @@ export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
           );
         })}
       </div>
+      {missions.some((m) => m.type === 'talk') && !aiReady(state.ai) && <p className="panel">보호자에게 AI 연결을 부탁하세요. 지금은 다른 미션만 끝내도 쿠폰을 받을 수 있어요.</p>}
 
       {missions.every((m) => m.type !== 'reading') && (
         <button className="btn btn-ghost" onClick={() => go({ name: 'reading', profileId })}>

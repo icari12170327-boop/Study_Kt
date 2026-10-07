@@ -15,8 +15,10 @@ import { exportState, importState } from '../store/storage';
 import { ProgressBar, TopBar } from '../components/common';
 import { MathOverview } from '../components/MathOverview';
 import { AiConnection } from './AiConnection';
+import { aiReady } from '../lib/talk';
+import { TalkRecords } from './TalkRecords';
 
-type Tab = 'overview' | 'settings' | 'coupons' | 'backup' | 'ai';
+type Tab = 'overview' | 'settings' | 'coupons' | 'backup' | 'ai' | 'talks';
 
 const LEVEL_LABEL: Record<Level, string> = { g3: '초등 3학년', g5: '초등 5학년', adult: '성인' };
 
@@ -33,6 +35,7 @@ export function Parent({ go }: { go: Go }) {
             ['coupons', '쿠폰'],
             ['backup', '백업·보안'],
             ['ai', 'AI 연결'],
+            ['talks', '대화 기록'],
           ] as [Tab, string][]
         ).map(([id, label]) => (
           <button key={id} className={`tab ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)}>
@@ -45,6 +48,7 @@ export function Parent({ go }: { go: Go }) {
       {tab === 'coupons' && <Coupons />}
       {tab === 'backup' && <Backup />}
       {tab === 'ai' && <AiConnection />}
+      {tab === 'talks' && <TalkRecords />}
     </div>
   );
 }
@@ -95,7 +99,7 @@ function Overview() {
 
             <div className="week-bars">
               {week.map((d) => {
-                const ratio = dayRatio(data.days[d], settings);
+                const ratio = dayRatio(data.days[d], settings, { aiReady: aiReady(state.ai) });
                 return (
                   <div key={d} className="week-bar" title={formatKoreanDate(d)}>
                     <div className="week-bar-fill" style={{ height: `${Math.max(4, ratio * 100)}%`, opacity: data.days[d]?.completed ? 1 : 0.45 }} />
@@ -163,6 +167,7 @@ function Settings() {
     update((d) => {
       const m = d.settings[pid].missions.find((x) => x.type === type);
       if (m) Object.assign(m, patch);
+      if (type === 'talk' && patch.target !== undefined && d.settings[pid].talk) d.settings[pid].talk.dailyMinutes = patch.target;
     });
 
   const toggle = (field: 'vocabDecks' | 'speakingDecks', id: string) =>
@@ -200,7 +205,7 @@ function Settings() {
                 if (!confirm(`${LEVEL_LABEL[level]} 기본 미션으로 바꿀까요? (학습 기록은 유지돼요)`)) return;
                 update((d) => {
                   d.profiles.find((p) => p.id === pid)!.level = level;
-                  d.settings[pid] = defaultSettings(level);
+                  d.settings[pid] = defaultSettings(level, pid);
                   d.data[pid].math = setMathLevel(d.data[pid].math, defaultMathState(level).level, level, toDateKey());
                 });
               }}

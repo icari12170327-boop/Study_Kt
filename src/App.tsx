@@ -9,6 +9,7 @@ import { Reading } from './pages/Reading';
 import { Rewards } from './pages/Rewards';
 import { Parent } from './pages/Parent';
 import { PinGate } from './components/PinGate';
+import { TalkSession } from './pages/TalkSession';
 
 export function App() {
   const [route, setRoute] = useState<Route>({ name: 'profiles' });
@@ -32,6 +33,8 @@ export function App() {
       return <SpeakingSession profileId={route.profileId} go={setRoute} />;
     case 'reading':
       return <Reading profileId={route.profileId} go={setRoute} />;
+    case 'talk':
+      return <TalkSession profileId={route.profileId} go={setRoute} />;
     case 'rewards':
       return <Rewards profileId={route.profileId} go={setRoute} />;
     case 'parent':
