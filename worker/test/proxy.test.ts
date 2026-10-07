@@ -618,6 +618,19 @@ describe('KV 반영과 생성 동시성', () => {
 });
 
 describe('지시문과 구조화된 텍스트 생성', () => {
+  it('모든 보호자 상황에서 수동 도움은 짧은 한 표현으로 돕고 아이 도움 규칙은 유지한다', () => {
+    for (const scenarioId of Object.keys(scenarioRoles)) {
+      const config = JSON.parse(buildCallBody({ ...session, profileId: 'parent', level: 'adult', mode: 'biz-talk', scenarioId, persona: { friendName: 'Alex', personaId: 'calm', voice: 'cedar' }, ...(scenarioId === 'biz-custom' ? { situation: '프로젝트 일정 공유 회의' } : {}) }, env.REALTIME_MODEL, 60).get('session') as string);
+      expect(config.instructions).toContain('When you receive "[STUCK]", offer one short phrase starting with "You could say …", then wait for the user to continue.');
+      expect(config.instructions).toContain('Do not correct English during the conversation; save corrections for feedback afterward.');
+      expect(config.instructions).toContain('When you receive "[WRAP_UP]", say a short goodbye.');
+      expect(config.audio.input.turn_detection.eagerness).toBe('auto'); expect(config.audio.output.speed).toBe(1);
+    }
+    const child = instructions(session, 60);
+    expect(child).toContain('When the child seems stuck (silence, "I don\'t know", "몰라", or you receive "[STUCK]")');
+    expect(child).toContain('say in one short, friendly Korean sentence that they can answer in Korean');
+    expect(child).not.toContain('When you receive "[STUCK]", offer one short phrase');
+  });
   it('사용자 태그를 이스케이프하고 어린이 안전·학년·음성 설정을 서버에서 만든다', () => {
     const req = {
       ...session,

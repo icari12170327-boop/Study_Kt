@@ -198,7 +198,8 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
             const seconds = elapsed(run), left = Math.max(0, run.cap - seconds);
             credit(run, seconds);
             if (alive.current) setRemaining(left);
-            const signals = talkSignals({ remaining: left, now: performance.now(), friendFinishedAt: run.friendFinishedAt, stuckSent: run.stuckSent, wrapSent: run.wrapSent, paused: run.paused });
+            // 보호자는 생각할 시간을 두고, 도움 버튼을 눌렀을 때만 막힘 신호를 보낸다.
+            const signals = talkSignals({ remaining: left, now: performance.now(), friendFinishedAt: run.friendFinishedAt, stuckSent: run.stuckSent, wrapSent: run.wrapSent, paused: run.paused, autoStuck: !run.business });
             if (signals.wrapUp) { run.wrapSent = true; run.handle?.sendSystemNote('[WRAP_UP]'); }
             if (signals.stuck) stuck(run);
             if (!left) finish(run);

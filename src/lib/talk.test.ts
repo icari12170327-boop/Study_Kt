@@ -146,6 +146,18 @@ describe('대화 미션과 보상', () => {
     expect(talkSignals({ ...current, friendFinishedAt: undefined }).stuck).toBe(false);
     expect(talkSignals({ ...current, remaining: 0 })).toEqual({ wrapUp: false, stuck: false });
   });
+  it('보호자 자동 도움을 끄면 10초 이상 침묵해도 신호를 보내지 않고 아이는 기존 기준을 유지한다', () => {
+    const current = { remaining: 120, friendFinishedAt: 0, stuckSent: false, wrapSent: false, paused: false };
+    for (const now of [9999, 10000, 60000]) {
+      expect(talkSignals({ ...current, now, autoStuck: false })).toEqual({ wrapUp: false, stuck: false });
+      expect(talkSignals({ ...current, now }).stuck).toBe(now >= 10000);
+    }
+  });
+  it('보호자 자동 도움을 꺼도 마지막 1분의 작별 신호는 유지한다', () => {
+    const current = { remaining: 60, now: 10000, friendFinishedAt: 0, stuckSent: false, wrapSent: false, paused: false, autoStuck: false };
+    expect(talkSignals(current)).toEqual({ wrapUp: true, stuck: false });
+    expect(talkSignals({ ...current, wrapSent: true })).toEqual({ wrapUp: false, stuck: false });
+  });
   it('AI 설정이 없으면 대화를 완료 조건·진행 비율에서 빼고 쿠폰은 한 번 지급한다', () => {
     const state = defaultState(), settings = state.settings.kid1, data = emptyProfileData('g5');
     applyProgress(data, settings, '2026-10-07', { type: 'science', amount: 5 }, { aiReady: false });

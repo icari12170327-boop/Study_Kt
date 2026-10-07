@@ -61,10 +61,10 @@ export function englishRatio(lines: TalkLine[]): number {
   const korean = text.match(/[가-힣]+/g)?.length ?? 0;
   return english + korean ? english / (english + korean) : 0;
 }
-export function talkSignals(input: { remaining: number; now: number; friendFinishedAt?: number; stuckSent: boolean; wrapSent: boolean; paused: boolean }): { wrapUp: boolean; stuck: boolean } {
+export function talkSignals(input: { remaining: number; now: number; friendFinishedAt?: number; stuckSent: boolean; wrapSent: boolean; paused: boolean; autoStuck?: boolean }): { wrapUp: boolean; stuck: boolean } {
   return {
     wrapUp: input.remaining > 0 && input.remaining <= 60 && !input.wrapSent,
-    stuck: !input.paused && !input.wrapSent && !input.stuckSent && input.friendFinishedAt !== undefined && input.now - input.friendFinishedAt >= 10000 && input.remaining > 0,
+    stuck: input.autoStuck !== false && !input.paused && !input.wrapSent && !input.stuckSent && input.friendFinishedAt !== undefined && input.now - input.friendFinishedAt >= 10000 && input.remaining > 0,
   };
 }
 /** 미션에 아직 반영되지 않은 초도 보존한다. 같은 실행에서 새로 지난 초만 전달한다. */
