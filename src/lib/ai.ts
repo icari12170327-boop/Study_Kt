@@ -1,10 +1,10 @@
-import type { AiConfig, GenerateRequest, Usage } from '../../shared/ai';
-export type { AiConfig, GenerateRequest, Usage, SessionRequest, SessionResponse } from '../../shared/ai';
+import type { ActiveSession, AiConfig, AiProfileId, EndActiveResponse, GenerateRequest, Usage } from '../../shared/ai';
+export type { ActiveSession, AiConfig, GenerateRequest, Usage, SessionRequest, SessionResponse } from '../../shared/ai';
 export type AiErrorKind = 'unauthorized' | 'limit' | 'busy' | 'unsafe' | 'mic-denied' | 'network' | 'server';
 const messages: Record<AiErrorKind, string> = {
   unauthorized: '가족 토큰과 허용된 앱 주소를 확인해 주세요.',
   limit: '사용 시간을 모두 썼어요. 보호자에게 알려 주세요.',
-  busy: '다른 기기에서 대화 중이에요. 먼저 그 대화를 끝내 주세요.',
+  busy: '다른 기기에서 대화 중이에요. 보호자 모드 → AI 연결에서 끝낼 수 있어요.',
   unsafe: '이 요청은 진행할 수 없어요. 보호자에게 알려 주세요.',
   'mic-denied': '마이크를 사용할 수 없어요. 브라우저의 마이크 권한을 확인해 주세요.',
   network: '연결이 끊겼어요. 인터넷 연결을 확인하고 다시 시도해 주세요.',
@@ -96,4 +96,17 @@ export async function fetchUsage(cfg: AiConfig): Promise<Usage> {
   const body = await aiRequest(cfg, '/api/usage');
   if (!isUsage(body)) throw new AiError('server');
   return body;
+}
+export async function fetchActiveSessions(cfg: AiConfig): Promise<ActiveSession[]> {
+  const body = await aiRequest(cfg, '/api/realtime/active');
+  if (!body || typeof body !== 'object' || !('sessions' in body) || !Array.isArray(body.sessions) ||
+    !body.sessions.every((s: ActiveSession) => s && ['kid1', 'kid2', 'parent'].includes(s.profileId) && typeof s.sessionId === 'string' &&
+      nonnegative(s.startedAt) && nonnegative(s.elapsedSeconds) && nonnegative(s.remainingSeconds))) throw new AiError('server');
+  return body.sessions;
+}
+export async function endActiveSessions(cfg: AiConfig, profileId: AiProfileId | 'all'): Promise<EndActiveResponse> {
+  const body = await aiRequest(cfg, '/api/realtime/end-active', { profileId });
+  if (!body || typeof body !== 'object' || !('ok' in body) || body.ok !== true || !('closed' in body) || !nonnegative(body.closed) ||
+    !('chargedSeconds' in body) || !nonnegative(body.chargedSeconds)) throw new AiError('server');
+  return body as EndActiveResponse;
 }

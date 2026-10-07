@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AiError, errorForResponse, fetchUsage, generate, normalizeAiConfig } from './ai';
+import { AiError, endActiveSessions, errorForResponse, fetchActiveSessions, fetchUsage, generate, normalizeAiConfig } from './ai';
 const cfg = { endpoint: 'https://worker.example/', token: 'f'.repeat(32) };
 const usage = {
   today: {
@@ -11,6 +11,20 @@ const usage = {
 };
 afterEach(() => vi.unstubAllGlobals());
 describe('AI 클라이언트', () => {
+  it('활성 대화와 강제 종료 응답을 검증하고 프로필만 전송한다', async () => {
+    const sessions = [{ profileId: 'kid1', sessionId: 'test', startedAt: 1000, elapsedSeconds: 10, remainingSeconds: 50 }];
+    const fetcher = vi.fn().mockResolvedValueOnce(Response.json({ sessions }))
+      .mockResolvedValueOnce(Response.json({ ok: true, closed: 1, chargedSeconds: 10 }))
+      .mockResolvedValueOnce(Response.json({ sessions: [{ ...sessions[0], elapsedSeconds: -1 }] }))
+      .mockResolvedValueOnce(Response.json({ ok: true, closed: 'invalid' }));
+    vi.stubGlobal('fetch', fetcher);
+    expect(await fetchActiveSessions(cfg)).toEqual(sessions);
+    expect(await endActiveSessions(cfg, 'kid1')).toEqual({ ok: true, closed: 1, chargedSeconds: 10 });
+    expect(JSON.parse(fetcher.mock.calls[1][1].body)).toEqual({ profileId: 'kid1' });
+    await expect(fetchActiveSessions(cfg)).rejects.toMatchObject({ kind: 'server' });
+    await expect(endActiveSessions(cfg, 'all')).rejects.toMatchObject({ kind: 'server' });
+    expect(errorForResponse(409).message).toContain('보호자 모드 → AI 연결');
+  });
   it('주소를 정규화하고 HTTPS와 로컬 개발 HTTP만 허용한다', () => {
     expect(normalizeAiConfig(cfg).endpoint).toBe('https://worker.example');
     expect(normalizeAiConfig({ ...cfg, endpoint: 'http://localhost:8787' }).endpoint).toBe('http://localhost:8787');

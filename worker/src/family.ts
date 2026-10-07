@@ -5,6 +5,7 @@ import {
   chargeSession,
   dateKeys,
   emptyLedger,
+  elapsedSeconds,
   pruneLedger,
   remainingSeconds,
   setting,
@@ -89,16 +90,15 @@ export class FamilyUsage {
   }
   private async update<T>(change: (ledger: Ledger) => T): Promise<T> {
     const outcome = await this.state.blockConcurrencyWhile(async () => {
-      const ledger = (await this.state.storage.get<Ledger>('ledger')) ?? emptyLedger();
-      let value: T;
       try {
-        value = change(ledger);
+        const ledger = (await this.state.storage.get<Ledger>('ledger')) ?? emptyLedger();
+        const value = change(ledger);
+        await this.save(ledger);
+        return { ok: true as const, value };
       } catch (error) {
-        // 변경 도중 실패하면 저장하지 않는다.
+        // 저장 오류도 잠금 밖으로 전달해 객체가 초기화되지 않게 한다.
         return { ok: false as const, error };
       }
-      await this.save(ledger);
-      return { ok: true as const, value };
     });
     if (!outcome.ok) throw outcome.error;
     return outcome.value;
@@ -142,7 +142,33 @@ export class FamilyUsage {
         )
         .map((session) => session.id),
     );
-    await Promise.all(ids.map((id) => this.closeSession(id)));
+    await Promise.all(ids.map(async (id) => {
+      try {
+        await this.closeSession(id);
+      } catch (error) {
+        // 강제 종료 후 남은 외부 정리 실패는 새 대화를 막지 않고 알람에 맡긴다.
+        if (!(await this.snapshot((ledger) => ledger.sessions[id]?.ended))) throw error;
+      }
+    }));
+  }
+  private async endActive(profileId: SessionRequest['profileId'] | 'all'): Promise<Response> {
+    const closed = await this.update((ledger) => {
+      const sessions = Object.values(ledger.sessions).filter((s) => !s.ended && (profileId === 'all' || s.profileId === profileId));
+      return sessions.map((session) => {
+        // 외부 종료를 기다리기 전에 서버 경과 시간을 한 번만 기록하고 busy를 해제한다.
+        chargeSession(ledger, session, Date.now());
+        session.needsHangup = !!session.callId;
+        return { id: session.id, seconds: session.charged ?? 0 };
+      });
+    });
+    await Promise.all(closed.map(async ({ id }) => {
+      try {
+        await this.closeSession(id);
+      } catch {
+        // needsHangup과 5초 재시도 알람은 이미 저장돼 있다.
+      }
+    }));
+    return Response.json({ ok: true, closed: closed.length, chargedSeconds: closed.reduce((sum, s) => sum + s.seconds, 0) });
   }
   async alarm(): Promise<void> {
     try {
@@ -204,6 +230,20 @@ export class FamilyUsage {
   async fetch(request: Request): Promise<Response> {
     const path = new URL(request.url).pathname;
     try {
+      if (path === '/api/realtime/active') {
+        const sessions = await this.snapshot((ledger) => Object.values(ledger.sessions).filter((s) => !s.ended).map((s) => ({
+          profileId: s.profileId,
+          sessionId: s.id,
+          startedAt: s.start,
+          elapsedSeconds: elapsedSeconds(s, Date.now()),
+          remainingSeconds: Math.max(0, s.remaining - Math.ceil((Date.now() - s.start) / 1000)),
+        })));
+        return Response.json({ sessions });
+      }
+      if (path === '/api/realtime/end-active') {
+        const { profileId } = await request.json() as { profileId: SessionRequest['profileId'] | 'all' };
+        return await this.endActive(profileId);
+      }
       if (path === '/api/generate') {
         const req = (await request.json()) as GenerateRequest;
         const reserved = await this.update((ledger) => {

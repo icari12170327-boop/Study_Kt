@@ -40,6 +40,7 @@ export const endSchema = z.strictObject({
   sessionId: text(100).regex(/^[\w-]+$/),
   seconds: z.number().finite().min(0).max(86400),
 });
+export const endActiveSchema = z.strictObject({ profileId: z.enum([...profiles, 'all']) });
 const line = z.strictObject({
   role: z.enum(['kid', 'friend', 'user', 'assistant']),
   text: text(2000),

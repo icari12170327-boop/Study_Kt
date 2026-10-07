@@ -20,6 +20,18 @@ export interface SessionResponse {
   answerSdp: string;
   remainingSeconds: number;
 }
+export interface ActiveSession {
+  profileId: AiProfileId;
+  sessionId: string;
+  startedAt: number;
+  elapsedSeconds: number;
+  remainingSeconds: number;
+}
+export interface EndActiveResponse {
+  ok: true;
+  closed: number;
+  chargedSeconds: number;
+}
 export type GenerateKind = 'talk-summary' | 'biz-feedback' | 'memory-merge' | 'word-problem' | 'reading-quiz';
 export interface GenerateRequest {
   profileId: AiProfileId;

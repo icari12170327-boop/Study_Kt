@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { parseRealtimeEvent, startTalk, type TalkCallbacks } from './realtime';
+import { parseRealtimeEvent, startTalk, stopLocalTalks, type TalkCallbacks } from './realtime';
 const cfg = { endpoint: 'https://worker.example', token: 'f'.repeat(32) };
 const req = {
   profileId: 'kid1' as const,
@@ -111,6 +111,16 @@ afterEach(() => {
   vi.useRealTimers();
 });
 describe('WebRTC 연결과 자원 해제', () => {
+  it('보호자 강제 종료는 같은 Worker·프로필의 로컬 마이크만 종료한다', async () => {
+    const handle = await startTalk(cfg, req, cb);
+    await stopLocalTalks({ ...cfg, endpoint: 'https://other-worker.example' }, 'all');
+    await stopLocalTalks(cfg, 'kid2');
+    expect(track.stop).not.toHaveBeenCalled();
+    await stopLocalTalks(cfg, 'kid1');
+    await handle.stop();
+    expect(track.stop).toHaveBeenCalledTimes(1);
+    expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith('/end'))).toHaveLength(1);
+  });
   it('음성 옵션·SDP·데이터 채널·마이크 토글과 종료를 처리하며 종료는 한 번만 보고한다', async () => {
     const handle = await startTalk(cfg, req, cb);
     expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({
