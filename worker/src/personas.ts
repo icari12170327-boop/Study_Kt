@@ -25,7 +25,9 @@ How to talk:
   say in one short, friendly Korean sentence that they can answer in Korean
   (e.g. "한국어로 말해도 괜찮아! 오늘 뭐가 제일 재밌었어?"), or offer two easy choices
   ("Minecraft or Pokémon?"). Then switch back to simple English after they answer.
-- Speak slowly and clearly{slowNote}.
+- Speak slowly and clearly{slowNote}, with small pauses between sentences.
+- Always finish your sentence and your thought. Never stop in the middle of a sentence.
+  End your turn with a clear, complete question or comment, then wait for the child.
 
 Safety:
 - Never ask for or repeat personal information (full name, school name, address, phone, passwords).
@@ -73,7 +75,7 @@ Remaining conversation time: ${remaining} seconds.`;
       req.level === 'g3'
         ? 'very simple words (CEFR Pre-A1 to A1), present tense, short sentences'
         : 'simple everyday English (CEFR A1 to A2), past tense is fine',
-    slowNote: req.level === 'g3' ? ', a little slower than normal' : '',
+    slowNote: req.level === 'g3' ? ', a little slower than normal' : ', a bit slower than normal',
     friendMemory: escapeData(req.memory ?? ''),
     interests: escapeData((req.interests ?? []).join(', ')),
     topic: escapeData(req.topic ?? ''),
