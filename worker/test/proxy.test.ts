@@ -5,6 +5,7 @@ import type { SessionRequest, SessionResponse, Usage } from '../../shared/ai';
 import { buildCallBody } from '../src/openai';
 import { instructions } from '../src/personas';
 import { emptyLedger, remainingSeconds, type Ledger } from '../src/usage';
+import { scenarioRoles } from '../src/validation';
 
 const token = 't'.repeat(32);
 const origin = 'https://family.example';
@@ -635,12 +636,16 @@ describe('지시문과 구조화된 텍스트 생성', () => {
     expect(config).toMatchObject({
       type: 'realtime',
       model: 'gpt-realtime-2.1-mini',
-      max_output_tokens: 250,
+      max_output_tokens: 1000,
       audio: {
-        input: { transcription: { model: 'gpt-4o-mini-transcribe' }, turn_detection: { type: 'semantic_vad' } },
-        output: { voice: 'marin' },
+        input: { transcription: { model: 'gpt-4o-mini-transcribe' }, turn_detection: { type: 'semantic_vad', eagerness: 'low' } },
+        output: { voice: 'marin', speed: 0.85 },
       },
     });
+    expect(prompt).toContain('Never stop in the middle of a sentence');
+    const biz = JSON.parse(buildCallBody({ ...req, mode: 'biz-talk', scenarioId: Object.keys(scenarioRoles)[0] } as typeof req, env.REALTIME_MODEL, 60).get('session') as string);
+    expect(biz.audio.input.turn_detection.eagerness).toBe('auto');
+    expect(biz.audio.output.speed).toBe(1);
   });
   it('아이 자막만 Moderation에 보내고 flagged를 요약과 함께 반환하며 내용은 저장하지 않는다', async () => {
     const response = await req('/api/generate', {

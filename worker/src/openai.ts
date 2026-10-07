@@ -13,7 +13,10 @@ export class ProxyError extends Error {
     super(code);
   }
 }
+/** 아이 대화의 말하기 속도 (OpenAI 허용 범위 0.25~1.5, 기본 1) */
+export const KID_SPEECH_SPEED = 0.85;
 export function buildCallBody(req: SessionRequest, model: string, remaining: number): FormData {
+  const kid = req.mode === 'kid-friend';
   const form = new FormData();
   form.set('sdp', req.offerSdp);
   form.set(
@@ -22,13 +25,15 @@ export function buildCallBody(req: SessionRequest, model: string, remaining: num
       type: 'realtime',
       model,
       instructions: instructions(req, remaining),
-      max_output_tokens: 250,
+      // 음성 토큰은 텍스트보다 훨씬 많이 쓴다. 250이면 두 문장도 말끝이 잘려서 넉넉히 둔다.
+      max_output_tokens: 1000,
       audio: {
         input: {
           transcription: { model: 'gpt-4o-mini-transcribe' },
-          turn_detection: req.pushToTalk ? null : { type: 'semantic_vad', eagerness: 'auto' },
+          // 아이는 영어로 말하다 자주 멈춘다. low면 생각하는 동안 끼어들지 않고 기다린다.
+          turn_detection: req.pushToTalk ? null : { type: 'semantic_vad', eagerness: kid ? 'low' : 'auto' },
         },
-        output: { voice: req.persona.voice },
+        output: { voice: req.persona.voice, speed: kid ? KID_SPEECH_SPEED : 1 },
       },
     }),
   );
