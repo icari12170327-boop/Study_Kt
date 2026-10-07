@@ -14,8 +14,9 @@ import { defaultSettings, defaultState } from '../store/defaults';
 import { exportState, importState } from '../store/storage';
 import { ProgressBar, TopBar } from '../components/common';
 import { MathOverview } from '../components/MathOverview';
+import { AiConnection } from './AiConnection';
 
-type Tab = 'overview' | 'settings' | 'coupons' | 'backup';
+type Tab = 'overview' | 'settings' | 'coupons' | 'backup' | 'ai';
 
 const LEVEL_LABEL: Record<Level, string> = { g3: '초등 3학년', g5: '초등 5학년', adult: '성인' };
 
@@ -31,6 +32,7 @@ export function Parent({ go }: { go: Go }) {
             ['settings', '미션 설정'],
             ['coupons', '쿠폰'],
             ['backup', '백업·보안'],
+            ['ai', 'AI 연결'],
           ] as [Tab, string][]
         ).map(([id, label]) => (
           <button key={id} className={`tab ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)}>
@@ -42,6 +44,7 @@ export function Parent({ go }: { go: Go }) {
       {tab === 'settings' && <Settings />}
       {tab === 'coupons' && <Coupons />}
       {tab === 'backup' && <Backup />}
+      {tab === 'ai' && <AiConnection />}
     </div>
   );
 }
@@ -319,7 +322,7 @@ function Backup() {
 
   const restore = async (file: File) => {
     try {
-      const next = importState(await file.text());
+      const next = importState(await file.text(), state.ai);
       if (!confirm('지금 기록을 백업 파일 내용으로 바꿀까요?')) return;
       replace(next);
       setMessage('복원했어요.');

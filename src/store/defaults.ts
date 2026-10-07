@@ -64,5 +64,5 @@ export function defaultState(): AppState {
   ];
   const settings = Object.fromEntries(profiles.map((p) => [p.id, defaultSettings(p.level)])) as Record<ProfileId, ProfileSettings>;
   const data = Object.fromEntries(profiles.map((p) => [p.id, emptyProfileData(p.level)])) as Record<ProfileId, ProfileData>;
-  return { version: 1, profiles, settings, data };
+  return { version: 1, ai: {}, profiles, settings, data };
 }

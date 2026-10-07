@@ -121,6 +121,7 @@ export interface ProfileData {
 
 export interface AppState {
   version: 1;
+  ai: import('../shared/ai').AiConfig;
   parentPin?: string;
   profiles: Profile[];
   settings: Record<ProfileId, ProfileSettings>;
