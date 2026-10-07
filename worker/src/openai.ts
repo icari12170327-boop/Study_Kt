@@ -45,10 +45,18 @@ export async function openCall(
     body: buildCallBody(req, env.REALTIME_MODEL, remaining),
     signal: AbortSignal.timeout(15000),
   });
-  if (!response.ok) throw new ProxyError('server', 502);
+  if (!response.ok) {
+    // OpenAI 오류 원인(권한, 크레딧, 설정 오류)을 Cloudflare 로그에서 볼 수 있게 남긴다. 키는 포함되지 않는다.
+    const detail = (await response.text().catch(() => '')).slice(0, 500);
+    console.error('openai realtime/calls failed', response.status, detail);
+    throw new ProxyError('server', 502);
+  }
   const location = response.headers.get('location') ?? '';
   const callId = location.match(/\/realtime\/calls\/([\w-]+)(?:\?|$)/)?.[1];
-  if (!callId) throw new ProxyError('server', 502);
+  if (!callId) {
+    console.error('openai realtime/calls: call id missing in location header', location);
+    throw new ProxyError('server', 502);
+  }
   return { callId, answerSdp: await response.text() };
 }
 export async function hangup(env: Env, callId: string): Promise<void> {
