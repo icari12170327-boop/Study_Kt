@@ -122,6 +122,20 @@ describe('실제 시각 기반 빙고 시계', () => {
 });
 
 describe('기록·설정 순수 로직', () => {
+  it('첫 기록이 0개면 새 기록으로 치지 않고 이후 양수 기록부터 갱신한다', () => {
+    const zero = { ...rec, found: 0, bingos: 0, hints: 0 };
+    const result = updateBest({}, zero);
+    expect(result).toEqual({ best: {}, isNew: false });
+    const first = updateBest(result.best, { ...zero, found: 1 });
+    expect(first.isNew).toBe(true); expect(first.best['120'].found).toBe(1);
+  });
+  it('0개 기록은 기존 최고나 다른 제한 시간의 최고를 갱신하지 않는다', () => {
+    const best = { '120': rec }, before = structuredClone(best);
+    expect(updateBest(best, { ...rec, found: 0, hints: 0 })).toEqual({ best, isNew: false });
+    expect(updateBest(best, { ...rec, limitSec: 180, found: 0, hints: 0 })).toEqual({ best, isNew: false });
+    expect(updateBest({ '120': { ...rec, found: 0 } }, { ...rec, found: 0, hints: 0 }).isNew).toBe(false);
+    expect(best).toEqual(before);
+  });
   it('더 많이 찾거나 동점에서 힌트가 적으면 갱신하고 제한 시간은 분리한다', () => {
     const best = { '120': rec }, before = structuredClone(best);
     expect(updateBest(best, { ...rec, found: 9 }).isNew).toBe(true);

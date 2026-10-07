@@ -117,7 +117,8 @@ export function MathBingo({ profileId, go }: { profileId: ProfileId; go: Go }) {
   const goal = game?.board.goals[game.goalIndex];
   const feedback = game?.feedback;
   const freshFeedback = !!game && !!feedback && bingoElapsed(game, now) - feedback.atMs < 1600;
-  const best = state.data[profileId].bingo?.best[String(game?.limitSec ?? settings.limitSec)];
+  const savedBest = state.data[profileId].bingo?.best[String(game?.limitSec ?? settings.limitSec)];
+  const best = savedBest && savedBest.found > 0 ? savedBest : undefined;
   return <div className="page bingo-page">
     <TopBar title="🎯 수학 빙고" onBack={() => go({ name: 'home', profileId })} />
     {profileId === 'parent' || profile.level === 'adult' || !settings.enabled ? <p className="panel">지금은 빙고가 꺼져 있어요.</p> : !game ? <>
@@ -141,7 +142,7 @@ export function MathBingo({ profileId, go }: { profileId: ProfileId; go: Go }) {
       <div className="stat-row"><div className="stat"><div className="stat-value">{game.found}</div><div className="stat-label">찾은 개수</div></div>
         <div className="stat"><div className="stat-value">{game.bingos}</div><div className="stat-label">완성한 빙고</div></div>
         <div className="stat"><div className="stat-value">{game.hints}</div><div className="stat-label">힌트 수</div></div></div>
-      {game.mode === 'time' ? <p>{game.limitSec}초 최고 기록: <strong>{best?.found ?? game.found}개</strong> · 힌트 {best?.hints ?? game.hints}번</p> : <p className="muted">연습 기록은 저장하지 않아요.</p>}
+      {game.mode === 'time' ? <p>{game.limitSec}초 최고 기록: {best ? <><strong>{best.found}개</strong> · 힌트 {best.hints}번</> : '아직 없어요'}</p> : <p className="muted">연습 기록은 저장하지 않아요.</p>}
       <div className="row-center"><button className="btn btn-primary" onClick={start}>한 판 더</button><button className="btn btn-soft" onClick={() => { current.current = undefined; setGame(undefined); }}>모드 고르기</button></div>
     </section> : <>
       {game.mode === 'time' ? <section className={`bingo-timer ${seconds <= 10 ? 'bingo-urgent' : ''}`} aria-label="남은 시간">

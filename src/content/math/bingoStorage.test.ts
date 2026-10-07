@@ -6,6 +6,16 @@ import type { BingoRecord } from '../../types';
 
 const rec: BingoRecord = { date: '2026-10-07', level: 'g5', limitSec: 120, found: 9, bingos: 1, hints: 2 };
 describe('빙고 선택 필드와 기존 데이터 호환', () => {
+  it('0개 판은 최근 기록으로만 저장하고 백업 복원 후에도 최고 기록은 비어 있다', () => {
+    const state = defaultState(), zero = { ...rec, found: 0, bingos: 0, hints: 0 };
+    expect(recordBingo(state.data.kid1, zero)).toBe(false);
+    const restored = importState(exportState(state));
+    expect(restored.data.kid1.bingo).toEqual({ recent: [zero], best: {} });
+    expect(recordBingo(restored.data.kid1, rec)).toBe(true);
+    expect(recordBingo(restored.data.kid1, zero)).toBe(false);
+    expect(restored.data.kid1.bingo?.recent).toEqual([zero, rec, zero]);
+    expect(restored.data.kid1.bingo?.best).toEqual({ '120': rec });
+  });
   it.each([1, 2])('버전 %i의 빙고 없는 기록을 보존하고 기본값을 채운다', version => {
     const raw = { ...defaultState(), version };
     for (const pid of ['kid1', 'kid2', 'parent'] as const) {

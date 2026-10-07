@@ -99,7 +99,8 @@ export function adjustClock(clock: BingoClock, now: number, deltaMs: number): Bi
 }
 export function updateBest(best: Record<string, BingoRecord>, rec: BingoRecord): { best: Record<string, BingoRecord>; isNew: boolean } {
   const old = best[String(rec.limitSec)];
-  const isNew = !old || rec.found > old.found || (rec.found === old.found && rec.hints < old.hints);
+  // 0개인 판은 최근 기록에만 남기고 최고 기록으로 축하하지 않는다.
+  const isNew = rec.found > 0 && (!old || rec.found > old.found || (rec.found === old.found && rec.hints < old.hints));
   return { best: isNew ? { ...best, [String(rec.limitSec)]: { ...rec } } : { ...best }, isNew };
 }
 export function defaultBingoSettings(level: Level): NonNullable<ProfileSettings['bingo']> {
