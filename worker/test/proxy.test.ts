@@ -31,6 +31,15 @@ let outgoing: ReturnType<typeof vi.fn>;
 let output: unknown;
 let calls: number;
 let failHangup: boolean;
+let lockDepth: number;
+let durableState: DurableObjectState;
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
 const readSession = (response: Response) => response.json() as Promise<SessionResponse>;
 const readUsage = (response: Response) => response.json() as Promise<Usage>;
 const req = (path: string, body?: unknown, headers?: Record<string, string>, method?: string) =>
@@ -59,6 +68,7 @@ beforeEach(() => {
   calls = 0;
   failHangup = false;
   output = summary;
+  lockDepth = 0;
   let queue = Promise.resolve();
   const state = {
     storage: {
@@ -69,7 +79,14 @@ beforeEach(() => {
       setAlarm: alarm,
     },
     blockConcurrencyWhile: <T>(fn: () => Promise<T>) => {
-      const next = queue.then(fn);
+      const next = queue.then(async () => {
+        lockDepth++;
+        try {
+          return await fn();
+        } finally {
+          lockDepth--;
+        }
+      });
       queue = next.then(
         () => {},
         () => {},
@@ -99,8 +116,10 @@ beforeEach(() => {
     },
     FAMILY: { idFromName: () => 'family', get: () => ({ fetch: (r: Request) => family.fetch(r) }) },
   } as unknown as Env;
+  durableState = state;
   family = new FamilyUsage(state, env);
   outgoing = vi.fn(async (url: string | URL | Request) => {
+    expect(lockDepth).toBe(0);
     const path = typeof url === 'string' ? url : url instanceof URL ? url.href : url.url;
     if (path.endsWith('/realtime/calls'))
       return new Response('v=0\r\nanswer', {
@@ -332,6 +351,104 @@ describe('대화 시간 제한과 서버 종료', () => {
     const ledger = emptyLedger();
     ledger.months['2026-10'] = 89980;
     expect(remainingSeconds(ledger, env, 'kid1', now)).toBe(20);
+  });
+});
+
+describe('저장 잠금 밖의 연결과 종료', () => {
+  it('연결 응답이 느려도 같은 프로필 예약과 다른 프로필 요청·사용량 조회는 처리한다', async () => {
+    const called = deferred<void>(),
+      reply = deferred<Response>();
+    outgoing.mockImplementationOnce(async () => {
+      expect(lockDepth).toBe(0);
+      called.resolve();
+      return reply.promise;
+    });
+    const opening = start();
+    await called.promise;
+    try {
+      expect((await start()).status).toBe(409);
+      expect((await req('/api/realtime/session', { ...session, profileId: 'kid2', level: 'g3' })).status).toBe(200);
+      expect((await req('/api/usage')).status).toBe(200);
+    } finally {
+      reply.resolve(new Response('v=0\r\nanswer', { headers: { location: '/v1/realtime/calls/rtc_slow' } }));
+    }
+    expect((await opening).status).toBe(200);
+  });
+  it('종료 요청이 느려도 다른 프로필 요청을 처리하고 중복 종료는 한 번만 호출·차감한다', async () => {
+    const first = await readSession(await start());
+    vi.setSystemTime(now + 10000);
+    const called = deferred<void>(),
+      reply = deferred<Response>();
+    outgoing.mockImplementationOnce(async (url) => {
+      expect(String(url)).toContain('/hangup');
+      expect(lockDepth).toBe(0);
+      called.resolve();
+      return reply.promise;
+    });
+    const closing = end(first.sessionId, 10);
+    await called.promise;
+    const duplicate = end(first.sessionId, 9999);
+    try {
+      expect((await req('/api/usage')).status).toBe(200);
+      expect((await req('/api/realtime/session', { ...session, profileId: 'kid2', level: 'g3' })).status).toBe(200);
+    } finally {
+      reply.resolve(new Response(null, { status: 200 }));
+    }
+    expect(await (await closing).json()).toMatchObject({ seconds: 10 });
+    expect(await (await duplicate).json()).toMatchObject({ seconds: 10 });
+    expect(outgoing.mock.calls.filter(([url]) => String(url).endsWith('/rtc_1/hangup'))).toHaveLength(1);
+    expect((await readUsage(await req('/api/usage'))).today.kid1.talkSeconds).toBe(10);
+  });
+  it('예약 만료 알람 뒤 늦게 도착한 통화는 종료하며 한 번만 사용량을 센다', async () => {
+    env.TALK_MINUTES_kid1 = '1';
+    const called = deferred<void>(),
+      reply = deferred<Response>();
+    outgoing.mockImplementationOnce(async () => {
+      expect(lockDepth).toBe(0);
+      called.resolve();
+      return reply.promise;
+    });
+    const opening = start();
+    await called.promise;
+    vi.setSystemTime(now + 61000);
+    await family.alarm();
+    expect((await readUsage(await req('/api/usage'))).today.kid1.talkSeconds).toBe(60);
+    reply.resolve(new Response('v=0\r\nanswer', { headers: { location: '/v1/realtime/calls/rtc_late' } }));
+    expect((await opening).status).toBe(429);
+    expect(outgoing.mock.calls.some(([url]) => String(url).endsWith('/rtc_late/hangup'))).toBe(true);
+    expect((await readUsage(await req('/api/usage'))).today.kid1.talkSeconds).toBe(60);
+    expect((await start()).status).toBe(429);
+  });
+  it('늦게 생성된 통화의 종료 실패도 저장하고 재시작·하루 경과 뒤 알람으로 복구한다', async () => {
+    env.TALK_MINUTES_kid1 = '1';
+    const called = deferred<void>(),
+      reply = deferred<Response>();
+    outgoing.mockImplementationOnce(async () => {
+      called.resolve();
+      return reply.promise;
+    });
+    const opening = start();
+    await called.promise;
+    vi.setSystemTime(now + 61000);
+    await family.alarm();
+    failHangup = true;
+    reply.resolve(new Response('v=0\r\nanswer', { headers: { location: '/v1/realtime/calls/rtc_orphan' } }));
+    expect((await opening).status).toBe(502);
+    expect(Object.values((storage.get('ledger') as Ledger).sessions)[0]).toMatchObject({
+      ended: true,
+      needsHangup: true,
+      callId: 'rtc_orphan',
+      charged: 60,
+    });
+    family = new FamilyUsage(durableState, env);
+    vi.setSystemTime(now + 2 * 86400000);
+    await family.alarm();
+    expect(Object.values((storage.get('ledger') as Ledger).sessions)).toHaveLength(1);
+    failHangup = false;
+    vi.setSystemTime(now + 2 * 86400000 + 5000);
+    await family.alarm();
+    expect(Object.values((storage.get('ledger') as Ledger).sessions)).toHaveLength(0);
+    expect((storage.get('ledger') as Ledger).months['2026-10']).toBe(60);
   });
 });
 

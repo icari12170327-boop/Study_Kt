@@ -17,6 +17,8 @@ export interface Session {
   callId?: string;
   ended?: boolean;
   charged?: number;
+  /** 종료된 예약 뒤 늦게 도착한 통화도 서버에서 정리한다. */
+  needsHangup?: boolean;
 }
 export interface Ledger {
   days: Record<string, Record<AiProfileId, DayUsage>>;
@@ -67,6 +69,6 @@ export function pruneLedger(ledger: Ledger, now: number): void {
   const monthCutoff = dateKeys(now - 400 * 86400000).month;
   ledger.months = Object.fromEntries(Object.entries(ledger.months).filter(([month]) => month >= monthCutoff));
   ledger.sessions = Object.fromEntries(
-    Object.entries(ledger.sessions).filter(([, s]) => !s.ended || s.start >= now - 86400000),
+    Object.entries(ledger.sessions).filter(([, s]) => !s.ended || s.needsHangup || s.start >= now - 86400000),
   );
 }
