@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store/StoreContext';
-import { AiError, fetchUsage, normalizeAiConfig, type Usage } from '../lib/ai';
-import { startTalk, type TalkHandle, type TalkState } from '../lib/realtime';
+import { AiError, endActiveSessions, fetchActiveSessions, fetchUsage, normalizeAiConfig, type ActiveSession, type Usage } from '../lib/ai';
+import { startTalk, stopLocalTalks, type TalkHandle, type TalkState } from '../lib/realtime';
 const labels: Record<TalkState, string> = {
   connecting: '연결 중',
   listening: '듣는 중',
@@ -16,6 +16,8 @@ export function AiConnection() {
   const [endpoint, setEndpoint] = useState(state.ai.endpoint ?? '');
   const [token, setToken] = useState(state.ai.token ?? '');
   const [usage, setUsage] = useState<Usage>();
+  const [sessions, setSessions] = useState<ActiveSession[]>();
+  const [ending, setEnding] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -33,6 +35,20 @@ export function AiConnection() {
       void handle.current?.stop();
     };
   }, []);
+  useEffect(() => {
+    let active = true;
+    try {
+      normalizeAiConfig(state.ai);
+      void fetchActiveSessions(state.ai).then((value) => {
+        if (active) setSessions(value);
+      }).catch((e: unknown) => {
+        if (active) setError(e instanceof AiError ? e.message : '진행 중인 대화를 확인하지 못했어요.');
+      });
+    } catch {
+      // 연결 설정이 없으면 보호자가 저장한 뒤 조회한다.
+    }
+    return () => { active = false; };
+  }, [state.ai]);
   const config = () => normalizeAiConfig({ endpoint, token });
   const showError = (e: unknown) => {
     if (alive.current) setError(e instanceof AiError ? e.message : '연결 설정을 확인해 주세요.');
@@ -41,15 +57,39 @@ export function AiConnection() {
     setBusy(true);
     setError('');
     try {
-      const value = await fetchUsage(config());
+      const [value, active] = await Promise.all([fetchUsage(config()), fetchActiveSessions(config())]);
       if (alive.current) {
         setUsage(value);
+        setSessions(active);
         setMessage('Worker 연결을 확인했어요.');
       }
     } catch (e) {
       showError(e);
     } finally {
       if (alive.current) setBusy(false);
+    }
+  };
+  const forceEnd = async (profileId: ActiveSession['profileId'] | 'all') => {
+    const name = profileId === 'all' ? '모두' : state.profiles.find((p) => p.id === profileId)?.name ?? profileId;
+    const question = profileId === 'all' ? '진행 중인 모든 대화를 끝낼까요?' : `${name}의 대화를 끝낼까요?`;
+    if (!confirm(`${question} 아이가 대화 중이면 바로 끊겨요.`)) return;
+    setEnding(true);
+    setError('');
+    try {
+      const ai = config();
+      // 로컬 마이크는 즉시 끄고, 종료 보고의 성공 여부와 관계없이 서버 강제 종료를 요청한다.
+      void stopLocalTalks(ai, profileId).catch(showError);
+      const result = await endActiveSessions(ai, profileId);
+      const [active, value] = await Promise.all([fetchActiveSessions(ai), fetchUsage(ai)]);
+      if (alive.current) {
+        setSessions(active);
+        setUsage(value);
+        setMessage(`${result.closed}개 대화를 끝냈어요. 기록한 시간: ${duration(result.chargedSeconds)}`);
+      }
+    } catch (e) {
+      showError(e);
+    } finally {
+      if (alive.current) setEnding(false);
     }
   };
   const save = () => {
@@ -60,6 +100,7 @@ export function AiConnection() {
       });
       setEndpoint(ai.endpoint);
       setUsage(undefined);
+      setSessions(undefined);
       setError('');
       setMessage('이 기기에 저장했어요. 백업에는 가족 토큰이 들어가지 않아요.');
     } catch (e) {
@@ -89,6 +130,9 @@ export function AiConnection() {
             if (s === 'listening' && !connected.current) {
               connected.current = true;
               setMessage('영어로 인사해 보세요. 연결 후 10초에 자동으로 끝나요.');
+              void fetchActiveSessions(ai).then((active) => {
+                if (alive.current) setSessions(active);
+              }).catch(showError);
               timer.current = setTimeout(() => {
                 void handle.current?.stop();
               }, 10000);
@@ -98,9 +142,12 @@ export function AiConnection() {
               handle.current = undefined;
               setBusy(false);
               setMessage('음성 테스트가 끝났어요. 소리가 들렸는지 확인해 주세요.');
-              void fetchUsage(ai)
-                .then((u) => {
-                  if (alive.current) setUsage(u);
+              void Promise.all([fetchUsage(ai), fetchActiveSessions(ai)])
+                .then(([u, active]) => {
+                  if (alive.current) {
+                    setUsage(u);
+                    setSessions(active);
+                  }
                 })
                 .catch(showError);
             }
@@ -132,6 +179,7 @@ export function AiConnection() {
             onChange={(e) => {
               setEndpoint(e.target.value);
               setUsage(undefined);
+              setSessions(undefined);
             }}
             placeholder="https://study-kt-proxy.example.workers.dev"
             autoCapitalize="none"
@@ -148,6 +196,7 @@ export function AiConnection() {
             onChange={(e) => {
               setToken(e.target.value);
               setUsage(undefined);
+              setSessions(undefined);
             }}
             autoComplete="off"
             spellCheck={false}
@@ -199,6 +248,19 @@ export function AiConnection() {
           </p>
         )}
         {transcript && <p lang="en">{transcript}</p>}
+      </div>
+      <div className="panel form">
+        <h2>진행 중인 대화</h2>
+        {sessions === undefined ? <p>연결을 확인하면 진행 중인 대화가 보여요.</p> : sessions.length === 0 ? <p>진행 중인 대화 없음</p> : <>
+          {sessions.map((session) => <div key={session.sessionId} className="panel">
+            <h3>{state.profiles.find((p) => p.id === session.profileId)?.name}</h3>
+            <p>시작: {new Date(session.startedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</p>
+            <p>경과 시간: {duration(session.elapsedSeconds)} · 남은 시간: {duration(session.remainingSeconds)}</p>
+            <button className="btn" disabled={ending} onClick={() => { void forceEnd(session.profileId); }}>이 대화 끝내기</button>
+          </div>)}
+          {sessions.length >= 2 && <button className="btn" disabled={ending} onClick={() => { void forceEnd('all'); }}>모두 끝내기</button>}
+        </>}
+        <p className="small muted">외부 통화 종료에 실패하면 서버가 다시 시도해요. 사용한 시간은 기록돼요.</p>
       </div>
       <div className="panel">
         <h2>AI 사용량</h2>

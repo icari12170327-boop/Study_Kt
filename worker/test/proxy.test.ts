@@ -83,6 +83,9 @@ beforeEach(() => {
         lockDepth++;
         try {
           return await fn();
+        } catch {
+          // 실제 런타임처럼 잠금 콜백의 예외가 응답을 502로 바꾸는 것을 재현한다.
+          throw new Error('잠금 콜백 예외로 Durable Object 초기화');
         } finally {
           lockDepth--;
         }
@@ -157,6 +160,14 @@ afterEach(() => {
 });
 
 describe('HTTP 인증과 입력 경계', () => {
+  it('강제 종료 경로도 인증·메서드·프로필 입력을 검증한다', async () => {
+    expect((await req('/api/realtime/active', undefined, { Authorization: '' })).status).toBe(401);
+    expect((await req('/api/realtime/end-active', { profileId: 'all' }, { Authorization: '' })).status).toBe(401);
+    for (const profileId of ['other', '', null, 1]) expect((await req('/api/realtime/end-active', { profileId })).status).toBe(400);
+    expect((await req('/api/realtime/active', {})).status).toBe(405);
+    expect((await req('/api/realtime/end-active')).status).toBe(405);
+    expect(outgoing).not.toHaveBeenCalled();
+  });
   it('인증 토큰을 같은 해시 길이로 비교하고 누락·다른 값·짧은 설정을 거부한다', async () => {
     expect(await authenticated(`Bearer ${token}`, token)).toBe(true);
     expect(await authenticated(`Bearer ${token}a`, token)).toBe(false);
@@ -265,7 +276,7 @@ describe('대화 시간 제한과 서버 종료', () => {
   });
   it('동시에 같은 프로필로 요청해도 하나만 연결하고 다른 요청은 409다', async () => {
     const results = await Promise.all([start(), start()]);
-    expect(results.map((r) => r.status)).toEqual([200, 409]);
+    expect(results.map((r) => r.status).sort((a, b) => a - b)).toEqual([200, 409]);
     expect(calls).toBe(1);
   });
   it('1분 상한 후 알람이 통화를 종료하며 종료 보고가 없어도 두 번째 시작은 429다', async () => {
@@ -351,6 +362,88 @@ describe('대화 시간 제한과 서버 종료', () => {
     const ledger = emptyLedger();
     ledger.months['2026-10'] = 89980;
     expect(remainingSeconds(ledger, env, 'kid1', now)).toBe(20);
+  });
+});
+
+describe('보호자 강제 종료', () => {
+  it('통화 ID 없이 공개 목록만 반환하고 프로필별 종료·중복 종료·재연결을 처리한다', async () => {
+    const first = await readSession(await start());
+    await req('/api/realtime/session', { ...session, profileId: 'kid2', level: 'g3' });
+    vi.setSystemTime(now + 10000);
+    const active = await (await req('/api/realtime/active')).json() as { sessions: unknown[] };
+    expect(active.sessions).toHaveLength(2);
+    expect(active.sessions[0]).toEqual({ profileId: 'kid1', sessionId: first.sessionId, startedAt: now, elapsedSeconds: 10, remainingSeconds: 1190 });
+    expect(await (await req('/api/realtime/end-active', { profileId: 'kid1' })).json()).toEqual({ ok: true, closed: 1, chargedSeconds: 10 });
+    expect(await (await req('/api/realtime/end-active', { profileId: 'kid1' })).json()).toEqual({ ok: true, closed: 0, chargedSeconds: 0 });
+    expect((await req('/api/realtime/active')).status).toBe(200);
+    expect((await start()).status).toBe(200);
+    expect((await readUsage(await req('/api/usage'))).today.kid1.talkSeconds).toBe(10);
+  });
+  it('hangup 실패에도 busy를 해제하고 시간은 보존하며 알람이 옛 통화를 재시도한다', async () => {
+    await start();
+    vi.setSystemTime(now + 10000);
+    failHangup = true;
+    expect(await (await req('/api/realtime/end-active', { profileId: 'all' })).json()).toEqual({ ok: true, closed: 1, chargedSeconds: 10 });
+    const old = Object.values((storage.get('ledger') as Ledger).sessions)[0];
+    expect(old).toMatchObject({ ended: true, needsHangup: true, charged: 10 });
+    expect((await start()).status).toBe(200);
+    expect((await readUsage(await req('/api/usage'))).today.kid1.talkSeconds).toBe(10);
+    failHangup = false;
+    vi.setSystemTime(now + 15000);
+    await family.alarm();
+    expect((storage.get('ledger') as Ledger).sessions[old.id].needsHangup).toBe(false);
+    expect(outgoing.mock.calls.filter(([url]) => String(url).endsWith('/rtc_1/hangup')).length).toBe(2);
+  });
+  it('강제 종료 재시도는 5초·1분·10분으로 늦추고 재시작 뒤에도 대기를 유지한다', async () => {
+    await start();
+    failHangup = true;
+    await req('/api/realtime/end-active', { profileId: 'all' });
+    const id = Object.keys((storage.get('ledger') as Ledger).sessions)[0];
+    expect((storage.get('ledger') as Ledger).sessions[id].nextHangupAt).toBe(now + 5000);
+    await req('/api/usage');
+    expect(outgoing.mock.calls.filter(([url]) => String(url).endsWith('/hangup'))).toHaveLength(1);
+    vi.setSystemTime(now + 5000);
+    await family.alarm();
+    expect((storage.get('ledger') as Ledger).sessions[id].nextHangupAt).toBe(now + 65000);
+    family = new FamilyUsage(durableState, env);
+    vi.setSystemTime(now + 60000);
+    await family.alarm();
+    expect(outgoing.mock.calls.filter(([url]) => String(url).endsWith('/hangup'))).toHaveLength(2);
+    vi.setSystemTime(now + 65000);
+    await family.alarm();
+    expect((storage.get('ledger') as Ledger).sessions[id].nextHangupAt).toBe(now + 665000);
+    vi.setSystemTime(now + 665000);
+    await family.alarm();
+    expect((storage.get('ledger') as Ledger).sessions[id].nextHangupAt).toBe(now + 1265000);
+    failHangup = false;
+    vi.setSystemTime(now + 1265000);
+    await family.alarm();
+    expect((storage.get('ledger') as Ledger).sessions[id]).toMatchObject({ ended: true, needsHangup: false });
+    expect((storage.get('ledger') as Ledger).sessions[id]).not.toHaveProperty('nextHangupAt');
+  });
+  it('모든 프로필을 한 번만 종료하고 limit·busy·invalid는 잠금 밖에서 그대로 전달한다', async () => {
+    await start();
+    expect((await start()).status).toBe(409);
+    expect((await end('missing', 0)).status).toBe(400);
+    await req('/api/realtime/session', { ...session, profileId: 'kid2', level: 'g3' });
+    vi.setSystemTime(now + 61000);
+    expect(await (await req('/api/realtime/end-active', { profileId: 'all' })).json()).toEqual({ ok: true, closed: 2, chargedSeconds: 122 });
+    env.TALK_MINUTES_kid1 = '1';
+    expect((await start()).status).toBe(429);
+    expect(await (await req('/api/realtime/active')).json()).toEqual({ sessions: [] });
+  });
+  it('연결 대기 중 강제 종료한 예약의 늦은 통화 응답도 정리한다', async () => {
+    const called = deferred<void>(), reply = deferred<Response>();
+    outgoing.mockImplementationOnce(async () => { called.resolve(); return reply.promise; });
+    const opening = start();
+    await called.promise;
+    vi.setSystemTime(now + 10000);
+    expect(await (await req('/api/realtime/end-active', { profileId: 'kid1' })).json()).toEqual({ ok: true, closed: 1, chargedSeconds: 10 });
+    expect((await start()).status).toBe(200);
+    reply.resolve(new Response('v=0\r\nanswer', { headers: { location: '/v1/realtime/calls/rtc_cancelled' } }));
+    expect((await opening).status).toBe(429);
+    expect(outgoing.mock.calls.some(([url]) => String(url).endsWith('/rtc_cancelled/hangup'))).toBe(true);
+    expect((await readUsage(await req('/api/usage'))).today.kid1.talkSeconds).toBe(10);
   });
 });
 
@@ -445,7 +538,7 @@ describe('저장 잠금 밖의 연결과 종료', () => {
     await family.alarm();
     expect(Object.values((storage.get('ledger') as Ledger).sessions)).toHaveLength(1);
     failHangup = false;
-    vi.setSystemTime(now + 2 * 86400000 + 5000);
+    vi.setSystemTime(now + 2 * 86400000 + 60000);
     await family.alarm();
     expect(Object.values((storage.get('ledger') as Ledger).sessions)).toHaveLength(0);
     expect((storage.get('ledger') as Ledger).months['2026-10']).toBe(60);
@@ -487,7 +580,7 @@ describe('KV 반영과 생성 동시성', () => {
       input: { title: '책', author: '', summary: '가'.repeat(40), level: 'adult' },
     };
     const results = await Promise.all([req('/api/generate', body), req('/api/generate', body)]);
-    expect(results.map((r) => r.status)).toEqual([200, 429]);
+    expect(results.map((r) => r.status).sort((a, b) => a - b)).toEqual([200, 429]);
   });
 });
 

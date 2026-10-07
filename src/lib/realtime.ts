@@ -16,6 +16,14 @@ export interface TalkCallbacks {
   onUserText(itemId: string, text: string): void;
   onError(error: AiError): void;
 }
+const localTalks = new Set<{ profileId: SessionRequest['profileId']; cfg: AiConfig; stop: () => Promise<void> }>();
+export async function stopLocalTalks(cfg: AiConfig, profileId: SessionRequest['profileId'] | 'all'): Promise<void> {
+  const expected = normalizeAiConfig(cfg);
+  await Promise.all([...localTalks].filter((talk) => {
+    const current = normalizeAiConfig(talk.cfg);
+    return (profileId === 'all' || talk.profileId === profileId) && current.endpoint === expected.endpoint && current.token === expected.token;
+  }).map((talk) => talk.stop()));
+}
 export function parseRealtimeEvent(json: unknown): TalkEvent | null {
   if (typeof json === 'string') {
     try {
@@ -90,6 +98,7 @@ export async function startTalk(
   let capTimer: ReturnType<typeof setTimeout> | undefined;
   let connectTimer: ReturnType<typeof setTimeout> | undefined;
   const cleanup = () => {
+    localTalks.delete(localTalk);
     clearTimeout(capTimer);
     clearTimeout(connectTimer);
     window.removeEventListener('pagehide', pagehide);
@@ -132,6 +141,8 @@ export async function startTalk(
   const pagehide = () => {
     void stop();
   };
+  const localTalk = { profileId: req.profileId, cfg: { ...cfg }, stop };
+  localTalks.add(localTalk);
   const fail = (error: AiError) => {
     if (stopped) return;
     cb.onState('error');

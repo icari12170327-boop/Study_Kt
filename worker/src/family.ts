@@ -5,6 +5,7 @@ import {
   chargeSession,
   dateKeys,
   emptyLedger,
+  elapsedSeconds,
   pruneLedger,
   remainingSeconds,
   setting,
@@ -65,7 +66,9 @@ export class FamilyUsage {
     const deadlines = Object.values(ledger.sessions)
       .filter((s) => !s.ended || s.needsHangup)
       .map((s) =>
-        s.needsHangup || this.closing.has(s.id)
+        s.needsHangup
+          ? Math.max(Date.now() + 1000, s.nextHangupAt ?? Date.now() + 5000)
+          : this.closing.has(s.id)
           ? Date.now() + 5000
           : Math.max(Date.now() + 1000, s.start + s.remaining * 1000),
       );
@@ -89,16 +92,15 @@ export class FamilyUsage {
   }
   private async update<T>(change: (ledger: Ledger) => T): Promise<T> {
     const outcome = await this.state.blockConcurrencyWhile(async () => {
-      const ledger = (await this.state.storage.get<Ledger>('ledger')) ?? emptyLedger();
-      let value: T;
       try {
-        value = change(ledger);
+        const ledger = (await this.state.storage.get<Ledger>('ledger')) ?? emptyLedger();
+        const value = change(ledger);
+        await this.save(ledger);
+        return { ok: true as const, value };
       } catch (error) {
-        // 변경 도중 실패하면 저장하지 않는다.
+        // 저장 오류도 잠금 밖으로 전달해 객체가 초기화되지 않게 한다.
         return { ok: false as const, error };
       }
-      await this.save(ledger);
-      return { ok: true as const, value };
     });
     if (!outcome.ok) throw outcome.error;
     return outcome.value;
@@ -109,7 +111,21 @@ export class FamilyUsage {
       if (!snapshot) throw new ProxyError('invalid', 400);
       if (snapshot.ended && !snapshot.needsHangup) return snapshot.charged ?? 0;
       // OpenAI를 기다리는 동안 다른 프로필·사용량 조회·알람의 저장 잠금을 막지 않는다.
-      if (snapshot.callId) await hangup(this.env, snapshot.callId);
+      if (snapshot.callId) {
+        try {
+          await hangup(this.env, snapshot.callId);
+        } catch (error) {
+          await this.update((ledger) => {
+            const current = ledger.sessions[id];
+            if (!current?.ended || !current.needsHangup) return;
+            current.hangupFailures = (current.hangupFailures ?? 0) + 1;
+            // 계속 실패할 때 호출 비용을 줄이도록 5초 → 1분 → 최대 10분으로 늦춘다.
+            const delay = current.hangupFailures === 1 ? 5000 : current.hangupFailures === 2 ? 60000 : 600000;
+            current.nextHangupAt = Date.now() + delay;
+          });
+          throw error;
+        }
+      }
       const charged = await this.update((ledger) => {
         const current = ledger.sessions[id];
         if (!current) throw new ProxyError('invalid', 400);
@@ -117,6 +133,8 @@ export class FamilyUsage {
         if (current.callId !== snapshot.callId) return;
         chargeSession(ledger, current, Date.now());
         current.needsHangup = false;
+        delete current.hangupFailures;
+        delete current.nextHangupAt;
         return current.charged ?? 0;
       });
       if (charged !== undefined) return charged;
@@ -138,11 +156,37 @@ export class FamilyUsage {
       Object.values(ledger.sessions)
         .filter(
           (session) =>
-            session.needsHangup || (!session.ended && Date.now() >= session.start + session.remaining * 1000),
+            (session.needsHangup && Date.now() >= (session.nextHangupAt ?? 0)) || (!session.ended && Date.now() >= session.start + session.remaining * 1000),
         )
         .map((session) => session.id),
     );
-    await Promise.all(ids.map((id) => this.closeSession(id)));
+    await Promise.all(ids.map(async (id) => {
+      try {
+        await this.closeSession(id);
+      } catch (error) {
+        // 강제 종료 후 남은 외부 정리 실패는 새 대화를 막지 않고 알람에 맡긴다.
+        if (!(await this.snapshot((ledger) => ledger.sessions[id]?.ended))) throw error;
+      }
+    }));
+  }
+  private async endActive(profileId: SessionRequest['profileId'] | 'all'): Promise<Response> {
+    const closed = await this.update((ledger) => {
+      const sessions = Object.values(ledger.sessions).filter((s) => !s.ended && (profileId === 'all' || s.profileId === profileId));
+      return sessions.map((session) => {
+        // 외부 종료를 기다리기 전에 서버 경과 시간을 한 번만 기록하고 busy를 해제한다.
+        chargeSession(ledger, session, Date.now());
+        session.needsHangup = !!session.callId;
+        return { id: session.id, seconds: session.charged ?? 0 };
+      });
+    });
+    await Promise.all(closed.map(async ({ id }) => {
+      try {
+        await this.closeSession(id);
+      } catch {
+        // needsHangup과 점진적 대기 알람은 이미 저장돼 있다.
+      }
+    }));
+    return Response.json({ ok: true, closed: closed.length, chargedSeconds: closed.reduce((sum, s) => sum + s.seconds, 0) });
   }
   async alarm(): Promise<void> {
     try {
@@ -204,6 +248,20 @@ export class FamilyUsage {
   async fetch(request: Request): Promise<Response> {
     const path = new URL(request.url).pathname;
     try {
+      if (path === '/api/realtime/active') {
+        const sessions = await this.snapshot((ledger) => Object.values(ledger.sessions).filter((s) => !s.ended).map((s) => ({
+          profileId: s.profileId,
+          sessionId: s.id,
+          startedAt: s.start,
+          elapsedSeconds: elapsedSeconds(s, Date.now()),
+          remainingSeconds: Math.max(0, s.remaining - Math.ceil((Date.now() - s.start) / 1000)),
+        })));
+        return Response.json({ sessions });
+      }
+      if (path === '/api/realtime/end-active') {
+        const { profileId } = await request.json() as { profileId: SessionRequest['profileId'] | 'all' };
+        return await this.endActive(profileId);
+      }
       if (path === '/api/generate') {
         const req = (await request.json()) as GenerateRequest;
         const reserved = await this.update((ledger) => {

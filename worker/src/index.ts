@@ -1,5 +1,5 @@
 import type { Env } from './env';
-import { endSchema, generateSchema, inputSchemas, sessionSchema } from './validation';
+import { endActiveSchema, endSchema, generateSchema, inputSchemas, sessionSchema } from './validation';
 export { FamilyUsage } from './family';
 // 입력 길이와 무관하게 같은 길이의 SHA-256 결과를 비교한다.
 export async function authenticated(header: string | null, token: string): Promise<boolean> {
@@ -40,9 +40,9 @@ export default {
     if (!(await authenticated(request.headers.get('Authorization'), env.FAMILY_TOKEN)))
       return json('unauthorized', 401);
     const path = new URL(request.url).pathname;
-    if (!['/api/usage', '/api/realtime/session', '/api/realtime/end', '/api/generate'].includes(path))
+    if (!['/api/usage', '/api/realtime/active', '/api/realtime/end-active', '/api/realtime/session', '/api/realtime/end', '/api/generate'].includes(path))
       return json('invalid', 404);
-    if (request.method !== (path === '/api/usage' ? 'GET' : 'POST')) return json('invalid', 405);
+    if (request.method !== (['/api/usage', '/api/realtime/active'].includes(path) ? 'GET' : 'POST')) return json('invalid', 405);
     let body: unknown;
     if (request.method === 'POST') {
       if (!request.headers.get('Content-Type')?.startsWith('application/json')) return json('invalid', 400);
@@ -65,6 +65,7 @@ export default {
         body = JSON.parse(await new Blob(chunks as BlobPart[]).text());
         if (path === '/api/realtime/session') body = sessionSchema.parse(body);
         else if (path === '/api/realtime/end') body = endSchema.parse(body);
+        else if (path === '/api/realtime/end-active') body = endActiveSchema.parse(body);
         else {
           const parsed = generateSchema.parse(body);
           body = { ...parsed, input: inputSchemas[parsed.kind].parse(parsed.input) };

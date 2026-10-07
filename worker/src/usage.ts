@@ -19,6 +19,8 @@ export interface Session {
   charged?: number;
   /** 종료된 예약 뒤 늦게 도착한 통화도 서버에서 정리한다. */
   needsHangup?: boolean;
+  hangupFailures?: number;
+  nextHangupAt?: number;
 }
 export interface Ledger {
   days: Record<string, Record<AiProfileId, DayUsage>>;
