@@ -122,7 +122,7 @@ describe('대화 미션과 보상', () => {
     expect(enabledMissions(settings, options).some((m) => m.type === 'talk')).toBe(ready);
     expect(applyProgress(data, settings, date, { type: 'math', amount: 20 }, options).justCompleted).toBe(!ready);
     expect(isDayComplete(data.days[date], settings, options)).toBe(!ready);
-    expect(dayRatio(data.days[date], settings, options)).toBe(ready ? 0.5 : 1);
+    expect(dayRatio(data.days[date], settings, options)).toBe(ready ? 2 / 3 : 1);
     expect(data.coupons.length).toBe(ready ? 0 : 1);
   });
   it('30초씩 끊어 대화해도 누적 1분마다 진행과 별을 한 번만 기록하고 백업한다', () => {
@@ -154,7 +154,7 @@ describe('대화 미션과 보상', () => {
     expect(applyProgress(data, settings, '2026-10-07', { type: 'math', amount: 20 }, { aiReady: false }).justCompleted).toBe(true);
     expect(isDayComplete(data.days['2026-10-07'], settings, { aiReady: true })).toBe(false);
     expect(dayRatio(data.days['2026-10-07'], settings, { aiReady: false })).toBe(1);
-    expect(dayRatio(data.days['2026-10-07'], settings, { aiReady: true })).toBe(0.5);
+    expect(dayRatio(data.days['2026-10-07'], settings, { aiReady: true })).toBe(2 / 3);
     applyProgress(data, settings, '2026-10-07', { type: 'math' }, { aiReady: false });
     expect(data.coupons).toHaveLength(1);
   });
