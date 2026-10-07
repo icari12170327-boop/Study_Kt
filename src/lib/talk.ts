@@ -40,7 +40,9 @@ export function normalizeTalkSettings(raw: unknown, level: Level, id?: ProfileId
   };
 }
 /** 텍스트와 item ID가 같으면 렌더링 횟수와 무관하게 같은 단어를 가린다. */
-export function maskSubtitle(text: string, percent: number, seed: string | number): string {
+export function maskSubtitle(text: string, percent: number, seed: string | number, complete = true): string {
+  // 스트리밍 중에는 그대로 보여 주고 완성 후 한 번만 가려 후보 변경의 깜빡임을 막는다.
+  if (!complete) return text;
   const words = [...text.matchAll(/[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu)];
   let hash = 2166136261;
   for (const ch of String(seed)) hash = Math.imul(hash ^ ch.charCodeAt(0), 16777619);

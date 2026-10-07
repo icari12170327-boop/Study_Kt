@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { defaultState, emptyProfileData } from '../store/defaults';
 import { exportState, importState, normalizeState } from '../store/storage';
 import { aiReady, defaultTalkSettings, englishRatio, maskSubtitle, migrateV1toV2, normalizeTalkSettings, recordTalkSeconds, summaryLines, talkRequest, talkSignals, talkTopics } from './talk';
-import { applyProgress, dayRatio, emptyDay, isDayComplete } from './progress';
+import { applyProgress, dayRatio, emptyDay, enabledMissions, isDayComplete } from './progress';
 import type { TalkLine } from '../types';
 
 describe('대화 저장 마이그레이션', () => {
@@ -65,6 +65,15 @@ describe('자막 가림과 영어 비율', () => {
     expect(maskSubtitle('', 100, 'item-1')).toBe('');
     expect(maskSubtitle(text, NaN, 'item-1')).toBe(text);
   });
+  it('스트리밍 중에는 이미 보인 단어를 유지하고 문장이 완성되면 한 번만 가린다', () => {
+    const phrase = 'No way that is so cool tell me more about your awesome';
+    for (const text of [phrase, `${phrase} world`, `${phrase} world today`]) {
+      expect(maskSubtitle(text, 10, 'stream-1', false)).toBe(text);
+    }
+    const complete = `${phrase} world today`;
+    expect(maskSubtitle(complete, 10, 'stream-1', true)).toBe(maskSubtitle(complete, 10, 'stream-1'));
+    expect(maskSubtitle(complete, 10, 'stream-1', true)).toContain('▢▢▢');
+  });
   it('아이의 라틴 단어와 한글 어절만 세며 친구 말·숫자·구두점은 제외한다', () => {
     const lines: TalkLine[] = [{ role: 'friend', text: 'many English words here', at: 0 }, { role: 'kid', text: "I'm happy 오늘 학교에서 123!", at: 1 }];
     expect(englishRatio(lines)).toBe(0.5);
@@ -74,6 +83,15 @@ describe('자막 가림과 영어 비율', () => {
   });
 });
 describe('대화 미션과 보상', () => {
+  it.each([false, true])('AI 연결 상태 %s를 목록·완료·비율·보상에 같은 기준으로 반영한다', (ready) => {
+    const state = defaultState(), settings = state.settings.kid1, data = emptyProfileData('g5');
+    const options = { aiReady: ready }, date = '2026-10-07';
+    expect(enabledMissions(settings, options).some((m) => m.type === 'talk')).toBe(ready);
+    expect(applyProgress(data, settings, date, { type: 'math', amount: 20 }, options).justCompleted).toBe(!ready);
+    expect(isDayComplete(data.days[date], settings, options)).toBe(!ready);
+    expect(dayRatio(data.days[date], settings, options)).toBe(ready ? 0.5 : 1);
+    expect(data.coupons.length).toBe(ready ? 0 : 1);
+  });
   it('30초씩 끊어 대화해도 누적 1분마다 진행과 별을 한 번만 기록하고 백업한다', () => {
     const state = defaultState(), data = state.data.kid1, settings = state.settings.kid1, day = '2026-10-07';
     recordTalkSeconds(data, settings, day, 30, true);

@@ -344,7 +344,7 @@ textarea {
 .talk-ptt { width: 100%; min-height: 84px; margin: 16px 0; touch-action: none; }
 .talk-ptt.on { box-shadow: 0 0 0 4px var(--primary-soft); }
 .talk-controls { margin: 16px 0; flex-wrap: wrap; }
-.talk-page .chip { min-height: 44px; overflow-wrap: anywhere; max-width: 100%; }
+.talk-page .chip { min-height: 48px; overflow-wrap: anywhere; max-width: 100%; }
 .talk-record { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); color: var(--text); text-align: left; font: inherit; cursor: pointer; overflow-wrap: anywhere; }
 .talk-record-line { overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) { .talk-speaking { animation: none; } }

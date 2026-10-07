@@ -13,7 +13,8 @@ export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
   const data = state.data[profileId];
   const settings = state.settings[profileId];
   const day = data.days[today];
-  const missions = enabledMissions(settings);
+  // 홈에는 연결 전 안내를 위한 대화 카드도 표시한다. 시작 가능 여부는 아래에서 확인한다.
+  const missions = enabledMissions(settings, { aiReady: true });
   const unusedCoupons = data.coupons.filter((c) => !c.usedAt).length;
 
   return (

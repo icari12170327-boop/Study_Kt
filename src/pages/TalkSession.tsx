@@ -10,7 +10,7 @@ import { aiReady, defaultTalkSettings, englishRatio, isTalkSummary, maskSubtitle
 import { toDateKey } from '../lib/date';
 import { uid } from '../lib/random';
 
-type StreamLine = TalkLine & { itemId: string };
+type StreamLine = TalkLine & { itemId: string; done: boolean };
 interface Run {
   id: string;
   date: string;
@@ -52,7 +52,7 @@ function Subtitle({ line, percent, onPeek }: { line: StreamLine; percent: number
     onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); clear(); timer.current = setTimeout(onPeek, 500); }}
     onPointerUp={clear} onPointerCancel={clear} onContextMenu={(event) => event.preventDefault()}
     onKeyDown={(event) => { if (['Enter', ' '].includes(event.key)) { event.preventDefault(); onPeek(); } }}>
-    {line.peeked ? line.text : maskSubtitle(line.text, percent, line.itemId)}
+    {line.peeked ? line.text : maskSubtitle(line.text, percent, line.itemId, line.done)}
     {line.peeked && <span className="small muted"> · 자막을 봤어요</span>}
   </button>;
 }
@@ -167,8 +167,8 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
     const append = (itemId: string, role: TalkLine['role'], text: string, done: boolean) => {
       if (run.finished) return;
       const old = run.lines.find((line) => line.itemId === itemId && line.role === role);
-      if (old) old.text = (done ? text : old.text + text).slice(0, 2000);
-      else run.lines.push({ itemId, role, text: text.slice(0, 2000), at: Date.now() });
+      if (old) { old.text = (done ? text : old.text + text).slice(0, 2000); old.done = done; }
+      else run.lines.push({ itemId, role, text: text.slice(0, 2000), at: Date.now(), done });
       if (alive.current) setLines(run.lines.slice(-60).map((line) => ({ ...line })));
     };
     try {

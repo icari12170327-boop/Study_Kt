@@ -12,18 +12,20 @@ export function ensureDay(data: ProfileData, date: string): DayLog {
   return data.days[date];
 }
 
-export function enabledMissions(settings: ProfileSettings, options = { aiReady: true }) {
+export interface ProgressOptions { aiReady: boolean }
+
+export function enabledMissions(settings: ProfileSettings, options: ProgressOptions) {
   return settings.missions.filter((m) => m.enabled && m.target > 0 && (m.type !== 'talk' || options.aiReady));
 }
 
-export function isDayComplete(day: DayLog | undefined, settings: ProfileSettings, options = { aiReady: false }): boolean {
+export function isDayComplete(day: DayLog | undefined, settings: ProfileSettings, options: ProgressOptions): boolean {
   const missions = enabledMissions(settings, options);
   if (!day || missions.length === 0) return false;
   return missions.every((m) => (day.progress[m.type] ?? 0) >= m.target);
 }
 
 /** 0~1 */
-export function dayRatio(day: DayLog | undefined, settings: ProfileSettings, options = { aiReady: false }): number {
+export function dayRatio(day: DayLog | undefined, settings: ProfileSettings, options: ProgressOptions): number {
   const missions = enabledMissions(settings, options);
   if (missions.length === 0) return 0;
   const sum = missions.reduce((s, m) => s + Math.min(1, (day?.progress[m.type] ?? 0) / m.target), 0);
@@ -60,7 +62,7 @@ export function applyProgress(
   settings: ProfileSettings,
   today: string,
   ev: ProgressEvent,
-  options = { aiReady: false },
+  options: ProgressOptions,
 ): ProgressResult {
   const day = ensureDay(data, today);
   const before = day.progress[ev.type] ?? 0;
