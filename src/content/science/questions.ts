@@ -127,16 +127,16 @@ export const SCIENCE_QUESTIONS: ScienceQuestion[] = [
     "unit": "life",
     "kind": "choice",
     "emoji": "🌈",
-    "question": "자유롭게 도는 자석의 북쪽을 가리키는 극은?",
+    "question": "주변에 다른 자석이 없을 때, 나침반에서 북쪽을 가리키는 부분은?",
     "choices": [
-      "북극",
-      "남극",
-      "동극",
-      "서극"
+      "N극",
+      "S극",
+      "자석의 가운데",
+      "자석의 모든 부분"
     ],
     "answer": 0,
-    "explain": "자석의 북극은 대체로 북쪽을 가리켜요. 지구 자체가 큰 자석처럼 작용하기 때문이에요.",
-    "card": "나침반의 자석은 방향을 찾는 데 쓰여요.",
+    "explain": "나침반에서 자석의 N극은 대체로 북쪽을 가리켜요. 지구 자체가 큰 자석처럼 작용하기 때문이에요.",
+    "card": "자석의 N극은 대체로 북쪽을 가리켜요.",
     "experimentId": "science-compass"
   },
   {

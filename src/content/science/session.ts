@@ -4,16 +4,24 @@ import { SCIENCE_CARDS, SCIENCE_CARD_MAP } from './experiments';
 import { SCIENCE_UNITS, type ScienceUnit } from './units';
 import { applyProgress, ensureDay } from '../../lib/progress';
 import { aiReady } from '../../lib/talk';
-import { pickSessionKeys, reviewCard } from '../../lib/srs';
-import { lastNDays, toDateKey, parseDateKey } from '../../lib/date';
+import { BOX_INTERVALS, pickSessionKeys, reviewCard } from '../../lib/srs';
+import { addDays, lastNDays, toDateKey, parseDateKey } from '../../lib/date';
 
 export const OTHER_OBSERVATIONS = ['다르게 관찰했어요', '관찰이 어려웠어요'];
 export function questionsFor(level: 'g3' | 'g5'): ScienceQuestion[] {
   return SCIENCE_QUESTIONS.filter(q => q.audience === 'both' || q.audience === level);
 }
+/** reviewCard의 예정일 = 마지막 풀이일 + 현재 상자 간격. 기존 저장 기록에도 적용한다. */
+function answeredToday(card: SrsCard | undefined, today: string): boolean {
+  return !!card && Number.isInteger(card.box) && card.box >= 1 && card.box <= BOX_INTERVALS.length &&
+    card.due === addDays(today, BOX_INTERVALS[card.box - 1]);
+}
 export function pickScienceSession(level: 'g3' | 'g5', srs: Record<string, SrsCard>, today: string, count: number): ScienceQuestion[] {
-  // 기존 선택기를 재사용하되, 아직 복습일이 아닌 문제의 연습 채우기는 하지 않는다.
-  const available = questionsFor(level).filter(q => !srs[`sci:${q.id}`] || srs[`sci:${q.id}`].due <= today);
+  // 예정 복습 → 새 문제 → 낮은 상자의 연습으로 채우되, 오늘 푼 문제와 아직 복습일 전인 오답은 제외한다.
+  const available = questionsFor(level).filter(q => {
+    const card = srs[`sci:${q.id}`];
+    return !answeredToday(card, today) && !(card && card.box === 1 && card.lapses > 0 && card.due > today);
+  });
   return pickSessionKeys(available.map(q => `sci:${q.id}`), srs, today, count).map(key => SCIENCE_QUESTION_MAP[key.slice(4)]);
 }
 export function gradeAnswer(q: ScienceQuestion, chosen: number): boolean {
@@ -32,6 +40,8 @@ export function recordScienceAnswer(state: AppState, profileId: ProfileId, id: s
   if (!q || !profile || profile.level === 'adult' || (q.audience !== 'both' && q.audience !== profile.level) ||
     !Number.isInteger(chosen) || chosen < 0 || chosen >= q.choices.length) return false;
   const data = state.data[profileId], correct = gradeAnswer(q, chosen);
+  // 새로고침·중복 요청에도 같은 날 같은 문제로 진행과 별을 중복 지급하지 않는다.
+  if (answeredToday(data.srs[`sci:${id}`], date)) return false;
   data.srs[`sci:${id}`] = reviewCard(data.srs[`sci:${id}`], correct, date);
   if (correct) {
     data.science.collected[id] ??= date;

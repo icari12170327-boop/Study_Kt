@@ -96,6 +96,58 @@ describe('학년·SRS·채점·배지', () => {
     const srs: Record<string, SrsCard> = Object.fromEntries(questionsFor('g3').map(q => [`sci:${q.id}`, { box: 1, seen: 1, lapses: 1, due: addDays(date, 1) }]));
     expect(pickScienceSession('g3', srs, date, 5)).toEqual([]);
   });
+  it('부족분은 오늘 풀지 않은 낮은 상자의 연습으로 채우고, 예정 복습과 새 문제를 우선한다', () => {
+    const qs = questionsFor('g3');
+    const srs: Record<string, SrsCard> = Object.fromEntries(qs.map(q => [`sci:${q.id}`, { box: 5, seen: 8, lapses: 0, due: addDays(date, 10) }]));
+    srs[`sci:${qs[0].id}`] = { box: 2, seen: 3, lapses: 0, due: date };
+    delete srs[`sci:${qs[1].id}`];
+    srs[`sci:${qs[2].id}`] = { box: 3, seen: 4, lapses: 0, due: addDays(date, 2) };
+    srs[`sci:${qs[3].id}`] = { box: 2, seen: 3, lapses: 1, due: addDays(date, 2) };
+    srs[`sci:${qs[4].id}`] = { box: 1, seen: 1, lapses: 0, due: addDays(date, 1) }; // 오늘 정답
+    srs[`sci:${qs[5].id}`] = { box: 1, seen: 2, lapses: 1, due: addDays(date, 1) }; // 오늘 오답
+    srs[`sci:${qs[6].id}`] = { box: 5, seen: 12, lapses: 0, due: addDays(date, 30) }; // 오늘 익힌 문제
+    const before = structuredClone(srs), selected = pickScienceSession('g3', srs, date, 5);
+    expect(selected.slice(0, 4).map(q => q.id)).toEqual([qs[0].id, qs[1].id, qs[3].id, qs[2].id]);
+    expect(selected).toHaveLength(5);
+    for (const q of qs.slice(4, 7)) expect(selected).not.toContain(q);
+    expect(srs).toEqual(before);
+  });
+  it('오늘 푼 문제는 백업 복원·재입장에서도 빼고 같은 날 다시 기록해도 보상을 늘리지 않는다', () => {
+    const state = defaultState();
+    state.settings.kid2.missions = [{ type: 'science', enabled: true, target: 5 }];
+    const qs = pickScienceSession('g3', state.data.kid2.srs, date, 5);
+    for (let n = 0; n < qs.length; n++) recordScienceAnswer(state, 'kid2', qs[n].id, n === 0 ? (qs[n].answer + 1) % qs[n].choices.length : qs[n].answer, date);
+    const restored = importState(exportState(state)), before = structuredClone(restored);
+    const selected = pickScienceSession('g3', restored.data.kid2.srs, date, 5);
+    expect(selected).toHaveLength(5);
+    expect(selected.every(q => !qs.includes(q))).toBe(true);
+    for (const q of qs) expect(recordScienceAnswer(restored, 'kid2', q.id, q.answer, date)).toBe(false);
+    expect(restored).toEqual(before);
+  });
+  for (const [profileId, level] of [['kid1', 'g5'], ['kid2', 'g3']] as const) for (const accuracy of [100, 80]) {
+    it(`${level} 정답률 ${accuracy}%로 180일간 매일 5문제·쿠폰·연속일을 유지한다`, () => {
+      let state = defaultState();
+      state.settings[profileId].missions = [{ type: 'science', enabled: true, target: 5 }];
+      for (let n = 0; n < 180; n++) {
+        const today = addDays(date, n), data = state.data[profileId];
+        const selected = pickScienceSession(level, data.srs, today, 5);
+        expect(selected, `${n + 1}일째`).toHaveLength(5);
+        expect(new Set(selected.map(q => q.id)).size).toBe(5);
+        for (let i = 0; i < selected.length; i++) {
+          const q = selected[i], chosen = accuracy === 80 && i === 0 ? (q.answer + 1) % q.choices.length : q.answer;
+          expect(recordScienceAnswer(state, profileId, q.id, chosen, today)).toBe(true);
+        }
+        expect(data.days[today].progress.science).toBe(5);
+        expect(data.days[today].completed).toBe(true);
+        expect(data.coupons).toHaveLength(n + 1);
+        expect(data.streak).toBe(n + 1);
+        expect(data.stars).toBe((n + 1) * (accuracy === 100 ? 5 : 4));
+        const next = pickScienceSession(level, data.srs, today, 5);
+        expect(next.every(q => !selected.includes(q))).toBe(true);
+        if (n % 30 === 29) state = importState(exportState(state));
+      }
+    });
+  }
   it('잘못된 답·학년·보호자 요청은 기록을 바꾸지 않는다', () => {
     const state = defaultState(), before = structuredClone(state);
     for (const chosen of [-1, 0.5, Infinity, NaN, question.choices.length]) {

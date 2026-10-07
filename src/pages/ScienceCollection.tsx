@@ -22,7 +22,7 @@ export function ScienceCollection({ profileId, go }: { profileId: ProfileId; go:
   return <div className={`page science-page ${first ? 'science-lab' : 'science-museum'}`}>
     <TopBar title={first ? '🧱 실험실 빌드' : '🏛️ 나의 과학 박물관'} onBack={() => go({ name: 'home', profileId })} />
     <section className="panel"><div className="science-hero">{profile.avatar}<span aria-label="오늘의 소품">{outfitFor(toDateKey(), profileId)}</span></div><strong>{profile.name}의 카드 {cards.filter(c => data.collected[c.id]).length} / {cards.length}장</strong><p className="muted">처음 맞힌 문제가 도감에 들어가요. {first ? '단원별 실험실 방을 지어요.' : '단원별 전시실을 채워요.'}</p></section>
-    <section className="panel"><h2 className="section-title">🏅 나의 배지</h2><div className="chip-wrap">{data.badges.length ? data.badges.map(id => <span className="badge" key={id}>{badgeLabel(id)}</span>) : <p className="muted">같은 단원의 카드를 모으면 배지가 생겨요.</p>}</div><p className="small muted">단원별 5장·10장·단원 전체 배지</p></section>
+    <section className="panel"><h2 className="section-title">🏅 나의 배지</h2><div className="chip-wrap">{data.badges.length ? data.badges.map(id => <span className="badge" key={id}>{badgeLabel(id)}</span>) : <p className="muted">같은 단원의 카드를 모으면 배지가 생겨요.</p>}</div><p className="small muted">단원별 5장·10장·단원 전체 배지</p><p className="small muted">문제가 5개 미만인 단원은 전체 배지만 있어요. 10장 배지는 문제가 10개 이상인 단원에서 얻어요.</p></section>
     {Object.entries(SCIENCE_UNITS).map(([unit, meta]) => {
       const group = cards.filter(c => c.unit === unit);
       if (!group.length) return null;
