@@ -1,4 +1,4 @@
-import { normalizeScience } from '../content/science/session';
+import { normalizeScience, normalizeScienceDay } from '../content/science/session';
 import type { AppState } from '../types';
 import type { AiConfig } from '../../shared/ai';
 import { defaultSettings, defaultState } from './defaults';
@@ -19,7 +19,12 @@ export function normalizeState(raw: unknown): AppState {
   for (const p of profiles) {
     settings[p.id] = { ...defaultSettings(p.level, p.id), ...s.settings?.[p.id] };
     settings[p.id].missions = settings[p.id].missions.map((m) => ({ ...m }));
-    if (!settings[p.id].missions.some(m => m.type === 'science')) settings[p.id].missions.push({ type: 'science', enabled: p.level !== 'adult', target: 1 });
+    if (!settings[p.id].missions.some(m => m.type === 'science')) settings[p.id].missions.push({ type: 'science', enabled: p.level !== 'adult', target: 5 });
+    if (s.settings?.[p.id]?.scienceV2 !== true) {
+      const science = settings[p.id].missions.find(m => m.type === 'science')!;
+      if (science.target === 1) science.target = 5;
+    }
+    settings[p.id].scienceV2 = true;
     const talk = normalizeTalkSettings(settings[p.id].talk, p.level, p.id);
     settings[p.id].talk = talk;
     const mission = settings[p.id].missions.find((m) => m.type === 'talk');
@@ -42,7 +47,7 @@ export function normalizeState(raw: unknown): AppState {
         Number.isFinite(row.guesses) && Number.isFinite(row.medianSec)).slice(-30) : [],
     };
     data[p.id].days = Object.fromEntries(Object.entries(data[p.id].days).map(([date, day]) =>
-      [date, { ...day, talkSeconds: typeof day.talkSeconds === 'number' && Number.isFinite(day.talkSeconds) && day.talkSeconds >= 0 ? Math.floor(day.talkSeconds) : (day.progress.talk ?? 0) * 60, mathAttempts: Array.isArray(day.mathAttempts) ? day.mathAttempts : [] }]));
+      [date, { ...day, ...(day.science !== undefined ? { science: normalizeScienceDay(day.science) } : {}), talkSeconds: typeof day.talkSeconds === 'number' && Number.isFinite(day.talkSeconds) && day.talkSeconds >= 0 ? Math.floor(day.talkSeconds) : (day.progress.talk ?? 0) * 60, mathAttempts: Array.isArray(day.mathAttempts) ? day.mathAttempts : [] }]));
   }
   const ai = {
     ...(typeof s.ai?.endpoint === 'string' ? { endpoint: s.ai.endpoint } : {}),
