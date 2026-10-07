@@ -1,13 +1,15 @@
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import type { Answer } from '../types';
 import type { AnswerInput } from '../content/math/grading';
-import { applyNumberKey } from '../lib/numberPad';
+import { applyNumberKey, mapKeyToAction } from '../lib/numberPad';
 
 interface Props {
   kind: Answer['kind'];
   value: AnswerInput;
   onChange: (value: AnswerInput) => void;
   onSubmit: () => void;
+  onNext: () => void;
+  nextButtonRef: RefObject<HTMLButtonElement | null>;
   onActivity: () => void;
   disabled?: boolean;
 }
@@ -27,36 +29,54 @@ const FIELDS: Record<Answer['kind'], Field[]> = {
   ],
 };
 
-export function NumberPad({ kind, value, onChange, onSubmit, onActivity, disabled }: Props) {
+export function NumberPad({ kind, value, onChange, onSubmit, onNext, nextButtonRef, onActivity, disabled }: Props) {
   const [active, setActive] = useState(0);
+  const root = useRef<HTMLDivElement>(null);
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
   const fields = FIELDS[kind];
-  const press = (key: string) => {
+  const press = useCallback((key: string) => {
     if (disabled) return;
     onActivity();
     const field = fields[active].key;
     onChange({ ...value, [field]: applyNumberKey(value[field] ?? '', key, kind === 'decimal') });
-  };
-  const nextField = () => {
-    const index = (active + 1) % fields.length;
+  }, [disabled, onActivity, fields, active, onChange, value, kind]);
+  const moveField = useCallback((direction: 1 | -1) => {
+    if (disabled) return;
+    const index = (active + direction + fields.length) % fields.length;
+    setActive(index);
     inputs.current[index]?.focus();
     onActivity();
-  };
+  }, [disabled, active, fields, onActivity]);
+
+  useEffect(() => {
+    const keydown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey || event.isComposing || event.keyCode === 229) return;
+      // PIN은 기존 클래스, 다른 모달은 표준 속성으로 확인한다.
+      if (document.querySelector('.modal-backdrop, [aria-modal="true"], dialog[open]')) return;
+      const target = event.target instanceof Element ? event.target : document.activeElement;
+      for (const element of [target, document.activeElement]) {
+        const editable = element?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]');
+        if (editable && !inputs.current.some((input) => input === editable)) return;
+        // 다른 버튼·링크의 Enter는 기본 활성화에 맡긴다. 숫자·삭제 키는 계속 받을 수 있다.
+        const control = element?.closest('button, a[href], [role="button"], [role="link"]');
+        if (event.key === 'Enter' && control && !root.current?.contains(control) && control !== nextButtonRef.current) return;
+      }
+      const action = mapKeyToAction(event.key, { kind, phase: disabled ? 'feedback' : 'answering', shiftKey: event.shiftKey });
+      if (!action) return;
+      // 포커스된 버튼의 기본 클릭도 막아 중복 제출을 방지한다.
+      event.preventDefault();
+      if (event.repeat && (action.type === 'submit' || action.type === 'next')) return;
+      if (action.type === 'input') press(action.key);
+      else if (action.type === 'move') moveField(action.direction);
+      else if (action.type === 'submit') onSubmit();
+      else onNext();
+    };
+    window.addEventListener('keydown', keydown);
+    return () => window.removeEventListener('keydown', keydown);
+  }, [kind, disabled, press, moveField, onSubmit, onNext, nextButtonRef]);
 
   return (
-    <div
-      className="number-answer"
-      onKeyDown={(event) => {
-        if (disabled || event.ctrlKey || event.altKey || event.metaKey) return;
-        if (/^[0-9]$/.test(event.key) || ['.', 'Backspace', 'Delete'].includes(event.key)) {
-          event.preventDefault();
-          press(event.key);
-        } else if (event.key === 'Enter') {
-          event.preventDefault();
-          if (!event.repeat) onSubmit();
-        }
-      }}
-    >
+    <div className="number-answer" ref={root}>
       <div className={`answer-row ${kind === 'fraction' ? 'fraction-row' : ''}`}>
         {fields.map((field, index) => (
           <label key={field.key} className="pad-field">
@@ -89,7 +109,7 @@ export function NumberPad({ kind, value, onChange, onSubmit, onActivity, disable
             .
           </button>
         ) : fields.length > 1 ? (
-          <button className="number-key small" disabled={disabled} onClick={nextField}>
+          <button className="number-key small" disabled={disabled} onClick={() => moveField(1)}>
             다음 칸
           </button>
         ) : (
