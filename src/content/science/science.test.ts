@@ -149,6 +149,16 @@ describe('실험 기록·별·배지', () => {
     done[cards[0].id] = { ...observation, date: addDays(date, 1) };
     expect(scienceBadges(done)).toEqual(['mixing:3', 'mixing:6']);
   });
+  it('현재 학년별 30장을 모두 모아도 6장·10장 배지는 아직 얻지 못한다', () => {
+    for (const level of ['g3', 'g5'] as const) {
+      const eligible = cardsFor(level);
+      const done = Object.fromEntries(eligible.map(c => [c.id, observation]));
+      const badges = scienceBadges(done);
+      expect(badges.length).toBeGreaterThan(0);
+      expect(badges.every(id => id.endsWith(':3'))).toBe(true);
+      expect(eligible.filter(c => c.topic === 'mixing')).toHaveLength(level === 'g3' ? 5 : 4);
+    }
+  });
 });
 
 describe('저장 호환·백업·AI 주제·소품', () => {
