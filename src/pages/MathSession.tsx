@@ -172,7 +172,7 @@ export function MathSession({ profileId, go }: { profileId: ProfileId; go: Go })
         <div className="question-text">{item.problem.question}</div>
         {item.problem.answer.kind === 'fraction' && <div className="muted small">기약분수로 답해요. 대분수는 자연수 칸도 채워요.</div>}
         <NumberPad key={`${round}-${index}`} kind={item.problem.answer.kind} value={input} onChange={setInput}
-          onSubmit={submit} onActivity={() => events.current.push(performance.now())} disabled={answered} />
+          onSubmit={submit} onNext={next} onActivity={() => events.current.push(performance.now())} disabled={answered} />
         {feedback && <div role="status" className={`feedback ${feedback.correct ? 'ok math-success' : 'bad'}`}>{feedback.message}</div>}
         {guesses >= 3 && <p className="guess-notice" role="status">천천히 생각해도 괜찮아! 빨리 틀리면 점수에 안 들어가 🙂</p>}
         {answered && !feedback?.correct && item.problem.hint && <div className="hint">💡 {item.problem.hint}</div>}
