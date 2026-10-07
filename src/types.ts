@@ -44,6 +44,7 @@ export interface MissionConfig {
 }
 
 export interface ProfileSettings {
+  bingo?: { enabled: boolean; productMix: 'off' | 'few' | 'normal' | 'many'; limitSec: number };
   /** 배포된 실험 미션의 단위를 한 번만 문제로 바꾼 표시. */
   scienceV2?: true;
   talk?: TalkSettings;
@@ -164,7 +165,18 @@ export interface ReadingNote {
   cards: QaCard[];
 }
 
+export interface BingoRecord {
+  date: string;
+  level: Level;
+  /** 같은 제한 시간끼리만 최고 기록을 비교한다. */
+  limitSec: number;
+  found: number;
+  bingos: number;
+  hints: number;
+}
+
 export interface ProfileData {
+  bingo?: { recent: BingoRecord[]; best: Record<string, BingoRecord> };
   science: ScienceData;
   talks: TalkLog[];
   friendMemory: string;

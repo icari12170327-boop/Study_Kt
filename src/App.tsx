@@ -1,3 +1,4 @@
+import { MathBingo } from './pages/MathBingo';
 import { useEffect, useState } from 'react';
 import type { Route } from './route';
 import { ProfileSelect } from './pages/ProfileSelect';
@@ -27,6 +28,8 @@ export function App() {
       return <ProfileSelect go={setRoute} />;
     case 'home':
       return <Home profileId={route.profileId} go={setRoute} />;
+    case 'bingo':
+      return <MathBingo key={route.profileId} profileId={route.profileId} go={setRoute} />;
     case 'math':
       return <MathSession profileId={route.profileId} go={setRoute} />;
     case 'vocab':

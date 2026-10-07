@@ -390,3 +390,46 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 .science-tile .small { display: block; }
 .science-detail fieldset { min-width: 0; }
 .science-detail .science-choice { overflow-wrap: anywhere; }
+
+/* 수학 빙고: 판만 드래그를 받고 나머지 화면은 스크롤할 수 있다. */
+.bingo-home .mission-icon { background: var(--primary); }
+.bingo-intro, .bingo-results { text-align: center; }
+.bingo-hero { font-size: 3.5rem; }
+.bingo-intro .tabs { justify-content: center; }
+.bingo-timer-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.bingo-timer-label strong { font-size: 1.5rem; }
+.bingo-urgent .bingo-timer-label strong { color: var(--bad); font-size: 2rem; }
+.bingo-goal { text-align: center; }
+.bingo-goal h2 { font-size: 1.25rem; margin: 6px 0; }
+.bingo-goal h2 strong { color: var(--primary); font-size: 1.75rem; }
+.bingo-goal p { margin: 4px 0; }
+.bingo-board-wrap { position: relative; align-self: center; }
+.bingo-board {
+  display: grid; grid-template-columns: repeat(var(--bingo-size), minmax(0, 1fr)); gap: 5px;
+  width: min(90vw, 70vh, 700px); max-width: calc(100vw - 32px); position: relative;
+  touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.bingo-size-5 { min-width: 300px; }
+.bingo-size-6 { min-width: 313px; }
+.bingo-cell {
+  border: 2px solid var(--line); border-radius: 12px; background: var(--card); aspect-ratio: 1;
+  font-size: clamp(1.15rem, 3.5vw, 2rem); font-weight: 800; padding: 0; cursor: pointer;
+}
+.bingo-size-5 .bingo-cell { min-height: 56px; }
+.bingo-size-6 .bingo-cell { min-height: 48px; }
+.bingo-cell.cursor { border-color: var(--primary); }
+.bingo-cell:focus-visible { outline: 3px solid var(--warn); outline-offset: -5px; }
+.bingo-cell.selected { background: var(--primary-soft); box-shadow: inset 0 0 0 3px var(--primary); }
+.bingo-cell.hinted { animation: bingo-hint 1s ease-in-out infinite alternate; }
+.bingo-cell.shake { animation: bingo-shake 0.32s ease-in-out 2; background: var(--bad-soft); }
+.bingo-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.bingo-lines line { stroke: var(--primary); stroke-width: 0.13; stroke-linecap: round; opacity: 0.75; }
+.bingo-lines .bingo-preview { stroke-dasharray: 0.12 0.08; opacity: 0.55; }
+.bingo-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: var(--card); opacity: 0.95; border-radius: var(--radius); }
+.bingo-overlay strong { font-size: 5rem; color: var(--primary); }
+.bingo-feedback { text-align: center; min-height: 1.6em; font-weight: 700; }
+.bingo-bonus, .bingo-new { color: var(--ok); }
+@keyframes bingo-shake { 25%, 75% { transform: translateX(-3px); } 50% { transform: translateX(3px); } }
+@keyframes bingo-hint { from { box-shadow: inset 0 0 0 2px var(--warn); } to { background: var(--primary-soft); box-shadow: inset 0 0 0 5px var(--warn); } }
+@media (prefers-color-scheme: dark) { .bingo-lines line { stroke: #a5b4fc; } .bingo-goal h2 strong { color: #a5b4fc; } }
+@media (prefers-reduced-motion: reduce) { .bingo-cell.hinted, .bingo-cell.shake { animation: none; } .bingo-cell.hinted { box-shadow: inset 0 0 0 4px var(--warn); } }
