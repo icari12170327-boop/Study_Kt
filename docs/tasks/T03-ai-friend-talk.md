@@ -15,6 +15,7 @@
 
 ## 범위
 **포함**
+- **0단계 (가장 먼저, 첫 커밋으로): 진행 중 대화 강제 종료.** 아래 "진행 중 대화 강제 종료" 설계대로 Worker 엔드포인트와 보호자 "AI 연결" 탭의 버튼을 만든다. 2026-10-07 실제 테스트에서 끝나지 않은 세션이 30분 동안 `busy`로 남아 다시 연결할 수 없었던 문제의 안전장치다.
 - 미션 타입 `talk` 추가 (단위: 분). 아이 기본값: 초3 15분, 초5 20분.
 - **아이 기본 미션 재구성**: `vocab`, `speaking`은 아이 프로필에서 기본 꺼짐(선택 미션으로 남김). 저장 데이터 마이그레이션 포함(아래).
 - 대화 준비 화면 → 대화 화면 → 대화 끝 화면
@@ -27,6 +28,21 @@
 - 발음 점수
 
 ## 설계
+
+### 진행 중 대화 강제 종료 (0단계)
+**Worker**
+- `GET /api/realtime/active` → `{ sessions: { profileId; sessionId; startedAt; elapsedSeconds; remainingSeconds }[] }` 끝나지 않은 세션 목록. 인증 필요.
+- `POST /api/realtime/end-active` `{ profileId: 'kid1' | 'kid2' | 'parent' | 'all' }` → 해당 프로필의 끝나지 않은 세션을 모두 기존 `closeSession()` 경로로 종료한다(OpenAI hangup 시도 + 흐른 시간만큼 기록). 응답 `{ ok: true, closed: number, chargedSeconds: number }`.
+  - OpenAI hangup이 실패해도 세션은 종료로 기록하고 `needsHangup`을 남겨 알람이 재시도하게 한다(앱이 다시 `busy`에 막히지 않아야 함).
+  - `closeSession()`과 같은 Durable Object 잠금 규칙을 따른다. **`blockConcurrencyWhile` 콜백 안에서 예외를 던지지 않는다**(PR #12에서 고친 문제).
+- 두 엔드포인트를 `index.ts`의 허용 경로, 메서드 검사, 입력 검증(zod)에 추가한다.
+
+**앱 (보호자 모드 → AI 연결 탭)**
+- "진행 중인 대화" 영역: 탭을 열 때와 "연결 확인"을 누를 때 `/api/realtime/active`를 불러와 프로필 이름, 시작 시각, 경과 시간을 보여 준다. 없으면 "진행 중인 대화 없음".
+- 세션마다 **"이 대화 끝내기"** 버튼, 2개 이상이면 **"모두 끝내기"** 버튼. 누르면 확인창("○○의 대화를 끝낼까요? 아이가 대화 중이면 바로 끊겨요.") 후 `/api/realtime/end-active` 호출, 결과와 사용량을 새로고침.
+- 이 기기에서 진행 중인 대화(`TalkHandle`)가 있으면 그것도 `stop()`한다.
+- 앱 쪽 409(`busy`) 안내 문구에 "보호자 모드 → AI 연결에서 끝낼 수 있어요"를 덧붙인다.
+
 
 ### 데이터 모델 (`types.ts`, `normalizeState`)
 ```ts
@@ -157,6 +173,10 @@ When you receive "[WRAP_UP]", say a warm, short goodbye and mention something to
 - `{slowNote}`: 초3이면 ", a little slower than normal"
 
 ## 수용 기준
+- [ ] (0단계) 보호자 AI 연결 탭에 진행 중인 대화가 프로필별로 보이고, "이 대화 끝내기"/"모두 끝내기"로 즉시 종료된다. 종료 후 같은 프로필로 바로 새 대화를 시작할 수 있다(`busy`가 나오지 않음).
+- [ ] (0단계) OpenAI hangup이 실패해도 세션은 종료되고, 알람이 hangup을 재시도한다(Worker 테스트).
+- [ ] (0단계) 인증 없이 `/api/realtime/active`, `/api/realtime/end-active`를 호출하면 401이다. 잘못된 `profileId`는 400이다.
+- [ ] (0단계) busy, limit, invalid 오류가 Durable Object 잠금 안에서 던져지지 않고 409/429/400으로 그대로 전달된다(Worker 테스트로 상태 코드 확인).
 - [ ] 아이 홈에 "🗣️ AI 친구와 대화 N분" 미션이 있고, 대화 1분마다 진행률이 오른다. 단어와 따라 말하기는 기본으로 꺼져 있다(보호자가 켤 수 있음).
 - [ ] v1 저장 데이터를 불러오면 마이그레이션이 적용되고 기존 기록(별, 연속 학습일, 오답노트, SRS)이 유지된다(테스트).
 - [ ] 주제 칩을 고르거나 바로 시작해서 음성 대화가 되고, 친구 말이 자막으로 스트리밍된다.
@@ -175,6 +195,7 @@ When you receive "[WRAP_UP]", say a warm, short goodbye and mention something to
 - 직접: DeX(Chrome) 또는 태블릿에서 첫째와 둘째 설정으로 각각 5분 대화 (헤드셋, 스피커 각각)
 
 ## 리뷰 포인트
+- (0단계) 강제 종료가 사용 시간을 정확히 기록하는지(0초로 지워서 상한을 우회할 수 없는지)
 - 아이 프로필 이름이나 실명이 Worker로 가지 않는지 (`friendName`, 학년, 관심사, 기억 요약만)
 - 자막 가림이 다시 그릴 때 바뀌지 않는지
 - 대화가 길어질 때 자막 목록 렌더링 성능 (가상 스크롤까지는 필요 없지만 최근 N줄만 그리기)

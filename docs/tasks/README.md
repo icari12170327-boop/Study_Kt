@@ -6,8 +6,8 @@
 |---|---|---|---|---|
 | T00 | 1단계 MVP (연산, 단어, 말하기, 독서노트, 보상, 보호자 모드, PWA) | 1 | - | ✅ 완료 (PR #1) |
 | [T01](T01-ci-deploy.md) | CI, GitHub Pages 자동 배포, 린트 | 1.5 | - | ✅ 완료 (PR #4, Sonnet 리뷰 승인) |
-| [T02](T02-ai-proxy.md) | AI 프록시: Realtime 대화 연결, 텍스트 생성, 하루 시간 상한 | 2 | T01 | 준비됨 · **다음** (아래 사전 준비 필요) |
-| [T03](T03-ai-friend-talk.md) | 아이용 AI 친구 프리토킹 (자막 가림, 기억, 대화 기록) | 2 | T02 | 준비됨 |
+| [T02](T02-ai-proxy.md) | AI 프록시: Realtime 대화 연결, 텍스트 생성, 하루 시간 상한 | 2 | T01 | ✅ 완료 (PR #10, 후속 수정 PR #11 #12) |
+| [T03](T03-ai-friend-talk.md) | 아이용 AI 친구 프리토킹 (0단계: 진행 중 대화 강제 종료) | 2 | T02 | 준비됨 · **다음** |
 | [T04](T04-parent-business-talk.md) | 보호자 비즈니스 프리토킹과 "내 표현" | 2 | T02, T03 | 준비됨 |
 | [T05](T05-adaptive-math.md) | 수학 도전: 레벨, 숫자 키패드, 꼼수 방지 | 3 | - | ✅ 완료 (PR #8, Sonnet 리뷰 승인) |
 | [T15](T15-dex-keyboard.md) | DeX 물리 키보드로 수학 도전 끝까지 풀기 (T05 후속) | 3 | T05 | 준비됨 · **다음** (반나절 이하) |
@@ -22,10 +22,11 @@
 | T14 | 기기 간 동기화 (아이마다 Fold4가 생기면 필요) | 5 | T01 | 초안 필요 |
 
 ## T02 사전 준비 (보호자)
-- [ ] OpenAI: 프로젝트를 새로 만들고 API 키 발급, **프로젝트 월 예산 한도** 설정 (예: 월 2만 원 상당)
+- [x] OpenAI: 프로젝트, API 키, 크레딧 충전 (예산은 알림 기준이라 선불 충전 + 자동 충전 끄기 권장)
 - [x] Cloudflare: 무료 계정 가입
-- [ ] Cloudflare: workers.dev 서브도메인, KV 네임스페이스, API 토큰 → GitHub Secrets (자세한 순서는 [T02](T02-ai-proxy.md)의 "Cloudflare 준비")
-- [ ] T02 머지 후: Worker에 `OPENAI_API_KEY`, `FAMILY_TOKEN`을 대시보드에서 Secret으로 등록
+- [x] Cloudflare: workers.dev 서브도메인(`icari12170327`), KV 네임스페이스, API 토큰 → GitHub Secrets (자세한 순서는 [T02](T02-ai-proxy.md)의 "Cloudflare 준비")
+- [x] T02 머지 후: Worker에 `OPENAI_API_KEY`, `FAMILY_TOKEN`을 대시보드에서 Secret으로 등록 (Worker: https://study-kt-proxy.icari12170327.workers.dev)
+- [ ] 10초 음성 연결 테스트 성공 확인 (2026-10-07: 남은 세션 때문에 busy, PR #12로 오류 표시 수정. 첫 실패 원인은 콘솔 `realtime error event`로 확인 예정)
 - [ ] 키와 토큰은 채팅, 저장소, PR에 절대 붙여 넣지 않는다
 
 ## 병행 진행 제안
