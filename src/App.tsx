@@ -57,7 +57,7 @@ export function App() {
       return <Rewards profileId={route.profileId} go={setRoute} />;
     case 'parent':
       return parentUnlocked ? (
-        <Parent go={setRoute} />
+        <Parent go={setRoute} initialTab={route.tab} />
       ) : (
         <PinGate onPass={() => setParentUnlocked(true)} onCancel={() => setRoute({ name: 'profiles' })} />
       );

@@ -1,3 +1,4 @@
+import { WeeklyReport } from './WeeklyReport';
 import { WordProblemSettings } from '../components/WordProblemSettings';
 import { PuzzleOverview } from '../components/PuzzleOverview';
 import { StoryOverview } from '../components/stories/StoryOverview';
@@ -28,12 +29,12 @@ import { AiConnection } from './AiConnection';
 import { aiReady } from '../lib/talk';
 import { TalkRecords } from './TalkRecords';
 
-type Tab = 'overview' | 'settings' | 'coupons' | 'backup' | 'ai' | 'talks';
+type Tab = 'overview' | 'settings' | 'coupons' | 'backup' | 'ai' | 'talks' | 'weekly';
 
 const LEVEL_LABEL: Record<Level, string> = { g3: '초등 3학년', g5: '초등 5학년', adult: '성인' };
 
-export function Parent({ go }: { go: Go }) {
-  const [tab, setTab] = useState<Tab>('overview');
+export function Parent({ go, initialTab }: { go: Go; initialTab?: 'weekly' }) {
+  const [tab, setTab] = useState<Tab>(initialTab ?? 'overview');
   return (
     <div className="page">
       <TopBar title="🔒 보호자 모드" onBack={() => go({ name: 'profiles' })} />
@@ -46,6 +47,7 @@ export function Parent({ go }: { go: Go }) {
             ['backup', '백업·보안'],
             ['ai', 'AI 연결'],
             ['talks', '대화 기록'],
+            ['weekly', '📊 주간 리포트'],
           ] as [Tab, string][]
         ).map(([id, label]) => (
           <button key={id} className={`tab ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)}>
@@ -53,6 +55,7 @@ export function Parent({ go }: { go: Go }) {
           </button>
         ))}
       </div>
+      {tab === 'weekly' && <WeeklyReport />}
       {tab === 'overview' && <Overview />}
       {tab === 'settings' && <Settings />}
       {tab === 'coupons' && <Coupons />}

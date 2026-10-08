@@ -573,3 +573,20 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
   .story-episode-link span:last-child { margin-left: auto; }
   .story-paragraph { padding: 14px; }
 }
+
+/* 주간 리포트: 막대와 카드만으로 숫자를 읽는다. */
+.weekly-report { min-width: 0; }
+.weekly-report select { width: 100%; min-height: 48px; margin-top: 6px; padding: 10px; font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+.weekly-sections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.weekly-sections .panel { margin: 0; min-width: 0; }
+.weekly-report h3 { margin-top: 0; }
+.weekly-report p, .weekly-report strong { overflow-wrap: anywhere; }
+.weekly-metric { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; margin: 14px 0; font-size: .95rem; }
+.weekly-metric strong { text-align: right; }
+.weekly-trend { color: var(--muted); font-size: .8em; }
+.weekly-bar { grid-column: 1 / -1; height: 8px; border-radius: 8px; overflow: hidden; background: var(--line); }
+.weekly-bar span { display: block; height: 100%; background: var(--primary); border-radius: inherit; }
+.weekly-report textarea { width: 100%; box-sizing: border-box; }
+.weekly-ai p { white-space: pre-wrap; }
+.weekly-notice { width: 100%; margin: 12px 0; }
+@media (max-width: 600px) { .weekly-sections { grid-template-columns: minmax(0, 1fr); } }
