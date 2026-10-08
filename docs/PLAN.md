@@ -209,6 +209,7 @@
 - [x] [T02](tasks/T02-ai-proxy.md) AI 프록시: Realtime 연결, 텍스트 생성, 하루 시간 상한
 - [x] [T03](tasks/T03-ai-friend-talk.md) 아이용 AI 친구 프리토킹 (자막 가림, 기억, 대화 기록)
 - [x] [T04](tasks/T04-parent-business-talk.md) 보호자 비즈니스 프리토킹과 "내 표현"
+- [ ] **[T18](tasks/T18-parent-coach-mode.md) 보호자 코치 모드 (왕초보: 한국어 대답 OK → 영어로 바꿔 따라 말하기 → 마무리 쓰기)**
 
 ### 3단계 — 수학과 재미 (T02와 병행 가능, AI 불필요)
 - [x] [T05](tasks/T05-adaptive-math.md) 수학 도전: 레벨, 숫자 키패드, 꼼수 방지 (PR #8)
