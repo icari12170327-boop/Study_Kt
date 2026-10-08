@@ -1,3 +1,4 @@
+import { RewardGames } from './pages/RewardGames';
 import { MathBingo } from './pages/MathBingo';
 import { useEffect, useState } from 'react';
 import type { Route } from './route';
@@ -28,6 +29,8 @@ export function App() {
       return <ProfileSelect go={setRoute} />;
     case 'home':
       return <Home profileId={route.profileId} go={setRoute} />;
+    case 'games':
+      return <RewardGames key={`${route.profileId}-${route.game ?? 'all'}`} profileId={route.profileId} initial={route.game} go={setRoute} />;
     case 'bingo':
       return <MathBingo key={route.profileId} profileId={route.profileId} go={setRoute} />;
     case 'math':

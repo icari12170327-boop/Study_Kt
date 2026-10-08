@@ -1,8 +1,9 @@
-import type { ProfileId } from './types';
+import type { GameId, ProfileId } from './types';
 
 export type Route =
   | { name: 'profiles' }
   | { name: 'home'; profileId: ProfileId }
+  | { name: 'games'; profileId: ProfileId; game?: GameId }
   | { name: 'bingo'; profileId: ProfileId }
   | { name: 'math'; profileId: ProfileId }
   | { name: 'vocab'; profileId: ProfileId }
