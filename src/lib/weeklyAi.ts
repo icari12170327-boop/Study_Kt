@@ -1,8 +1,8 @@
-import type { WeeklyAi, WeeklyAiText, WeeklyStats } from '../../shared/weeklyReport';
+import type { WeeklyAi, WeeklyAiText } from '../../shared/weeklyReport';
 import type { AiConfig } from '../../shared/ai';
 import type { ProfileData } from '../types';
 import { addDays, toDateKey } from './date';
-import { validReportDate, weeklyReportRequest, weekRange } from './weeklyReport';
+import { validReportDate, weeklyReportRequest, weekRange, type WeeklyStats } from './weeklyReport';
 import { AiError, generate } from './ai';
 
 export function isWeeklyAiText(raw: unknown): raw is WeeklyAiText {

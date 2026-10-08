@@ -65,6 +65,21 @@ describe('고정 기록 집계', () => {
     expect(stats.math).toMatchObject({ solved: 11, accuracy: 64, currentLevel: 5, levelStart: 3, levelEnd: 4, guesses: 1, storyAccuracy: 50 });
     expect(stats.math.weakSkills.map(row => [row.skill, row.accuracy])).toEqual([['g3-div-basic', 0], ['g3-sub3', 50], ['g3-add3', 83]]);
   });
+  it('단원이 한 개뿐이고 모두 맞혔다면 살펴볼 단원과 AI 입력에서 제외한다', () => {
+    const state = defaultState(), day = emptyDay('2026-10-05');
+    day.mathBySkill = { 'g3-add3': { total: 8, correct: 8 } }; state.data.kid2.days[day.date] = day;
+    const stats = buildWeeklyStats(state, 'kid2', weekRange(day.date));
+    expect(stats.math).toMatchObject({ solved: 8, accuracy: 100, weakSkills: [] });
+    expect(weeklyReportRequest(stats, 'g3').input.stats.math.weakSkills).toEqual([]);
+    expect(reportText(stats)).toContain('살펴볼 수학 단원: 기록 없음');
+  });
+  it('기록된 단원이 세 개 미만이어도 100%는 빼고 나머지 단원만 정답률순으로 남긴다', () => {
+    const state = defaultState(), day = emptyDay('2026-10-05');
+    day.mathBySkill = { 'g3-add3': { total: 8, correct: 8 }, 'g3-sub3': { total: 4, correct: 3 } }; state.data.kid2.days[day.date] = day;
+    const stats = buildWeeklyStats(state, 'kid2', weekRange(day.date));
+    expect(stats.math.weakSkills.map(row => row.skill)).toEqual(['g3-sub3']);
+    expect(stats.math).toMatchObject({ solved: 12, accuracy: 92 });
+  });
   it('과학 정답률은 전체 정답률과 분리하고 배지의 획득일은 첫 정답 날짜로 재구성한다', () => {
     const stats = buildWeeklyStats(fixture(), 'kid2', weekRange('2026-10-08'));
     expect(stats.science).toEqual({ solved: 8, accuracy: 75, newCards: 2, newBadges: ['life:5'] });
@@ -109,6 +124,42 @@ describe('비교와 복사·전송 문구', () => {
     const empty = buildWeeklyStats(defaultState(), 'kid1', weekRange('2026-10-08'));
     expect(compareStats(empty, empty).mathSolved).toBe('none');
   });
+  it('전주 기록이 전혀 없으면 현재 숫자가 있어도 모든 화살표를 숨긴다', () => {
+    const state = fixture(), range = weekRange('2026-10-08');
+    const cur = buildWeeklyStats(state, 'kid2', range);
+    const prev = buildWeeklyStats(defaultState(), 'kid2', weekRange(range.start, -1));
+    expect(cur.hasRecords).toBe(true); expect(prev.hasRecords).toBe(false);
+    expect(Object.values(compareStats(cur, prev)).every(value => value === 'none')).toBe(true);
+    expect(Object.values(compareStats(prev, cur)).every(value => value === 'none')).toBe(true);
+  });
+  it('전주에 0문제인 학습일 기록이 있으면 0과 기록 없음을 구분해 비교한다', () => {
+    const state = defaultState(); state.data.kid2.days['2026-10-04'] = emptyDay('2026-10-04');
+    state.data.kid2.days['2026-10-05'] = { ...emptyDay('2026-10-05'), completed: true, mathBySkill: { 'g3-add3': { correct: 4, total: 5 } } };
+    const cur = buildWeeklyStats(state, 'kid2', weekRange('2026-10-05'));
+    const prev = buildWeeklyStats(state, 'kid2', weekRange('2026-10-05', -1));
+    expect(prev.hasRecords).toBe(true); expect(prev.math.solved).toBe(0);
+    expect(compareStats(cur, prev)).toMatchObject({ mathSolved: 'up', completedDays: 'up', mathAccuracy: 'none' });
+  });
+  it.each(['talk', 'bingo', 'game', 'puzzle', 'puzzleDaily', 'science', 'coupon', 'level'])('학습일 없이 %s 기록만 있어도 기록이 있는 주로 처리한다', kind => {
+    const state = defaultState(), data = state.data.kid2, date = '2026-10-04';
+    if (kind === 'talk') data.talks = [{ id: 't', date, seconds: 0, englishRatio: 0, lines: [] }];
+    if (kind === 'bingo') data.bingo!.recent = [{ date, level: 'g3', limitSec: 120, found: 0, bingos: 0, hints: 0 }];
+    if (kind === 'game') data.games = [{ date, game: 'fishing', score: 0 }];
+    if (kind === 'puzzle') data.puzzles!.recent = [{ date, type: 'train', difficulty: 1, correct: false, hinted: false, activeSec: 0 }];
+    if (kind === 'puzzleDaily') data.puzzles!.daily = [{ date, total: 1, solved: 0, hinted: 0, activeSec: 0 }];
+    if (kind === 'science') data.science.collected[SCIENCE_QUESTIONS[0].id] = date;
+    if (kind === 'coupon') data.coupons = [{ id: 'c', label: '쿠폰', earnedAt: date }];
+    if (kind === 'level') data.math.history = [{ date, level: 2, counted: 0, correct: 0, guesses: 0, medianSec: 0 }];
+    const prev = buildWeeklyStats(state, 'kid2', weekRange('2026-10-05', -1));
+    expect(prev.hasRecords).toBe(true);
+    const cur = buildWeeklyStats(fixture(), 'kid2', weekRange('2026-10-05'));
+    expect(compareStats(cur, prev).mathSolved).toBe('up');
+  });
+  it('기간 밖의 레벨·누적 별·이야기 기록은 해당 주의 기록 존재로 추정하지 않는다', () => {
+    const state = fixture();
+    const stats = buildWeeklyStats(state, 'kid2', weekRange('2026-11-02'));
+    expect(stats.math.levelEnd).toBe(5); expect(stats.hasRecords).toBe(false);
+  });
   it('프로필 이름과 AI 결과를 복사 텍스트에 넣고 원문은 포함하지 않는다', () => {
     const stats = buildWeeklyStats(fixture(), 'kid2', weekRange('2026-10-08'));
     const text = reportText(stats, { goodKo: '잘한 점', watchKo: '살펴볼 점', nextKo: '다음 제안', createdAt: '2026-10-08T00:00:00Z' }, '토끼 친구');
@@ -123,5 +174,6 @@ describe('비교와 복사·전송 문구', () => {
     const request = weeklyReportRequest(stats, 'g3');
     expect(request).toMatchObject({ profileId: 'parent', level: 'adult', kind: 'weekly-report', input: { level: 'g3', stats: { profileId: 'kid2', talk: { highlights: [] } } } });
     expect(JSON.stringify(request)).not.toContain('PRIVATE');
+    expect(request.input.stats).not.toHaveProperty('hasRecords');
   });
 });

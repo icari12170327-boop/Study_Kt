@@ -28,6 +28,16 @@ describe('보호자 주간 리포트 화면', () => {
     state.data.kid1.days['2026-10-11'] = { date: '2026-10-11', completed: false, progress: { math: 2 }, mathAttempts: [], correct: 0, total: 2, mathBySkill: { 'g5-dec-add': { total: 2, correct: 0 } } };
     expect(render()).toContain('0%'); expect(render()).toContain('width:0%'); expect(render()).not.toContain('<canvas');
   });
+  it('모두 맞힌 단원은 화면의 살펴볼 목록에서도 기록 없음으로 표시한다', () => {
+    state.data.kid1.days['2026-10-11'] = { date: '2026-10-11', completed: false, progress: { math: 8 }, mathAttempts: [], correct: 8, total: 8, mathBySkill: { 'g3-add3': { total: 8, correct: 8 } } };
+    const html = render(), weak = html.split('함께 살펴볼 단원</h4>')[1].split('</section>')[0];
+    expect(html).toContain('100%'); expect(weak).toContain('기록 없음'); expect(weak).not.toContain('세 자리 덧셈');
+  });
+  it('첫 사용 주에는 개수와 레벨이 있어도 전주 대비 화살표를 표시하지 않는다', () => {
+    state.data.kid1.days['2026-10-11'] = { date: '2026-10-11', completed: true, progress: { math: 2 }, mathAttempts: [], correct: 1, total: 2, mathBySkill: { 'g3-add3': { total: 2, correct: 1 } } };
+    const html = render();
+    expect(html).toContain('2문제'); expect(html).not.toContain('weekly-trend'); expect(html).not.toContain('▲'); expect(html).not.toContain('▼');
+  });
   it('보호자 탭에만 리포트가 있고 아이 홈에는 노출하지 않는다', () => {
     expect(renderToStaticMarkup(createElement(Parent, { go: () => {} }))).toContain('📊 주간 리포트');
     const kid = renderToStaticMarkup(createElement(Home, { profileId: 'kid1', go: () => {} }));

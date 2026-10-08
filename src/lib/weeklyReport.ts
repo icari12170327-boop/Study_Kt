@@ -1,10 +1,12 @@
 import type { AppState, ProfileId } from '../types';
-import type { WeekRange, WeeklyAi, WeeklyStats } from '../../shared/weeklyReport';
+import type { WeekRange, WeeklyAi, WeeklyStats as NumericWeeklyStats } from '../../shared/weeklyReport';
 import { SKILL_MAP } from '../content/math/skills';
 import { SCIENCE_QUESTIONS } from '../content/science/questions';
 import { badgeLabel } from '../content/science/units';
 import { addDays, lastNDays, parseDateKey, toDateKey } from './date';
-export type { WeekRange, WeeklyAi, WeeklyStats } from '../../shared/weeklyReport';
+export type { WeekRange, WeeklyAi } from '../../shared/weeklyReport';
+/** 비교용 기록 존재 여부는 로컬에서만 사용하며 Worker에 보내지 않는다. */
+export interface WeeklyStats extends NumericWeeklyStats { hasRecords: boolean }
 
 export function validReportDate(value: unknown): value is string {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && toDateKey(parseDateKey(value)) === value;
@@ -80,12 +82,16 @@ export function buildWeeklyStats(state: AppState, profileId: ProfileId, range: W
   const story = attempts.filter(attempt => attempt.story === true);
   return {
     profileId, range: { ...range },
+    hasRecords: days.length > 0 || talks.length > 0 || bingo.length > 0 || games.length > 0 ||
+      dailyPuzzles.length > 0 || recentPuzzles.length > 0 || history.some(row => within(row.date)) ||
+      Object.values(data.science.collected).some(within) || data.coupons.some(row => within(row.earnedAt)),
     attendance: { completedDays, streak, stars: null, coupons: data.coupons.filter(row => within(row.earnedAt)).length },
     math: {
       solved: mathTotal, accuracy: mathMeasured === mathTotal ? percent(mathCorrect, mathMeasured) : null,
       currentLevel: data.math.level, levelStart: levelAt(addDays(range.start, -1)), levelEnd: levelAt(range.end),
       weakSkills: Object.entries(bySkill).filter(([skill, stat]) => SKILL_MAP[skill] && stat.total > 0)
         .map(([skill, stat]) => ({ skill, label: SKILL_MAP[skill].label, accuracy: percent(stat.correct, stat.total)! }))
+        .filter(row => row.accuracy < 100)
         .sort((a, b) => a.accuracy - b.accuracy || a.skill.localeCompare(b.skill)).slice(0, 3),
       guesses: attempts.filter(attempt => attempt.story !== true && attempt.guessed).length,
       storyAccuracy: percent(story.filter(attempt => attempt.correct).length, story.length),
@@ -121,7 +127,7 @@ export function compareStats(cur: WeeklyStats, prev: WeeklyStats): Record<string
   const before = metrics(prev);
   return Object.fromEntries(Object.entries(metrics(cur)).map(([key, value]) => {
     const previous = before[key];
-    return [key, value === null || previous === null || (value === 0 && previous === 0) ? 'none' : value > previous ? 'up' : value < previous ? 'down' : 'same'];
+    return [key, !cur.hasRecords || !prev.hasRecords || value === null || previous === null || (value === 0 && previous === 0) ? 'none' : value > previous ? 'up' : value < previous ? 'down' : 'same'];
   }));
 }
 export const reportValue = (value: number | null | undefined, unit = ''): string => value === null || value === undefined ? '기록 없음' : `${value}${unit}`;
