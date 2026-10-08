@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Level, ProfileId } from '../types';
 import { useStore } from '../store/StoreContext';
 import { buildWeeklyStats, compareStats, reportText, reportValue, weekRange, weeklyNoticeDay, type ReportTrend, type WeeklyStats } from '../lib/weeklyReport';
+import { copyWeeklyReport, runWeeklyAi } from '../lib/weeklyReportActions';
 import { requestWeeklyAi, saveWeeklyAi } from '../lib/weeklyAi';
 import { aiReady } from '../lib/talk';
 import { useStoryDate } from '../components/stories/useStoryDate';
@@ -52,24 +53,15 @@ function ReportBody({ stats, previous, profileName, level, today }: { stats: Wee
   useEffect(() => () => { controller.current?.abort(); controller.current = null; }, []);
   useEffect(() => { if (copyFallback !== null) { copyBox.current?.focus(); copyBox.current?.select(); } }, [copyFallback]);
   const makeAi = async () => {
-    if (controller.current || level === 'adult' || !aiReady(state.ai)) return;
-    const request = new AbortController(); controller.current = request;
-    setPending(true); setError('');
-    try {
-      const result = await requestWeeklyAi(state.ai, stats, level, AbortSignal.any([request.signal, AbortSignal.timeout(25000)]));
-      if (controller.current !== request || request.signal.aborted) return;
-      update(draft => saveWeeklyAi(draft.data[stats.profileId], stats.range.start, result, today));
-    } catch (reason) {
-      if (controller.current === request && !request.signal.aborted) setError(reason instanceof Error ? reason.message : '요약을 만들지 못했어요.');
-    } finally {
-      if (controller.current === request) { controller.current = null; setPending(false); }
-    }
+    if (level === 'adult' || !aiReady(state.ai)) return;
+    await runWeeklyAi(controller, signal => requestWeeklyAi(state.ai, stats, level, signal), {
+      pending: setPending, error: setError,
+      save: result => update(draft => saveWeeklyAi(draft.data[stats.profileId], stats.range.start, result, today)),
+    });
   };
   const copy = async () => {
-    const text = reportText(stats, cached, profileName);
-    try {
-      await navigator.clipboard.writeText(text); setCopyStatus('복사했어요.'); setCopyFallback(null);
-    } catch { setCopyFallback(text); setCopyStatus('복사하지 못했어요. 아래 글을 선택해서 복사해 주세요.'); }
+    const result = await copyWeeklyReport(reportText(stats, cached, profileName), navigator.clipboard ? text => navigator.clipboard.writeText(text) : undefined);
+    setCopyStatus(result.status); setCopyFallback(result.fallback);
   };
   const metric = (label: string, value: number | null | undefined, key: string, unit = '', max?: number) => <Metric label={label} value={value} trend={trend[key]} unit={unit} max={max} />;
   return <>
