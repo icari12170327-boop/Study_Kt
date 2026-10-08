@@ -1,3 +1,6 @@
+import { BalancePuzzle } from './BalancePuzzle';
+import { PatternPuzzle } from './PatternPuzzle';
+import { BlocksPuzzle } from './BlocksPuzzle';
 import { completePuzzleGrid, setPuzzleGridInput } from '../../content/puzzles/input';
 import type { ComponentType } from 'react';
 import type { Cell } from '../../content/math/bingo';
@@ -13,12 +16,15 @@ export interface PuzzleRendererProps {
   select: (cell: Cell) => void;
   change: (input: unknown) => void;
   disabled: boolean;
+  onSubmit?: (input?: unknown) => void;
+  onNext?: () => void;
 }
 /** 보기형 퍼즐은 키패드 없이 Component에서 change를 호출할 수 있다. */
 export interface PuzzleRenderer {
   icon: string;
   example: string;
   instruction: string;
+  answerPrompt?: string;
   Component: ComponentType<PuzzleRendererProps>;
   initialInput: (puzzle: Puzzle) => unknown;
   answerInput: (puzzle: Puzzle) => unknown;
@@ -68,7 +74,19 @@ const gridAdapter = {
   move: (puzzle: Puzzle, selected: Cell, key: string) => movePuzzleCell((puzzle.view as NumberGrid).rows, selected, key),
   padValue: (input: unknown, selected: Cell) => (input as string[][])[selected.r][selected.c],
 };
+const numericAdapter = {
+  initialInput: () => '', answerInput: (puzzle: Puzzle) => String(puzzle.answer),
+  complete: (input: unknown) => /^\d+$/.test(String(input)), toAnswer: (input: unknown) => Number(input),
+  padValue: (input: unknown) => String(input), setPad: (_input: unknown, _selected: Cell, value: string) => value,
+};
 export const PUZZLE_RENDERERS: Partial<Record<PuzzleType, PuzzleRenderer>> = {
+  balance: { ...numericAdapter, Component: BalancePuzzle, icon: '⚖️', example: '🍎 + 🍎 = 10',
+    instruction: '같은 그림은 같은 수예요. 물음표 그림의 수를 찾아요.', answerPrompt: '물음표 그림 하나는 얼마일까요?' },
+  pattern: { Component: PatternPuzzle, icon: '🟦', example: '● → ▲ → ● → ?', instruction: '앞에서부터 반복되는 순서를 보고 다음 칸을 골라요.',
+    answerPrompt: '다음 칸에 올 보기를 골라요.', initialInput: () => null, answerInput: puzzle => puzzle.answer,
+    complete: input => typeof input === 'number' && Number.isInteger(input) && input >= 1 && input <= 4, toAnswer: input => input },
+  blocks: { ...numericAdapter, Component: BlocksPuzzle, icon: '🧊', example: '쌓인 블록은 모두 몇 개?',
+    instruction: '쌓인 블록을 모두 세어요. 가려진 곳은 층 수를 보고 세어요.', answerPrompt: '블록은 모두 몇 개일까요?' },
   sudoku: { ...gridAdapter,
     complete: input => completePuzzleGrid(input, 'sudoku'),
     setPad: (input, selected, value) => setPuzzleGridInput(input as string[][], selected, value, 'sudoku'),

@@ -127,9 +127,12 @@ function PuzzlePlay({ profileId, go }: { profileId: ProfileId; go: Go }) {
     setMessage(`${result.correct ? '멋져요! 잘 풀었어요.' : '정답을 함께 살펴봐요.'} ${changeText}`);
     setNow(time);
   };
-  const submit = () => {
-    const current = live.current;
+  const submit = (input?: unknown) => {
+    let current = live.current;
     if (!current || current.finished) return;
+    if (input !== undefined) {
+      current = { ...current, input }; live.current = current; setPlay(current);
+    }
     activity();
     const renderer = PUZZLE_RENDERERS[current.puzzle.type]!;
     if (!renderer.complete(current.input)) { setMessage('빈칸을 모두 채워 주세요.'); return; }
@@ -137,7 +140,7 @@ function PuzzlePlay({ profileId, go }: { profileId: ProfileId; go: Go }) {
     if (correct) finish({ correct, hinted: current.hinted, revealed: false, wrong: current.wrong });
     else {
       const changed = { ...current, wrong: current.wrong + 1 };
-      live.current = changed; setPlay(changed); setMessage('조금만 더 생각해 봐요. 숫자를 바꿀 수 있어요.');
+      live.current = changed; setPlay(changed); setMessage(current.puzzle.type === 'pattern' ? '조금만 더 생각해 봐요. 보기를 바꿀 수 있어요.' : '조금만 더 생각해 봐요. 숫자를 바꿀 수 있어요.');
     }
   };
   const saveExit = () => {
@@ -177,9 +180,9 @@ function PuzzlePlay({ profileId, go }: { profileId: ProfileId; go: Go }) {
     <div className="puzzle-status"><span>{'★'.repeat(play.puzzle.difficulty)}{'☆'.repeat(5 - play.puzzle.difficulty)}</span><span>활동 {formatTime(Math.floor((summary.activeSec * 1000 + activeMs) / 1000))}</span></div>
     <p className="puzzle-instruction">{renderer.instruction}</p>
     {paused && <button className="btn btn-soft puzzle-resume" onClick={activity}>계속하려면 화면을 눌러요</button>}
-    <Component puzzle={play.puzzle} input={play.revealed ? renderer.answerInput(play.puzzle) : play.input} selected={play.selected} select={select} change={change} disabled={play.finished} />
+    <Component puzzle={play.puzzle} input={play.revealed ? renderer.answerInput(play.puzzle) : play.input} selected={play.selected} select={select} change={change} disabled={play.finished} onSubmit={submit} onNext={next} />
     {play.hinted && <p className="panel puzzle-hint">💡 {play.puzzle.hint}</p>}
-    <p className="puzzle-feedback" role="status">{message || (renderer.move ? '빈칸을 누르거나 방향키로 이동해요.' : '다음 수는 무엇일까요?')}</p>
+    <p className="puzzle-feedback" role="status">{message || renderer.answerPrompt || (renderer.move ? '빈칸을 누르거나 방향키로 이동해요.' : '다음 수는 무엇일까요?')}</p>
     {!play.finished && <div className="row-center">
       {activeMs >= PUZZLE_HINT_MS && !play.hinted && <button className="btn btn-soft puzzle-hint-ready" onClick={() => {
         activity(); setPlay(previous => previous ? { ...previous, hinted: true } : previous);
@@ -187,7 +190,7 @@ function PuzzlePlay({ profileId, go }: { profileId: ProfileId; go: Go }) {
       {play.wrong >= 3 && <button className="btn btn-soft" onClick={() => finish({ correct: false, hinted: play.hinted, revealed: true, wrong: play.wrong })}>정답 보기</button>}
     </div>}
     {renderer.padValue && renderer.setPad && <div ref={padContainer}><NumberPad kind="int" value={{ value: renderer.padValue(play.input, play.selected) }}
-      onChange={value => change(renderer.setPad!(play.input, play.selected, value.value ?? ''))} onSubmit={submit}
+      onChange={value => change(renderer.setPad!(play.input, play.selected, value.value ?? ''))} onSubmit={() => submit()}
       onNext={next} nextButtonRef={nextButtonRef} onActivity={activity} disabled={play.finished} /></div>}
     {play.finished && <button ref={nextButtonRef} className="btn btn-primary puzzle-next" onClick={next}>다음 퍼즐</button>}
     <button className="btn btn-ghost puzzle-other" onClick={choose}>다른 퍼즐</button>

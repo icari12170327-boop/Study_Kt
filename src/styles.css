@@ -505,3 +505,31 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
   .puzzle-grid .puzzle-cell { height: 48px; }
 }
 @media (prefers-reduced-motion: reduce) { .puzzle-hint-ready { animation: none; border: 2px solid var(--primary); } }
+
+/* T06b: 그림 식, 도형 보기, 반응형 블록 그림 */
+.balance-puzzle { max-width: 560px; margin: 20px auto; text-align: center; }
+.balance-equation { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin: 10px 0; font-size: 1.6rem; font-weight: 700; }
+.balance-term { display: inline-flex; align-items: center; gap: 10px; font-size: 2rem; }
+.balance-sign { font-size: 1.4rem; }
+.balance-target { font-size: 2rem; font-weight: 700; margin: 16px 0; }
+.pattern-sequence { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; padding: 0; list-style: none; }
+.pattern-sequence li { display: flex; flex-direction: column; justify-content: center; text-align: center; gap: 8px; width: 120px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.pattern-unknown strong { font-size: 2rem; }
+.pattern-tile { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.pattern-shapes { display: flex; justify-content: center; gap: 3px; width: 100%; }
+.pattern-shapes svg { width: 28px; height: 28px; flex-shrink: 0; }
+.pattern-label { font-size: .85rem; overflow-wrap: anywhere; }
+.pattern-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 540px; margin: 20px auto; }
+.pattern-option { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 8px; background: var(--card); color: var(--text); border: 2px solid var(--line); border-radius: 16px; min-height: 110px; cursor: pointer; }
+.pattern-option.selected { border-color: var(--primary); background: var(--primary-soft); box-shadow: 0 0 0 2px var(--primary); }
+.pattern-option:disabled { cursor: default; }
+.pattern-confirm { display: block; margin: 12px auto; min-width: 180px; }
+.blocks-puzzle { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 20px; margin: 16px auto; }
+.blocks-picture { display: block; width: 100%; max-width: 360px; height: auto; stroke: var(--text); stroke-width: 1; }
+.blocks-floor { fill: var(--card); stroke: var(--line); }
+.blocks-top { fill: #bce0fa; }
+.blocks-left { fill: #69b6e8; }
+.blocks-right { fill: #348ac2; }
+.blocks-map { text-align: center; max-width: 300px; }
+.blocks-heights { display: grid; gap: 4px; width: fit-content; margin: 8px auto; }
+.blocks-heights span { display: flex; justify-content: center; align-items: center; min-width: 48px; min-height: 48px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; font-weight: 700; }

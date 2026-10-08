@@ -1,3 +1,6 @@
+import { balanceGenerator } from './balance';
+import { patternGenerator } from './pattern';
+import { blocksGenerator } from './blocks';
 import { seededRng } from '../../lib/random';
 import { sudokuGenerator } from './sudoku';
 import { trainGenerator } from './train';
@@ -7,6 +10,7 @@ import type { Difficulty, PuzzleGenerator, PuzzleType } from './types';
 export const PUZZLE_TYPES: PuzzleType[] = ['sudoku', 'train', 'pyramid', 'balance', 'pattern', 'blocks'];
 export const GENERATORS: Partial<Record<PuzzleType, PuzzleGenerator>> = {
   sudoku: sudokuGenerator, train: trainGenerator, pyramid: pyramidGenerator,
+  balance: balanceGenerator, pattern: patternGenerator, blocks: blocksGenerator,
 };
 export const PUZZLE_LABELS: Record<PuzzleType, string> = {
   sudoku: '스도쿠', train: '숫자 기차', pyramid: '수 피라미드', balance: '저울', pattern: '도형 규칙', blocks: '블록 세기',

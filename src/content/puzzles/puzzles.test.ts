@@ -11,7 +11,7 @@ import type { Difficulty } from './types';
 const levels: Difficulty[] = [1, 2, 3, 4, 5];
 
 describe('공통 생성기', () => {
-  it('이번에는 세 종류만 등록한다', () => expect(registeredPuzzleTypes()).toEqual(['sudoku', 'train', 'pyramid']));
+  it('기존 세 종류와 새 세 종류를 등록한다', () => expect(registeredPuzzleTypes()).toEqual(['sudoku', 'train', 'pyramid', 'balance', 'pattern', 'blocks']));
   for (const type of registeredPuzzleTypes()) for (const level of levels) {
     it(`${type} ${level}단계는 같은 시드로 재현되고 정답만 채점한다`, () => {
       const generator = GENERATORS[type]!;
@@ -22,7 +22,11 @@ describe('공통 생성기', () => {
       expect(generatePuzzle(type, level, 426).seed).toBe(426);
     });
   }
-  it('미등록 생성기는 호출할 수 없다', () => expect(() => generatePuzzle('blocks', 1, 0)).toThrow());
+  it('미등록 생성기는 호출할 수 없다', () => {
+    const generator = GENERATORS.blocks;
+    try { delete GENERATORS.blocks; expect(() => generatePuzzle('blocks', 1, 0)).toThrow(); }
+    finally { GENERATORS.blocks = generator; }
+  });
 });
 describe('스도쿠 유일 해', () => {
   for (const level of levels) it(`${level}단계 200회 생성`, () => {
