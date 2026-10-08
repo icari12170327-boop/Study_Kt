@@ -216,7 +216,7 @@
 - [x] [T05](tasks/T05-adaptive-math.md) 수학 도전: 레벨, 숫자 키패드, 꼼수 방지 (PR #8)
 - [x] [T15](tasks/T15-dex-keyboard.md) DeX 물리 키보드로 수학 도전 끝까지 풀기
 - [x] [T16](tasks/T16-math-bingo.md) 수학 빙고판 (첫째 아이디어: 합이 맞는 숫자 3개 찾아 줄 긋기)
-- [ ] **[T06](tasks/T06-brain-puzzles.md) 두뇌 퍼즐 6종 (자유 놀이, T06a → T06b)**
+- [x] [T06](tasks/T06-brain-puzzles.md) 두뇌 퍼즐 6종 (자유 놀이, T06a → T06b)
 - [x] [T07](tasks/T07-reward-games.md) 오늘의 문제 게임과 형제 대결
 
 ### 4단계 — 과학과 읽기 콘텐츠
