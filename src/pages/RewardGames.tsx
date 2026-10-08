@@ -32,7 +32,7 @@ export function RewardGames({ profileId, go, initial }: { profileId: ProfileId; 
       const pool = buildFishPool(data.days[today]?.mathAttempts ?? [], filler, 8);
       starting.current = true;
       update(draft => { reserveGame(draft.settings[profileId], draft.data[profileId], today, game); });
-      setFishing({ date: today, index, pool });
+      setFishing({ date: today, index, pool, seed });
     } else {
       const slots = reserveDuel(snapshot, today); if (!slots) return;
       const queues = { kid1: duelQueue(state.profiles.find(p => p.id === 'kid1')!.level, dataLevel('kid1'), seed), kid2: duelQueue(state.profiles.find(p => p.id === 'kid2')!.level, dataLevel('kid2'), seed) };

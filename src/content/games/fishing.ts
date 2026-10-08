@@ -33,3 +33,30 @@ export function buildFishPool(attempts: readonly MathAttempt[], filler: readonly
   return [...pool.values()];
 }
 export function fishingScore(caught: readonly Fish[]): number { return caught.reduce((sum, fish) => sum + fish.points, 0); }
+
+/** 잡은 물고기는 계속 제외하고 틀린 물고기만 도망간 시간이 지나면 돌아온다. */
+export function availableFish(pool: readonly Fish[], caught: readonly Fish[], escapedUntil: ReadonlyMap<string, number>, now: number): Fish[] {
+  const caughtIds = new Set(caught.map(fish => fish.id));
+  return pool.filter(fish => !caughtIds.has(fish.id) && (escapedUntil.get(fish.id) ?? 0) <= now).slice(0, 8);
+}
+/** 이미 잡은 문제도 중복 후보에서 제외한다. 후보가 모두 중복이어도 반복 생성하지 않는다. */
+export function refillFishPool(pool: readonly Fish[], caught: readonly Fish[], filler: readonly MathProblem[], min = 8): Fish[] {
+  const next = [...pool], seen = new Set(pool.map(fish => problemKey(fish.problem)));
+  const caughtIds = new Set(caught.map(fish => fish.id));
+  let remaining = pool.filter(fish => !caughtIds.has(fish.id)).length;
+  for (const raw of filler) {
+    if (remaining >= min) break;
+    const problem = normalizeProblem(raw);
+    if (!problem || seen.has(problemKey(problem))) continue;
+    seen.add(problemKey(problem));
+    next.push({ id: `fish-${next.length}`, problem, golden: false, points: 10 }); remaining++;
+  }
+  return next;
+}
+export function fishingKeyAction(key: string, count: number, cursor: number, focusedIndex?: number): { type: 'choose' | 'move'; index: number } | null {
+  if (count <= 0) return null;
+  const base = focusedIndex !== undefined && focusedIndex >= 0 && focusedIndex < count ? focusedIndex : (cursor % count + count) % count;
+  if (key === 'Enter') return { type: 'choose', index: base };
+  if (key === 'ArrowLeft' || key === 'ArrowRight') return { type: 'move', index: (base + (key === 'ArrowRight' ? 1 : -1) + count) % count };
+  return null;
+}

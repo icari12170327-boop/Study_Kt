@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { MathAttempt, MathProblem } from '../../types';
-import { buildFishPool, fishingScore, normalizeProblem } from './fishing';
+import { availableFish, buildFishPool, fishingKeyAction, fishingScore, normalizeProblem, refillFishPool } from './fishing';
 import { duelQueue, duelScore, duelWinner } from './duel';
 import { canPlay, crownVisible, finishDuel, finishGame, gamesPlayedToday, nextDay, normalizeGameAttempts, normalizeGames, normalizeGamesPerDay, reserveDuel, reserveGame, roundRemaining } from './limits';
 import { defaultState } from '../../store/defaults';
@@ -46,6 +46,32 @@ describe('낚시 문제와 점수', () => {
     const attempts = Array.from({ length: 12 }, (_, i) => attempt(i % 2 === 0, { ...p, question: `${i} + 2 = ?` }));
     const pool = buildFishPool(attempts, [], 8);
     expect(pool).toHaveLength(12); expect(fishingScore(pool)).toBe(240);
+  });
+  it('잡은 금빛 문제는 시간이 지나도 돌아오지 않고 틀린 물고기만 5초 뒤 돌아온다', () => {
+    const pool = buildFishPool([attempt(false, p)], duelQueue('g3', 1, 4), 8), caught = [pool[0]], escaped = new Map([[pool[1].id, 5000]]);
+    expect(availableFish(pool, caught, escaped, 4999)).not.toContain(pool[1]);
+    expect(availableFish(pool, caught, escaped, 5000)).toContain(pool[1]);
+    expect(availableFish(pool, caught, escaped, 100000)).not.toContain(pool[0]);
+    expect(fishingScore(caught)).toBe(30);
+  });
+  it('잡은 문제를 다시 생성하지 않고 새 레벨 문제로 남은 풀을 8마리까지 채운다', () => {
+    const pool = buildFishPool([attempt(false, p)], [], 8), caught = [...pool], original = structuredClone(pool);
+    const next = refillFishPool(pool, caught, [p, ...duelQueue('g3', 2, 45)]);
+    const available = availableFish(next, caught, new Map(), 5000);
+    expect(available).toHaveLength(8); expect(available.every(row => !row.golden && row.points === 10)).toBe(true);
+    expect(available.map(row => row.problem)).not.toContainEqual(p);
+    expect(new Set(next.map(row => row.id)).size).toBe(next.length); expect(pool).toEqual(original);
+    expect(refillFishPool(pool, caught, [p, p])).toEqual(pool);
+    expect(availableFish(refillFishPool(pool, caught, [p, p]), caught, new Map(), 5000)).toEqual([]);
+  });
+  it('Tab 포커스 Enter는 포커스한 물고기를, 포커스가 없으면 방향키 커서를 연다', () => {
+    expect(fishingKeyAction('Enter', 8, 0, 2)).toEqual({ type: 'choose', index: 2 });
+    expect(fishingKeyAction('Enter', 8, 5)).toEqual({ type: 'choose', index: 5 });
+    expect(fishingKeyAction('ArrowRight', 8, 0, 2)).toEqual({ type: 'move', index: 3 });
+    expect(fishingKeyAction('ArrowLeft', 8, 0)).toEqual({ type: 'move', index: 7 });
+    expect(fishingKeyAction('ArrowRight', 8, 7)).toEqual({ type: 'move', index: 0 });
+    expect(fishingKeyAction('Enter', 7, 7, -1)).toEqual({ type: 'choose', index: 0 });
+    expect(fishingKeyAction('Enter', 0, 0)).toBeNull(); expect(fishingKeyAction('Tab', 8, 0)).toBeNull();
   });
   it('백업의 잘못된 본문·정답 형태는 물고기로 쓰지 않는다', () => {
     for (const raw of [null, {}, { ...p, answer: { kind: 'x' } }, { ...p, answer: { kind: 'int', value: Infinity } }, { ...p, answer: { kind: 'fraction', num: 1, den: 0 } }, { ...p, question: 1 }]) expect(normalizeProblem(raw)).toBeUndefined();
