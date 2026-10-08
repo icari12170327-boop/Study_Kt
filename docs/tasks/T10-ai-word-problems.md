@@ -1,28 +1,35 @@
 # T10 — AI 수학 문장제 (관심사 맞춤)
 
-- 상태: 준비됨
+- 상태: 완료 (PR #37)
 - 단계: 5
 - 선행 작업: T02, T05 (수학 도전 화면과 숫자 키패드 위에 얹는다)
 - 예상 분량: 반나절~하루
 
 ## 목표
-연산 세션에 아이 관심사(축구, 공룡, 마인크래프트 등)를 넣은 **문장제**가 섞여 나온다. 계산은 이미 연습한 단원과 같고, 이야기만 AI가 만든다.
+수학 도전 세션에 아이 관심사(첫째: 로블록스 만들기·장애물, 둘째: 동물의 숲 섬·곤충·물고기 등)를 넣은 **문장제**가 섞여 나온다. 계산은 이미 연습한 단원과 같고, 이야기만 AI가 만든다.
 
 ## 배경
 연산만 반복하면 지루하고, 교과서 문장제를 읽고 식을 세우는 힘도 필요하다. 다만 AI가 계산을 틀리면 아이가 혼란스러우므로, **숫자와 정답은 코드가 정하고 AI는 이야기만 쓴다.**
 
+## 현재 코드 상태 (구현 전에 확인)
+- **Worker는 이미 준비돼 있다**(T02): `/api/generate` `kind: 'word-problem'` 입력 스키마 `{ items: { id, skill, expression, numbers, answerKind, interest, level }[] }`(최대 8개), 출력 `{ items: { id, story, question }[] }`, 지시문은 `worker/src/personas.ts`. Worker 변경은 아래 "Worker 지시문 보강" 한 줄만.
+- 수학 세션은 `src/pages/MathSession.tsx`, 문제 목록은 `buildLevelQueue(grade, level, wrongNotes, count, rng)`(T05), 입력은 `NumberPad`(T15), 시도 기록 `mathAttempt()`(`src/content/math/adaptive.ts`)과 `MathAttempt.problem`(T07, 오늘만 저장).
+- 아이 관심사는 이미 `ProfileSettings.talk.interests`(T03, AI 친구 대화용)에 있다. **새 관심사 필드를 만들지 않고 이것을 재사용**한다.
+- T05 레벨 평가(`evaluateLevel`)는 정답 문제의 **풀이 시간 중앙값**을 쓴다. 문장제는 읽는 시간이 들어가 느려지므로 따로 처리해야 한다(아래 설계).
+
 ## 범위
 **포함**
-- 보호자 설정에 아이별 "관심사" 입력 (쉼표 구분, 최대 5개). `ProfileSettings.interests: string[]`
-- 보호자 설정에 "문장제 비율" (0%, 20%, 40%, 기본 20%). `ProfileSettings.wordProblemRatio: number`
+- 관심사: `settings.talk.interests`를 그대로 쓴다(보호자 AI 친구 설정 화면에서 이미 편집 가능). 비어 있으면 학년 기본 소재(학교, 간식, 동물, 놀이터)를 쓴다.
+- 보호자 설정에 "문장제 비율" (0%, 20%, 40%, 기본 20%). `ProfileSettings.wordProblemRatio?: 0 | 0.2 | 0.4` (선택 필드, version 2 유지). 20문제 기본이면 약 4문제.
 - 문장제 생성 흐름:
   1. 기존 생성기로 문제를 만든다 (예: `g3-mul2x1` → `23 × 4`, 정답 92).
-  2. Worker `/api/generate` `kind: 'word-problem'`(T02의 텍스트 생성 엔드포인트)에 `{ skill, expression, numbers, answerKind, interest, level }`을 보낸다. **정답은 보내지 않는다.**
+  2. Worker `/api/generate` `kind: 'word-problem'`에 `{ id, skill, expression, numbers, answerKind, interest, level }`을 보낸다. 관심사는 문제마다 돌아가며 하나씩. **정답은 보내지 않는다.** 오답노트에서 다시 나온 문제(`wrongId`)는 문장제로 바꾸지 않는다(같은 문제 그대로 다시 풀기).
   3. AI는 `{ story: string, question: string }`만 돌려준다.
   4. 앱이 검증: 이야기에 원래 숫자가 모두 그대로 들어 있고, 다른 숫자가 없어야 함(검증 실패 시 원래 연산 문제로 대체).
 - 세션 시작 시 필요한 문장제를 **한 번에 묶어 요청**(최대 8개)하고, 오기 전까지 기다리게 하지 않는다: 연산 문제부터 시작하고, 도착한 문장제를 뒤쪽 순서에 끼운다.
 - 화면: 문장제는 글이 길므로 `question-text` 대신 읽기 좋은 크기(1.2rem)로 보여 주고, 🔊 읽어 주기(한국어 TTS, `lang: 'ko-KR'`)
-- 오프라인이거나 AI 미설정이면 문장제 없이 기존처럼 동작
+- 오프라인이거나 AI 미설정이면 문장제 없이 기존처럼 동작. 요청은 세션당 1번만(재시도 없음, 10초 타임아웃).
+- 문장제 위에 원래 식을 작게 숨겨 두고 "식 보기" 버튼으로 펼칠 수 있게 한다(막혔을 때 도움, 기본 접힘).
 
 **제외**
 - AI가 새 유형의 문제나 숫자를 정하는 것
@@ -32,17 +39,26 @@
 - 순수 함수 `src/content/math/wordProblem.ts`
   - `extractNumbers(problem: MathProblem): string[]` — 문제 식의 숫자 토큰 (분수는 `"3/4"` 한 덩어리)
   - `validateStory(story: string, question: string, numbers: string[]): boolean` — 원래 숫자가 모두 있고, 추가 숫자(아라비아 숫자)가 없는지. 한글 수사("두 개")는 허용하지 않도록 프롬프트에서 요구하고, 검증은 아라비아 숫자 기준
-- 문장제 문제는 `MathProblem`에 `story?: string` 필드를 추가해 표현한다. 채점과 오답노트는 기존과 같다(오답노트에도 이야기 포함).
-- Worker 프롬프트: 학년 수준 어휘, 2~3문장, 주어진 숫자만 그대로 사용, 단위를 상황에 맞게, 폭력과 공포 소재 금지, 관심사가 부적절하면 일반 소재로 대체
+- 문장제 문제는 `MathProblem`에 `story?: { text: string; question: string }` 필드를 추가해 표현한다. 채점은 기존과 같다.
+- 오답노트에는 이야기 **없이** 원래 문제로 저장한다(관심사가 바뀌어도 오답 복습이 자연스럽게, AI 없이도 다시 풀 수 있게). 오답노트 화면에는 "문장제" 표시만.
+- `MathAttempt`에 `story?: true`를 추가한다. 레벨 평가(`evaluateLevel`)에서 문장제 시도는 **정답률에는 넣고, 시간 중앙값과 찍기 판정(`guessed`, 5초 미만 오답)에서는 뺀다.** 테스트로 확인.
+- 낚시 게임·형제 대결(T07)은 오늘 문제를 쓸 때 `story`를 빼고 식만 쓴다.
+- 문장제 표시 문구는 AI 결과 그대로 쓰되, 앱은 `textContent`로만 넣는다(HTML 해석 금지).
+- Worker 지시문(이미 있음): 학년 수준 어휘, 2~3문장, 주어진 숫자만 그대로 사용, 폭력과 공포 소재 금지, 관심사가 부적절하면 일반 소재로 대체.
+- **Worker 지시문 보강 (이번 작업의 유일한 Worker 변경)**: 게임 관심사는 만들기·탐험·수집 같은 장면으로 쓰고, 게임 속 화폐 구매·현질·아이템 결제 장면은 쓰지 않는다. 실제 사람 이름은 쓰지 않는다. `qr`(몫과 나머지)는 질문이 몫과 나머지를 모두 묻게, `fraction`은 분수 그대로 쓰게. Worker 테스트에 이 문장들이 지시문에 있는지 확인 추가.
 - 구조화된 출력 스키마: `{ items: { id: string; story: string; question: string }[] }`
 
 ## 수용 기준
-- [ ] 관심사와 비율을 설정하면 연산 세션의 약 그 비율만큼 문장제가 나온다.
+- [ ] 비율을 설정하면 수학 도전 세션의 약 그 비율만큼 문장제가 나온다. 관심사는 AI 친구 설정의 관심사를 쓴다.
+- [ ] 오답노트에서 다시 나온 문제는 문장제로 바뀌지 않고, 문장제를 틀리면 오답노트에는 원래 식으로 저장된다.
+- [ ] 문장제 시도는 레벨 평가의 시간 중앙값과 찍기 판정에서 빠진다(테스트).
+- [ ] "식 보기"로 원래 식을 펼칠 수 있다.
 - [ ] 모든 문장제의 정답은 코드 생성기의 정답과 같다(AI가 정답을 정하지 않음).
 - [ ] 검증 실패한 문장제는 화면에 나오지 않고 원래 문제로 바뀐다(테스트로 확인).
 - [ ] AI 응답이 늦거나 실패해도 세션이 멈추지 않는다.
 - [ ] 문장제를 한국어 음성으로 읽어 줄 수 있다.
-- [ ] `npm run typecheck && npm test && npm run build` 통과
+- [ ] 키보드(DeX)만으로 문장제를 풀 수 있다(기존 수학 도전과 같은 조작).
+- [ ] `npm run lint && npm run typecheck && npm test && npm run build` 통과, `cd worker && npm run typecheck && npm test` 통과
 
 ## 테스트
 - `extractNumbers`: 정수, 소수, 분수, 몫과 나머지 문제
