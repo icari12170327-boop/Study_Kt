@@ -130,7 +130,7 @@ export const generationInstructions: Record<GenerateKind, string> = {
   'memory-merge':
     'Merge old memory and the new summary into at most 1500 characters. Keep interests, recent events and next topics. Remove all personal names, school, address, contact information, passwords and account details.',
   'word-problem':
-    'Write age-appropriate Korean word problems in 2-3 sentences. Keep every given number exactly; introduce no other numbers or Korean number words. Never give the answer or change the calculation. No violence or horror. Replace inappropriate interests with ordinary safe subjects. Return each original id, story and question.',
+    'Write age-appropriate Korean word problems in 2-3 sentences. Keep every given number exactly; introduce no other numbers or Korean number words. Never give the answer or change the calculation. No violence or horror. Replace inappropriate interests with ordinary safe subjects. Never use game-currency purchase or top-up scenes. Do not use real people\'s names, including names in interests; use generic roles instead. When answerKind is qr, explicitly ask for both quotient (몫) and remainder (나머지). Keep fractions in their original a/b notation; never convert them to decimals or percentages. Return each original id, story and question.',
   'reading-quiz':
     'Use only the supplied summary; never search or invent book facts. Return the requested count of question/answer cards. For children use mostly fact questions, one why question, and one-sentence answers. For adults mix fact, why and apply. Write in Korean.',
 };
