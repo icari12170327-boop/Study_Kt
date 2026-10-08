@@ -1,3 +1,5 @@
+import type { PuzzleData } from './content/puzzles/types';
+
 export type ProfileId = 'kid1' | 'kid2' | 'parent';
 
 /** g3: 초등 3학년, g5: 초등 5학년, adult: 보호자 */
@@ -44,6 +46,7 @@ export interface MissionConfig {
 }
 
 export interface ProfileSettings {
+  puzzles?: { enabled: boolean };
   gamesPerDay?: number;
   coach?: CoachSettings;
   bizTalkEnabledOnce?: true;
@@ -205,6 +208,7 @@ export type GameId = 'fishing' | 'duel';
 export interface GameRecord { date: string; game: GameId; score: number; caught?: number; golden?: number; opponent?: ProfileId; won?: boolean }
 
 export interface ProfileData {
+  puzzles?: PuzzleData;
   games?: GameRecord[];
   crownUntil?: string;
   customCards?: CustomCard[];

@@ -1,3 +1,4 @@
+import { normalizePuzzleData, normalizePuzzleSettings } from '../content/puzzles/state';
 import { normalizeGameAttempts, normalizeGames, normalizeGamesPerDay, validGameDate } from '../content/games/limits';
 import { toDateKey } from '../lib/date';
 import { enableBusinessTalkOnce, normalizeBizSituations, normalizeCustomCards } from '../lib/business';
@@ -23,6 +24,7 @@ export function normalizeState(raw: unknown, today = toDateKey()): AppState {
   const data = { ...base.data };
   for (const p of profiles) {
     settings[p.id] = { ...defaultSettings(p.level, p.id), ...s.settings?.[p.id] };
+    settings[p.id].puzzles = normalizePuzzleSettings(s.settings?.[p.id]?.puzzles);
     settings[p.id].gamesPerDay = normalizeGamesPerDay(s.settings?.[p.id]?.gamesPerDay);
     settings[p.id].missions = settings[p.id].missions.map((m) => ({ ...m }));
     if (!settings[p.id].missions.some(m => m.type === 'science')) settings[p.id].missions.push({ type: 'science', enabled: p.level !== 'adult', target: 5 });
@@ -43,6 +45,7 @@ export function normalizeState(raw: unknown, today = toDateKey()): AppState {
       talk.dailyMinutes = mission.target;
     } else settings[p.id].missions = [...settings[p.id].missions, { type: 'talk', enabled: p.level !== 'adult', target: talk.dailyMinutes }];
     data[p.id] = { ...base.data[p.id], ...s.data?.[p.id] };
+    data[p.id].puzzles = normalizePuzzleData(s.data?.[p.id]?.puzzles, p.level);
     data[p.id].games = normalizeGames(s.data?.[p.id]?.games);
     if (validGameDate(s.data?.[p.id]?.crownUntil)) data[p.id].crownUntil = s.data![p.id].crownUntil;
     else delete data[p.id].crownUntil;
