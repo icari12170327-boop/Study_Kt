@@ -1,4 +1,5 @@
 import { MY_PHRASES } from '../lib/business';
+import { normalizeCoachSettings } from '../lib/coach';
 import type { AppState, Level, ProfileData, ProfileId, ProfileSettings } from '../types';
 import { skillsForLevel } from '../content/math/skills';
 import { defaultMathState } from '../content/math/levels';
@@ -55,6 +56,7 @@ export function defaultSettings(level: Level, id?: ProfileId): ProfileSettings {
       };
     case 'adult':
       return {
+        coach: normalizeCoachSettings(undefined),
         bizTalkEnabledOnce: true,
         scienceV2: true,
         bingo: defaultBingoSettings(level),

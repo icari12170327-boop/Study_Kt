@@ -17,6 +17,7 @@ export class ProxyError extends Error {
 export const KID_SPEECH_SPEED = 0.85;
 export function buildCallBody(req: SessionRequest, model: string, remaining: number): FormData {
   const kid = req.mode === 'kid-friend';
+  const coach = req.mode === 'parent-coach';
   const form = new FormData();
   form.set('sdp', req.offerSdp);
   form.set(
@@ -31,9 +32,9 @@ export function buildCallBody(req: SessionRequest, model: string, remaining: num
         input: {
           transcription: { model: 'gpt-4o-mini-transcribe' },
           // 아이는 영어로 말하다 자주 멈춘다. low면 생각하는 동안 끼어들지 않고 기다린다.
-          turn_detection: req.pushToTalk ? null : { type: 'semantic_vad', eagerness: kid ? 'low' : 'auto' },
+          turn_detection: req.pushToTalk ? null : { type: 'semantic_vad', eagerness: kid || coach ? 'low' : 'auto' },
         },
-        output: { voice: req.persona.voice, speed: kid ? KID_SPEECH_SPEED : 1 },
+        output: { voice: req.persona.voice, speed: kid ? KID_SPEECH_SPEED : req.speed ?? (coach ? 0.85 : 1) },
       },
     }),
   );

@@ -1,5 +1,9 @@
 export type AiProfileId = 'kid1' | 'kid2' | 'parent';
 export type AiLevel = 'g3' | 'g5' | 'adult';
+export type CoachTopic = 'daily' | 'work' | 'money';
+export type CoachLevel = 'zero' | 'words' | 'short' | 'daily';
+export type CoachRepeat = 'low' | 'mid' | 'high';
+export type ParentSpeed = 0.85 | 0.9 | 1;
 export interface AiConfig {
   endpoint?: string;
   token?: string;
@@ -7,7 +11,7 @@ export interface AiConfig {
 export interface SessionRequest {
   profileId: AiProfileId;
   level: AiLevel;
-  mode: 'kid-friend' | 'biz-talk';
+  mode: 'kid-friend' | 'biz-talk' | 'parent-coach';
   offerSdp: string;
   persona: { friendName: string; personaId: string; voice: string; friendHobbies?: string };
   pushToTalk?: boolean;
@@ -16,6 +20,9 @@ export interface SessionRequest {
   topic?: string;
   scenarioId?: string;
   situation?: string;
+  coachTopic?: CoachTopic;
+  coach?: { level: CoachLevel; repeat: CoachRepeat };
+  speed?: ParentSpeed;
 }
 export interface SessionResponse {
   sessionId: string;
@@ -34,7 +41,7 @@ export interface EndActiveResponse {
   closed: number;
   chargedSeconds: number;
 }
-export type GenerateKind = 'talk-summary' | 'biz-feedback' | 'memory-merge' | 'word-problem' | 'reading-quiz';
+export type GenerateKind = 'talk-summary' | 'biz-feedback' | 'memory-merge' | 'word-problem' | 'reading-quiz' | 'coach-gloss' | 'coach-wrapup' | 'coach-check';
 export interface GenerateRequest {
   profileId: AiProfileId;
   level: AiLevel;
