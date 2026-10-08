@@ -221,7 +221,7 @@
 
 ### 4단계 — 과학과 읽기 콘텐츠
 - [x] [T08](tasks/T08-science-cards.md) 과학 문제(첫째, 둘째 모두), 도감, 배지, 캐릭터 옷차림 (v2: 문제 중심)
-- [ ] **[T09](tasks/T09-story-reading.md) 국어 연재 이야기 (자유 놀이, 원고 docs/stories/small-island.md)**
+- [x] [T09](tasks/T09-story-reading.md) 국어 연재 이야기 (자유 놀이, 원고 docs/stories/small-island.md)
 
 ### 5단계 — 확장
 - [x] [T10](tasks/T10-ai-word-problems.md) AI 수학 문장제 (관심사 맞춤)
