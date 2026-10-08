@@ -8,6 +8,9 @@ export interface WordProblemInput {
 }
 export interface WordProblemStory { id: string; story: string; question: string }
 const numberTokens = (text: string): string[] => text.match(/\d+(?:\.\d+)?(?:\/\d+(?:\.\d+)?)?/g) ?? [];
+// 숫자 토큰 밖의 수량은 정답을 바꿀 수 있으므로 보수적으로 거부한다.
+const writtenQuantity = /(?:^|[^\p{L}\p{N}])(?:하나|둘|셋|넷|다섯|여섯|일곱|여덟|아홉|열|스물|서른|마흔|쉰|예순|일흔|여든|아흔|절반|반)(?=$|[^\p{L}\p{N}]|은|는|이|가|을|를|의|만|씩|도|으로|에게)/u;
+const countedQuantity = /(?:한|두|세|네|다섯|여섯|일곱|여덟|아홉|열|스무|스물|서른|마흔|쉰|예순|일흔|여든|아흔|일|이|삼|사|오|육|칠|팔|구|십|백|천|반)\s*(?:개|명|마리|번|배|장|권|줄|묶음|봉지|봉투|상자|쌍|대|잔|병|조각|쪽)|몇\s*배/u;
 
 /** 식에서 숫자의 원래 표기를 보존한다. 분수는 분자·분모를 나누지 않는다. */
 export function extractNumbers(problem: MathProblem): string[] { return numberTokens(problem.question); }
@@ -21,6 +24,8 @@ export function normalizeWordInterests(raw: unknown): string[] {
 export function validateStory(story: string, question: string, numbers: string[]): boolean {
   if (typeof story !== 'string' || typeof question !== 'string' || !story.trim() || !question.trim() || story.length > 1000 || question.length > 300 || !numbers.length) return false;
   const text = `${story}\n${question}`;
+  // 전각 숫자·유니코드 분수 등도 ASCII 숫자와 따로 해석될 수 있어 받지 않는다.
+  if (/(?![0-9])\p{N}/u.test(text) || writtenQuantity.test(text) || countedQuantity.test(text)) return false;
   // 음수·지수·천 단위 쉼표 표기는 원래 식에 없는 수를 만들 수 있어 받지 않는다.
   if (/(?:^|[^\d])[-−]\s*\d|\d\s*[eE]\s*[+-]?\s*\d|\d,\d/.test(text)) return false;
   const tokens = numberTokens(text), allowed = new Set(numbers);

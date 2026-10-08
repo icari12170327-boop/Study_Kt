@@ -5,6 +5,12 @@ import type { QueueItem } from './session';
 const problem: MathProblem = { skill: 'g3-mul2x1', question: '23 × 4 =', answer: { kind: 'int', value: 92 } };
 const queue: QueueItem[] = Array.from({ length: 20 }, () => ({ problem: { ...problem } }));
 const valid = { story: '공룡 스티커가 23개씩 담긴 봉투가 4개 있어요.', question: '스티커는 모두 몇 개인가요?' };
+const hiddenQuantities = [
+  '하나', '둘', '셋', '넷', '다섯', '여섯', '일곱', '여덟', '아홉', '열',
+  '하나를', '셋씩', '열 명', '열명', '두 개', '두개', '한 마리', '세 번', '네 장',
+  '두 묶음', '삼 개', '스무 명', '절반', '절반으로', '반', '반씩', '반개', '반쪽', '두 배', '세배', '몇 배',
+  '４', '½', 'Ⅳ', '④', '²', '٤', '४',
+];
 describe('숫자 토큰과 이야기 검증', () => {
   it.each([
     ['23 × 4 =', ['23', '4']], ['1.25 × 0.4 =', ['1.25', '0.4']],
@@ -14,6 +20,14 @@ describe('숫자 토큰과 이야기 검증', () => {
     expect(extractNumbers(problem)).not.toContain('92'); expect(validateStory(valid.story, valid.question, ['23', '4'])).toBe(true);
   });
   it.each(['23개 있어요.', '23개씩 4묶음과 5개 있어요.', '32개씩 4묶음이에요.', '023개씩 4묶음이에요.', '-23개씩 4묶음이에요.', '2.3e1개씩 4묶음이에요.', '2,300개와 4개예요.'])('누락·추가·변형을 거부: %s', story => expect(validateStory(story, valid.question, ['23', '4'])).toBe(false));
+  it.each(hiddenQuantities)('이야기와 물음의 숨은 수량을 거부: %s', quantity => {
+    expect(validateStory(`${valid.story} ${quantity}만큼 더 가져왔어요.`, valid.question, ['23', '4'])).toBe(false);
+    expect(validateStory(valid.story, `${quantity}만큼 가져오면 모두 몇 개인가요?`, ['23', '4'])).toBe(false);
+  });
+  it('수량과 닮은 일반 단어와 몇 개를 묻는 물음은 허용한다', () => {
+    expect(validateStory('한글로 적힌 스티커 23개씩 4봉투를 열심히 세어요. 반짝이는 스티커를 반복해서 살펴요.', '남은 스티커는 몇 개인가요?', ['23', '4'])).toBe(true);
+    expect(validateStory('세모 스티커 23개를 4개씩 나눠요.', '몫과 나머지는 얼마인가요?', ['23', '4'])).toBe(true);
+  });
   it('소수는 소수점·끝자리까지, 분수는 분수 그대로 비교한다', () => {
     expect(validateStory('끈 1.25m와 0.4m가 있어요.', '전체 길이는?', ['1.25', '0.4'])).toBe(true);
     expect(validateStory('끈 1.25m와 0.40m가 있어요.', '전체 길이는?', ['1.25', '0.4'])).toBe(false);
@@ -29,6 +43,22 @@ describe('숫자 토큰과 이야기 검증', () => {
   });
 });
 describe('기다리지 않는 문장제 삽입', () => {
+  it.each(hiddenQuantities)('숨은 수량 %s를 거부해 원래 문제·정답을 유지한다', quantity => {
+    const plan = planWordProblems(queue, 20, [], 'g3');
+    const index = Number(plan[0].id.slice('word-'.length));
+    const original = structuredClone(queue);
+    for (const candidate of [
+      { ...valid, story: `${valid.story} ${quantity}만큼 더 가져왔어요.` },
+      { ...valid, question: `${quantity}만큼 가져오면 모두 몇 개인가요?` },
+    ]) {
+      const next = insertWordProblems(queue, plan, { items: [{ id: plan[0].id, ...candidate }] }, 0);
+      expect(next).toEqual(original);
+      expect(next[index]).toBe(queue[index]);
+      expect(next[index].problem).not.toHaveProperty('story');
+      expect(next[index].problem.answer).toBe(queue[index].problem.answer);
+    }
+    expect(queue).toEqual(original);
+  });
   it.each([[0, 0], [20, 4], [40, 8]])('비율 %s에서 %s개를 한 묶음으로, 정답 없이 계획한다', (ratio, count) => {
     const plan = planWordProblems(queue, ratio, ['공룡'], 'g3'); expect(plan).toHaveLength(count);
     for (const row of plan) { expect(row).not.toHaveProperty('answer'); expect(row).not.toHaveProperty('hint'); expect(row.numbers).toEqual(['23', '4']); }
