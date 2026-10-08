@@ -16,7 +16,7 @@ export interface PuzzleRendererProps {
   select: (cell: Cell) => void;
   change: (input: unknown) => void;
   disabled: boolean;
-  onSubmit?: () => void;
+  onSubmit?: (input?: unknown) => void;
   onNext?: () => void;
 }
 /** 보기형 퍼즐은 키패드 없이 Component에서 change를 호출할 수 있다. */

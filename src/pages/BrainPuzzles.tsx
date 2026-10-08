@@ -127,9 +127,12 @@ function PuzzlePlay({ profileId, go }: { profileId: ProfileId; go: Go }) {
     setMessage(`${result.correct ? '멋져요! 잘 풀었어요.' : '정답을 함께 살펴봐요.'} ${changeText}`);
     setNow(time);
   };
-  const submit = () => {
-    const current = live.current;
+  const submit = (input?: unknown) => {
+    let current = live.current;
     if (!current || current.finished) return;
+    if (input !== undefined) {
+      current = { ...current, input }; live.current = current; setPlay(current);
+    }
     activity();
     const renderer = PUZZLE_RENDERERS[current.puzzle.type]!;
     if (!renderer.complete(current.input)) { setMessage('빈칸을 모두 채워 주세요.'); return; }
@@ -187,7 +190,7 @@ function PuzzlePlay({ profileId, go }: { profileId: ProfileId; go: Go }) {
       {play.wrong >= 3 && <button className="btn btn-soft" onClick={() => finish({ correct: false, hinted: play.hinted, revealed: true, wrong: play.wrong })}>정답 보기</button>}
     </div>}
     {renderer.padValue && renderer.setPad && <div ref={padContainer}><NumberPad kind="int" value={{ value: renderer.padValue(play.input, play.selected) }}
-      onChange={value => change(renderer.setPad!(play.input, play.selected, value.value ?? ''))} onSubmit={submit}
+      onChange={value => change(renderer.setPad!(play.input, play.selected, value.value ?? ''))} onSubmit={() => submit()}
       onNext={next} nextButtonRef={nextButtonRef} onActivity={activity} disabled={play.finished} /></div>}
     {play.finished && <button ref={nextButtonRef} className="btn btn-primary puzzle-next" onClick={next}>다음 퍼즐</button>}
     <button className="btn btn-ghost puzzle-other" onClick={choose}>다른 퍼즐</button>

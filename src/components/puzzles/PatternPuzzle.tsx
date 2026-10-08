@@ -28,7 +28,16 @@ export function PatternPuzzle({ puzzle, input, change, disabled, onSubmit, onNex
       if (choice === null && event.key !== 'Enter') return;
       event.preventDefault();
       if (event.repeat) return;
-      if (event.key === 'Enter') { if (disabled) onNext?.(); else onSubmit?.(); }
+      if (event.key === 'Enter') {
+        if (disabled) onNext?.();
+        else {
+          const focused = document.activeElement?.closest<HTMLElement>('[data-pattern-choice]');
+          const focusedChoice = focused && root.current?.contains(focused) ? patternChoiceKey(focused.dataset.patternChoice ?? '') : null;
+          // React 상태 반영을 기다리지 않고 포커스된 보기를 같은 입력으로 선택·채점한다.
+          if (focusedChoice !== null) change(focusedChoice);
+          onSubmit?.(focusedChoice ?? undefined);
+        }
+      }
       else if (!disabled) change(choice);
     };
     window.addEventListener('keydown', keydown);
@@ -41,11 +50,11 @@ export function PatternPuzzle({ puzzle, input, change, disabled, onSubmit, onNex
     </ol>
     <div className="pattern-options" role="group" aria-label="다음 칸 보기 네 개">
       {view.options.map((tile, i) => <button key={i} type="button" className={`pattern-option ${input === i + 1 ? 'selected' : ''}`}
-        aria-label={`${i + 1}번 ${describePatternTile(tile)}`} aria-pressed={input === i + 1} disabled={disabled} onClick={() => change(i + 1)}>
+        data-pattern-choice={i + 1} aria-label={`${i + 1}번 ${describePatternTile(tile)}`} aria-pressed={input === i + 1} disabled={disabled} onClick={() => change(i + 1)}>
         <strong>{i + 1}번</strong><Tile tile={tile} />
       </button>)}
     </div>
     <p className="small muted center">1~4로 고르고 Enter로 확인해요.</p>
-    {!disabled && <button className="btn btn-primary pattern-confirm" onClick={onSubmit}>확인</button>}
+    {!disabled && <button className="btn btn-primary pattern-confirm" onClick={() => onSubmit?.()}>확인</button>}
   </div>;
 }
