@@ -1,5 +1,7 @@
 import { WordProblemSettings } from '../components/WordProblemSettings';
 import { PuzzleOverview } from '../components/PuzzleOverview';
+import { StoryOverview } from '../components/stories/StoryOverview';
+import { StorySettings } from '../components/stories/StorySettings';
 import { normalizePuzzleSettings } from '../content/puzzles/state';
 import { normalizeGamesPerDay } from '../content/games/limits';
 import { MyPhrases } from '../components/MyPhrases';
@@ -143,6 +145,7 @@ function Overview() {
 
             {p.level !== 'adult' && <ScienceOverview data={data} />}
             {p.id !== 'parent' && p.level !== 'adult' && <PuzzleOverview data={data} grade={p.level} today={today} />}
+            {p.id !== 'parent' && p.level !== 'adult' && <StoryOverview profileId={p.id} />}
 
             {data.wrongNotes.length > 0 && (
               <>
@@ -304,6 +307,7 @@ function Settings() {
       </div>}
 
       {pid !== 'parent' && profile.level !== 'adult' && <WordProblemSettings key={pid} profileId={pid} />}
+      {pid !== 'parent' && profile.level !== 'adult' && <StorySettings key={`story-${pid}`} profileId={pid} />}
 
       <div className="panel">
         <label>

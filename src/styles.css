@@ -537,3 +537,39 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 /* T10: 이야기와 물음은 원문 텍스트로 읽기 쉽게 표시한다. */
 .word-problem-text { font-size: 1.2rem; line-height: 1.8; text-align: left; white-space: pre-line; overflow-wrap: anywhere; margin: 20px 0; }
 .word-problem .btn { margin-bottom: 12px; }
+
+/* 연재 이야기 · 자유 놀이 */
+.story-home { margin-top: 12px; }
+.story-home .mission-icon { background: var(--primary-soft); }
+.story-home .mission-go { max-width: 120px; text-align: right; }
+.story-book { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; cursor: pointer; text-align: left; }
+.story-book > span:first-child { font-size: 2.5rem; }
+.story-book strong { font-size: 1.25rem; }
+.story-episode-link { display: flex; justify-content: space-between; gap: 12px; text-align: left; }
+.story-episode-link span { overflow-wrap: anywhere; }
+.story-episode-link span:last-child { flex-shrink: 0; }
+.story-text { font-size: 1.25rem; line-height: 1.8; }
+.story-paragraph { background: var(--card); border: 2px solid transparent; border-radius: var(--radius); padding: 18px; margin-bottom: 18px; }
+.story-paragraph p { margin: 0 0 14px; white-space: pre-line; overflow-wrap: anywhere; }
+.story-paragraph .btn { font-size: 1rem; }
+.story-image { display: block; max-width: 100%; height: auto; margin: 0 auto 18px; }
+.story-evidence { border-color: var(--primary); background: var(--primary-soft); }
+.story-evidence-label { display: block; margin-bottom: 12px; }
+.story-quiz h2 { font-size: 1.25rem; line-height: 1.8; overflow-wrap: anywhere; }
+.story-options { display: grid; gap: 12px; margin: 18px 0; }
+.story-choice { display: flex; align-items: center; gap: 12px; text-align: left; border: 2px solid var(--line); border-radius: 14px; background: var(--card); cursor: pointer; min-height: 56px; padding: 14px; font-size: 1.125rem; line-height: 1.6; overflow-wrap: anywhere; }
+.story-choice.selected { border-color: var(--primary); background: var(--primary-soft); }
+.story-choice .badge { flex-shrink: 0; }
+.story-choice:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
+.story-feedback, .story-ending { font-size: 1.125rem; line-height: 1.8; }
+.story-overview { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 8px; }
+.story-overview summary { cursor: pointer; padding: 12px 0; }
+.story-overview .btn { margin-top: 12px; }
+.story-stats { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.story-stats caption { text-align: left; padding: 12px 0; }
+.story-stats th, .story-stats td { text-align: left; border-bottom: 1px solid var(--line); padding: 8px 4px; overflow-wrap: anywhere; }
+@media (max-width: 430px) {
+  .story-episode-link { flex-wrap: wrap; }
+  .story-episode-link span:last-child { margin-left: auto; }
+  .story-paragraph { padding: 14px; }
+}

@@ -1,5 +1,6 @@
 import { normalizePuzzleSettings } from '../content/puzzles/state';
 import { RewardGameCard } from '../components/RewardGameCard';
+import { StoryHomeCard } from '../components/stories/StoryHomeCard';
 import { normalizeBingoSettings } from '../content/math/bingo';
 import { useStore } from '../store/StoreContext';
 import type { ProfileId } from '../types';
@@ -98,6 +99,7 @@ export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
         <span className="mission-icon">🧩</span><span className="mission-body"><span className="mission-title">두뇌 퍼즐</span><span className="small muted">스도쿠·숫자 기차·수 피라미드 · 자유 놀이</span></span><span className="mission-go">놀기</span>
       </button>}
       <RewardGameCard profileId={profileId} today={today} go={go} />
+      <StoryHomeCard profileId={profileId} go={go} />
       {missions.some((m) => m.type === 'talk') && !aiReady(state.ai) && <p className="panel">{profileId === 'parent' ? '보호자 모드에서 AI 연결을 설정해 주세요. 지금은 다른 미션만 끝내도 쿠폰을 받을 수 있어요.' : '보호자에게 AI 연결을 부탁하세요. 지금은 다른 미션만 끝내도 쿠폰을 받을 수 있어요.'}</p>}
 
       {missions.every((m) => m.type !== 'reading') && (

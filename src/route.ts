@@ -10,6 +10,7 @@ export type Route =
   | { name: 'vocab'; profileId: ProfileId }
   | { name: 'speaking'; profileId: ProfileId }
   | { name: 'reading'; profileId: ProfileId }
+  | { name: 'stories'; profileId: ProfileId }
   | { name: 'talk'; profileId: ProfileId }
   | { name: 'science'; profileId: ProfileId }
   | { name: 'science-collection'; profileId: ProfileId }
