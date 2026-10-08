@@ -1,3 +1,4 @@
+import { completePuzzleGrid, setPuzzleGridInput } from '../../content/puzzles/input';
 import type { ComponentType } from 'react';
 import type { Cell } from '../../content/math/bingo';
 import { movePuzzleCell } from '../../content/puzzles/navigation';
@@ -58,7 +59,6 @@ const gridAdapter = {
   Component: PuzzleGrid,
   initialInput: (puzzle: Puzzle) => (puzzle.view as NumberGrid).rows.map(row => row.map(n => n ? String(n) : '')),
   answerInput: (puzzle: Puzzle) => (puzzle.answer as number[][]).map(row => row.map(String)),
-  complete: (input: unknown) => (input as string[][]).every(row => row.every(n => /^\d+$/.test(n))),
   toAnswer: (input: unknown) => (input as string[][]).map(row => row.map(Number)),
   firstCell: (puzzle: Puzzle): Cell => {
     const rows = (puzzle.view as NumberGrid).rows;
@@ -67,12 +67,16 @@ const gridAdapter = {
   },
   move: (puzzle: Puzzle, selected: Cell, key: string) => movePuzzleCell((puzzle.view as NumberGrid).rows, selected, key),
   padValue: (input: unknown, selected: Cell) => (input as string[][])[selected.r][selected.c],
-  setPad: (input: unknown, selected: Cell, value: string) => (input as string[][]).map((row, r) =>
-    row.map((n, c) => r === selected.r && c === selected.c ? value : n)),
 };
 export const PUZZLE_RENDERERS: Partial<Record<PuzzleType, PuzzleRenderer>> = {
-  sudoku: { ...gridAdapter, icon: '🔢', example: '1 · □ · 3 · 4', instruction: '빈칸을 골라 숫자를 넣어요. 가로, 세로, 굵은 선 안에 같은 수는 한 번만!' },
-  pyramid: { ...gridAdapter, icon: '🔺', example: '3 + 4 → 7', instruction: '위 칸은 바로 아래 두 칸을 더한 수예요.' },
+  sudoku: { ...gridAdapter,
+    complete: input => completePuzzleGrid(input, 'sudoku'),
+    setPad: (input, selected, value) => setPuzzleGridInput(input as string[][], selected, value, 'sudoku'),
+    icon: '🔢', example: '1 · □ · 3 · 4', instruction: '빈칸을 골라 숫자를 넣어요. 가로, 세로, 굵은 선 안에 같은 수는 한 번만!' },
+  pyramid: { ...gridAdapter,
+    complete: input => completePuzzleGrid(input, 'pyramid'),
+    setPad: (input, selected, value) => setPuzzleGridInput(input as string[][], selected, value, 'pyramid'),
+    icon: '🔺', example: '3 + 4 → 7', instruction: '위 칸은 바로 아래 두 칸을 더한 수예요.' },
   train: { icon: '🚂', example: '2 → 4 → 6 → ?', instruction: '숫자가 달라지는 규칙을 찾아 다음 수를 넣어요.', Component: Train,
     initialInput: () => '', answerInput: puzzle => String(puzzle.answer), complete: input => /^\d+$/.test(String(input)),
     toAnswer: input => Number(input), padValue: input => String(input), setPad: (_input, _selected, value) => value },

@@ -50,7 +50,8 @@ describe('두뇌 퍼즐 입구와 공통 틀', () => {
     expect(renderer.complete(input)).toBe(false);
     const answerInput = renderer.answerInput(puzzle);
     expect(renderer.complete(answerInput)).toBe(true); expect(renderer.toAnswer(answerInput)).toEqual(puzzle.answer);
-    const edited = renderer.setPad!(input, selected, '12'); expect(renderer.padValue!(edited, selected)).toBe('12');
+    const value = type === 'sudoku' ? '2' : '12';
+    const edited = renderer.setPad!(input, selected, value); expect(renderer.padValue!(edited, selected)).toBe(value);
     expect(renderer.padValue!(input, selected)).toBe('');
     const html = renderToStaticMarkup(createElement(renderer.Component, { puzzle, input: answerInput, selected,
       select: () => {}, change: () => {}, disabled: true }));

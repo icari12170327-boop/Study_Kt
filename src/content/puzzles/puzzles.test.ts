@@ -134,9 +134,9 @@ describe('활동 시간과 칸 이동', () => {
     expect(puzzleActiveMs(clock, 120_000)).toBe(120_000);
     expect(puzzleActiveMs(clock, 119_000)).toBe(120_000);
   });
-  it('정해진 칸과 경계를 건너뛰고 피라미드의 없는 칸에 가지 않는다', () => {
+  it('정해진 칸을 건너뛰고 줄 끝과 피라미드의 없는 칸에서도 다른 빈칸으로 간다', () => {
     expect(movePuzzleCell([[0, 1, 0], [0, 0, 0]], { r: 0, c: 0 }, 'ArrowRight')).toEqual({ r: 0, c: 2 });
-    expect(movePuzzleCell([[0, 1, 0]], { r: 0, c: 2 }, 'ArrowRight')).toEqual({ r: 0, c: 2 });
-    expect(movePuzzleCell([[0], [0, 0], [0, 0, 0]], { r: 2, c: 2 }, 'ArrowUp')).toEqual({ r: 2, c: 2 });
+    expect(movePuzzleCell([[0, 1, 0]], { r: 0, c: 2 }, 'ArrowRight')).toEqual({ r: 0, c: 0 });
+    expect(movePuzzleCell([[0], [0, 0], [0, 0, 0]], { r: 2, c: 2 }, 'ArrowUp')).toEqual({ r: 1, c: 1 });
   });
 });
