@@ -1,3 +1,7 @@
+import { WordProblemText } from '../components/WordProblemText';
+import { useWordProblemQueue } from '../components/useWordProblemQueue';
+import { withoutStory } from '../content/math/wordProblem';
+import { canSpeak } from '../lib/speech';
 import { canPlay } from '../content/games/limits';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/StoreContext';
@@ -42,7 +46,7 @@ export function MathSession({ profileId, go }: { profileId: ProfileId; go: Go })
     });
   }, [profileId, today, grade, update]);
 
-  const queue = useMemo(() => {
+  const baseQueue = useMemo(() => {
     const done = data.days[today]?.progress.math ?? 0;
     const count = Math.max(target - done, 0) || target;
     return buildLevelQueue(grade, evaluated.level, data.wrongNotes, count);
@@ -60,6 +64,7 @@ export function MathSession({ profileId, go }: { profileId: ProfileId; go: Go })
   const attempted = useRef(false);
   const nextButton = useRef<HTMLButtonElement>(null);
   const [guesses, setGuesses] = useState(0);
+  const queue = useWordProblemQueue(baseQueue, index, state.ai, profileId, grade, settings.wordProblemRatio, settings.talk?.interests);
 
   useEffect(() => {
     events.current = [performance.now()];
@@ -67,6 +72,7 @@ export function MathSession({ profileId, go }: { profileId: ProfileId; go: Go })
   }, [index, round]);
 
   useEffect(() => () => window.clearTimeout(timer.current), []);
+  useEffect(() => () => { if (canSpeak()) window.speechSynthesis.cancel(); }, [index, round]);
 
   const finished = index >= queue.length;
   const item = queue[index];
@@ -93,7 +99,7 @@ export function MathSession({ profileId, go }: { profileId: ProfileId; go: Go })
     }
     const correct = result.correct;
     attempted.current = true;
-    const attempt = mathAttempt(item.problem.skill, correct, events.current);
+    const attempt = mathAttempt(item.problem.skill, correct, events.current, !!item.problem.story);
     if (attempt.guessed) setGuesses((count) => count + 1);
     setScore((s) => ({ correct: s.correct + (correct ? 1 : 0), total: s.total + 1 }));
     update((draft) => {
@@ -104,11 +110,11 @@ export function MathSession({ profileId, go }: { profileId: ProfileId; go: Go })
         total: 1,
         skill: item.problem.skill,
       }, { aiReady: aiReady(draft.ai) });
-      d.days[today].mathAttempts.push({ ...attempt, problem: item.problem });
+      d.days[today].mathAttempts.push({ ...attempt, problem: withoutStory(item.problem) });
       if (correct && item.wrongId) {
         d.wrongNotes = d.wrongNotes.filter((w) => w.id !== item.wrongId);
       } else if (!correct && !item.wrongId) {
-        d.wrongNotes.push({ id: uid(), problem: item.problem, addedAt: today, given: describeInput(input) });
+        d.wrongNotes.push({ id: uid(), problem: withoutStory(item.problem), addedAt: today, given: describeInput(input) });
         if (d.wrongNotes.length > MAX_WRONG_NOTES) d.wrongNotes.splice(0, d.wrongNotes.length - MAX_WRONG_NOTES);
       }
     });
@@ -165,6 +171,7 @@ export function MathSession({ profileId, go }: { profileId: ProfileId; go: Go })
       <ProgressBar value={index} max={queue.length} color="#f97316" />
       <div className="question-card">
         <div className="question-tag">
+          {item.problem.story && <span className="badge">📖 문장제</span>}
           {item.wrongId && <span className="badge badge-warn">오답 다시 풀기</span>}
           {skill && (
             <span className="badge">
@@ -172,7 +179,7 @@ export function MathSession({ profileId, go }: { profileId: ProfileId; go: Go })
             </span>
           )}
         </div>
-        <div className="question-text">{item.problem.question}</div>
+        {item.problem.story ? <WordProblemText story={item.problem.story} /> : <div className="question-text">{item.problem.question}</div>}
         {item.problem.answer.kind === 'fraction' && <div className="muted small">기약분수로 답해요. 대분수는 자연수 칸도 채워요.</div>}
         <NumberPad key={`${round}-${index}`} kind={item.problem.answer.kind} value={input} onChange={setInput}
           onSubmit={submit} onNext={next} nextButtonRef={nextButton} onActivity={() => events.current.push(performance.now())} disabled={answered} />

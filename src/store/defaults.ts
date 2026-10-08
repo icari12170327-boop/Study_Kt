@@ -21,6 +21,7 @@ export function defaultSettings(level: Level, id?: ProfileId): ProfileSettings {
   switch (level) {
     case 'g3':
       return {
+        wordProblemRatio: 20,
         puzzles: { enabled: true },
         gamesPerDay: 3,
         scienceV2: true,
@@ -41,6 +42,7 @@ export function defaultSettings(level: Level, id?: ProfileId): ProfileSettings {
       };
     case 'g5':
       return {
+        wordProblemRatio: 20,
         puzzles: { enabled: true },
         gamesPerDay: 3,
         scienceV2: true,
@@ -61,6 +63,7 @@ export function defaultSettings(level: Level, id?: ProfileId): ProfileSettings {
       };
     case 'adult':
       return {
+        wordProblemRatio: 20,
         coach: normalizeCoachSettings(undefined),
         bizTalkEnabledOnce: true,
         puzzles: { enabled: true },

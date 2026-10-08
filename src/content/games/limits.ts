@@ -33,9 +33,9 @@ export function normalizeGames(raw: unknown): GameRecord[] {
 export function normalizeGameAttempts(raw: unknown, date: string, today: string): MathAttempt[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter(row => row && typeof row === 'object').map(row => {
-    const { problem: rawProblem, ...attempt } = row;
+    const { problem: rawProblem, story, ...attempt } = row;
     const problem = date === today ? normalizeProblem(rawProblem) : undefined;
-    return { ...attempt, ...(problem ? { problem } : {}) } as MathAttempt;
+    return { ...attempt, ...(story === true ? { story: true } : {}), ...(problem ? { problem } : {}) } as MathAttempt;
   });
 }
 /** 시작할 때 한 판을 확보한다. 중단도 한 판으로 세고 학습 기록에는 손대지 않는다. */

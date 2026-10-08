@@ -1,3 +1,4 @@
+import { WordProblemSettings } from '../components/WordProblemSettings';
 import { PuzzleOverview } from '../components/PuzzleOverview';
 import { normalizePuzzleSettings } from '../content/puzzles/state';
 import { normalizeGamesPerDay } from '../content/games/limits';
@@ -301,6 +302,8 @@ function Settings() {
         </div>
         <p className="small muted">다음 게임부터 적용해요. 별과 쿠폰 없이 자유롭게 놀아요.</p>
       </div>}
+
+      {pid !== 'parent' && profile.level !== 'adult' && <WordProblemSettings key={pid} profileId={pid} />}
 
       <div className="panel">
         <label>

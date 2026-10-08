@@ -7,9 +7,9 @@ export function activeDuration(events: readonly number[], idleCapMs = 60000): nu
   return events.slice(1).reduce((sum, event, i) => sum + Math.min(idleCapMs, Math.max(0, event - events[i])), 0);
 }
 
-export function mathAttempt(skill: string, correct: boolean, events: readonly number[]): MathAttempt {
+export function mathAttempt(skill: string, correct: boolean, events: readonly number[], story = false): MathAttempt {
   const activeMs = activeDuration(events);
-  return { skill, correct, activeMs, guessed: !correct && activeMs < 5000 };
+  return { skill, correct, activeMs, guessed: !story && !correct && activeMs < 5000, ...(story ? { story: true } : {}) };
 }
 
 export function latestMathDay(days: Record<string, DayLog>, today: string): DayLog | undefined {
@@ -43,15 +43,16 @@ export function evaluateLevel(
   )
     return state;
 
-  const attempts = lastDay.mathAttempts.filter((attempt) => !attempt.guessed);
+  const attempts = lastDay.mathAttempts.filter((attempt) => attempt.story === true || !attempt.guessed);
   const correct = attempts.filter((attempt) => attempt.correct);
-  const medianSec = median(correct.map((attempt) => attempt.activeMs)) / 1000;
+  const timedCorrect = correct.filter((attempt) => attempt.story !== true);
+  const medianSec = median(timedCorrect.map((attempt) => attempt.activeMs)) / 1000;
   const levels = mathLevelsFor(grade);
   const current = clampMathLevel(state.level, grade);
   let next = current;
   if (attempts.length >= 10) {
     const accuracy = correct.length / attempts.length;
-    if (accuracy >= 0.9 && medianSec <= levels[current - 1].targetSec) next++;
+    if (accuracy >= 0.9 && timedCorrect.length > 0 && medianSec <= levels[current - 1].targetSec) next++;
     else if (accuracy < 0.6) next--;
   }
   const recent = state.history.filter((row) => row.date >= addDays(today, -6) && row.date <= today);
@@ -108,7 +109,7 @@ export function mathTimeline(state: MathLevelState, days: Record<string, DayLog>
     return {
       date,
       level: date === today ? state.level : row?.level,
-      guesses: days[date]?.mathAttempts.filter((attempt) => attempt.guessed).length ?? 0,
+      guesses: days[date]?.mathAttempts.filter((attempt) => attempt.story !== true && attempt.guessed).length ?? 0,
     };
   });
 }

@@ -1,3 +1,4 @@
+import { normalizeWordProblemRatio, withoutStory } from '../content/math/wordProblem';
 import { normalizePuzzleData, normalizePuzzleSettings } from '../content/puzzles/state';
 import { normalizeGameAttempts, normalizeGames, normalizeGamesPerDay, validGameDate } from '../content/games/limits';
 import { toDateKey } from '../lib/date';
@@ -24,6 +25,7 @@ export function normalizeState(raw: unknown, today = toDateKey()): AppState {
   const data = { ...base.data };
   for (const p of profiles) {
     settings[p.id] = { ...defaultSettings(p.level, p.id), ...s.settings?.[p.id] };
+    settings[p.id].wordProblemRatio = normalizeWordProblemRatio(s.settings?.[p.id]?.wordProblemRatio);
     settings[p.id].puzzles = normalizePuzzleSettings(s.settings?.[p.id]?.puzzles);
     settings[p.id].gamesPerDay = normalizeGamesPerDay(s.settings?.[p.id]?.gamesPerDay);
     settings[p.id].missions = settings[p.id].missions.map((m) => ({ ...m }));
@@ -45,6 +47,7 @@ export function normalizeState(raw: unknown, today = toDateKey()): AppState {
       talk.dailyMinutes = mission.target;
     } else settings[p.id].missions = [...settings[p.id].missions, { type: 'talk', enabled: p.level !== 'adult', target: talk.dailyMinutes }];
     data[p.id] = { ...base.data[p.id], ...s.data?.[p.id] };
+    data[p.id].wrongNotes = Array.isArray(data[p.id].wrongNotes) ? data[p.id].wrongNotes.filter(note => note && note.problem).map(note => ({ ...note, problem: withoutStory(note.problem) })) : [];
     data[p.id].puzzles = normalizePuzzleData(s.data?.[p.id]?.puzzles, p.level);
     data[p.id].games = normalizeGames(s.data?.[p.id]?.games);
     if (validGameDate(s.data?.[p.id]?.crownUntil)) data[p.id].crownUntil = s.data![p.id].crownUntil;

@@ -1,3 +1,4 @@
+import { withoutStory } from './wordProblem';
 import type { Level, MathProblem, WrongItem } from '../../types';
 import { pick, shuffle, type Rng, defaultRng } from '../../lib/random';
 import { SKILL_MAP } from './skills';
@@ -30,7 +31,7 @@ export function buildLevelQueue(grade: Level, level: number, wrongNotes: readonl
     const note = wrongNotes.find((note) => note.problem.skill === item.problem.skill && !used.has(note.id));
     if (!note || used.size >= Math.floor(size / 2)) return item;
     used.add(note.id);
-    return { ...item, problem: note.problem, wrongId: note.id };
+    return { ...item, problem: withoutStory(note.problem), wrongId: note.id };
   });
 }
 
@@ -45,7 +46,7 @@ export function buildMathQueue(
   rng: Rng = defaultRng,
 ): QueueItem[] {
   const skills = skillIds.map((id) => SKILL_MAP[id]).filter(Boolean);
-  const review = wrongNotes.slice(0, skills.length ? Math.floor(count / 2) : count).map((w) => ({ problem: w.problem, wrongId: w.id }));
+  const review = wrongNotes.slice(0, skills.length ? Math.floor(count / 2) : count).map((w) => ({ problem: withoutStory(w.problem), wrongId: w.id }));
   const fresh: QueueItem[] = [];
   if (skills.length) {
     // 단원이 고르게 나오도록 섞은 단원 목록을 돌아가며 사용
