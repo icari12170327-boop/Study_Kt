@@ -41,7 +41,7 @@ export interface EndActiveResponse {
   closed: number;
   chargedSeconds: number;
 }
-export type GenerateKind = 'talk-summary' | 'biz-feedback' | 'memory-merge' | 'word-problem' | 'reading-quiz' | 'coach-gloss' | 'coach-wrapup' | 'coach-check';
+export type GenerateKind = 'talk-summary' | 'biz-feedback' | 'memory-merge' | 'word-problem' | 'reading-quiz' | 'coach-gloss' | 'coach-wrapup' | 'coach-check' | 'weekly-report';
 export interface GenerateRequest {
   profileId: AiProfileId;
   level: AiLevel;
