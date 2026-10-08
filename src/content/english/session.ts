@@ -24,7 +24,11 @@ export function buildVocabSession(
   data: Pick<ProfileData, 'customCards'> = {},
 ): VocabItem[] {
   const byKey = new Map<string, { deckId: string; card: VocabCard }>();
-  for (const id of deckIds) for (const card of getVocabCards(id, data)) byKey.set(vocabKey(id, card.id), { deckId: id, card });
+  for (const id of deckIds) for (const card of getVocabCards(id, data)) {
+    // 코치 대화 중 저장한 문장은 한국어 뜻을 받은 뒤 단어 문제에 넣는다.
+    if (id === 'my-phrases' && !card.ko.trim()) continue;
+    byKey.set(vocabKey(id, card.id), { deckId: id, card });
+  }
 
   const keys = englishSessionKeys([...byKey.keys()], srs, today, count);
   return shuffle(keys, rng).map((key) => {
@@ -38,7 +42,7 @@ export function buildVocabSession(
     if (deckId === 'my-phrases' && new Set(choices.map(c => c[field]).filter(value => value !== card[field])).size < 3)
       choices.push(...VOCAB_DECKS.filter(deck => deck.level === 'adult').flatMap(deck => deck.cards));
     const pool = [...new Set(choices.map((c) => c[field]))].filter(
-      (v) => v !== card[field],
+      (v) => !!v.trim() && v !== card[field],
     );
     const options = shuffle([card[field], ...shuffle(pool, rng).slice(0, 3)], rng);
     return { key, card, mode, options, isNew };

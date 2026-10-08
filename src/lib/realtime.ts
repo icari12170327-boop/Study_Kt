@@ -14,12 +14,12 @@ export interface TalkHandle {
 }
 export interface TalkCallbacks {
   onState(state: TalkState): void;
-  onAssistantText(itemId: string, delta: string, done: boolean): void;
+  onAssistantText(itemId: string, delta: string, done: boolean, responseId?: string): void;
   onUserText(itemId: string, text: string): void;
   onError(error: AiError): void;
   onConnected?(remainingSeconds: number): void;
   onUserSpeaking?(): void;
-  onFriendFinished?(): void;
+  onFriendFinished?(responseId?: string): void;
   onCharged?(seconds: number): void;
 }
 const localTalks = new Set<{ profileId: SessionRequest['profileId']; cfg: AiConfig; stop: () => Promise<void> }>();
@@ -111,6 +111,7 @@ export async function startTalk(
   let responseActive = false;
   let audioPlaying = false;
   let pendingResponse = false;
+  let greetingRequested = false;
   const requestResponse = () => {
     pendingResponse = true;
     if (!responseActive && !audioPlaying && !stopped && channel?.readyState === 'open') {
@@ -143,6 +144,7 @@ export async function startTalk(
       pc.ontrack = null;
     }
     if (channel) {
+      channel.onopen = null;
       channel.onmessage = null;
       channel.onclose = null;
       channel.onerror = null;
@@ -216,22 +218,35 @@ export async function startTalk(
     };
     stream.getTracks().forEach((track) => pc!.addTrack(track, stream!));
     channel = pc.createDataChannel('oai-events');
+    // 코치만 연결 직후 먼저 인사한다. 기존 아이·상황극의 시작 방식은 유지한다.
+    if (req.mode === 'parent-coach') channel.onopen = () => {
+      if (greetingRequested) return;
+      greetingRequested = true; requestResponse();
+    };
     channel.onmessage = (e) => {
       const event = parseRealtimeEvent(e.data);
       if (stopped) return;
+      let responseId: string | undefined;
       try {
-        const raw = JSON.parse(e.data) as { type?: string };
+        const raw = JSON.parse(e.data) as { type?: string; response_id?: unknown };
+        if (typeof raw.response_id === 'string') responseId = raw.response_id;
         if (raw.type === 'response.created') responseActive = true;
         if (raw.type === 'response.done') responseActive = false;
         if (raw.type === 'output_audio_buffer.started') audioPlaying = true;
         if (raw.type === 'output_audio_buffer.stopped' || raw.type === 'output_audio_buffer.cleared') audioPlaying = false;
         if (raw.type === 'input_audio_buffer.speech_started') cb.onUserSpeaking?.();
-        if (raw.type === 'output_audio_buffer.stopped') cb.onFriendFinished?.();
+        if (raw.type === 'output_audio_buffer.stopped') {
+          if (req.mode === 'parent-coach') cb.onFriendFinished?.(responseId);
+          else cb.onFriendFinished?.();
+        }
         if (pendingResponse) requestResponse();
       } catch { /* 잘못된 이벤트는 파서가 걸러낸다. */ }
       if (!event) return;
       if (event.type === 'state') cb.onState(event.state);
-      if (event.type === 'assistant') cb.onAssistantText(event.itemId, event.text, event.done);
+      if (event.type === 'assistant') {
+        if (req.mode === 'parent-coach') cb.onAssistantText(event.itemId, event.text, event.done, responseId);
+        else cb.onAssistantText(event.itemId, event.text, event.done);
+      }
       if (event.type === 'user') cb.onUserText(event.itemId, event.text);
       if (event.type === 'error') fail(new AiError('server'));
     };

@@ -44,6 +44,7 @@ export interface MissionConfig {
 }
 
 export interface ProfileSettings {
+  coach?: CoachSettings;
   bizTalkEnabledOnce?: true;
   bingo?: { enabled: boolean; productMix: 'off' | 'few' | 'normal' | 'many'; limitSec: number };
   /** 배포된 실험 미션의 단위를 한 번만 문제로 바꾼 표시. */
@@ -84,7 +85,19 @@ export interface TalkLog {
   scenarioId?: string;
   situation?: string;
   feedback?: BizFeedback;
+  mode?: 'coach';
+  coachTopic?: import('../shared/ai').CoachTopic;
+  coachWrapup?: CoachWrapup;
+  coachCheck?: CoachCheck & { text: string };
 }
+export interface CoachSettings {
+  level: import('../shared/ai').CoachLevel;
+  repeat: import('../shared/ai').CoachRepeat;
+  speed: import('../shared/ai').ParentSpeed;
+  subtitle: 'now' | 'after' | 'hidden';
+}
+export interface CoachWrapup { sentences: { en: string; ko: string }[] }
+export interface CoachCheck { corrected: string; noteKo: string }
 export interface BizFeedback {
   overallKo: string;
   corrections: { said: string; better: string; why: string }[];

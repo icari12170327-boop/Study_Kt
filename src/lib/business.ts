@@ -1,5 +1,6 @@
 import type { BizFeedback, CustomCard, ProfileData, ProfileSettings, TalkLog, TalkSummary } from '../types';
 import type { SessionRequest } from './ai';
+import type { ParentSpeed } from '../../shared/ai';
 import type { Rng } from './random';
 export const MY_PHRASES = 'my-phrases';
 export const BUSINESS_SCENARIOS = [
@@ -33,7 +34,7 @@ export function normalizeCustomCards(raw: unknown): CustomCard[] {
   const ids = new Set<string>(), expressions = new Set<string>(), result: CustomCard[] = [];
   for (const item of raw) {
     const row = object(item);
-    if (!text(row.id, 100) || !/^mp-\d+-[a-z0-9]{4}$/.test(row.id) || !text(row.en, 300) || !text(row.ko, 300) || !text(row.source, 300) ||
+    if (!text(row.id, 100) || !/^mp-\d+-[a-z0-9]{4}$/.test(row.id) || !text(row.en, 300) || typeof row.ko !== 'string' || row.ko.length > 300 || !text(row.source, 300) ||
       typeof row.createdAt !== 'string' || row.createdAt.length > 40 || !Number.isFinite(Date.parse(row.createdAt)) || ids.has(row.id) || expressions.has(englishKey(row.en))) continue;
     ids.add(row.id); expressions.add(englishKey(row.en));
     result.push({ id: row.id, en: row.en.trim(), ko: row.ko.trim(), source: row.source.trim(), createdAt: row.createdAt });
@@ -46,10 +47,14 @@ export function normalizeBizSituations(raw: unknown): string[] {
 export function rememberSituation(data: ProfileData, situation: string): void {
   if (text(situation, 300)) data.bizSituations = normalizeBizSituations([situation.trim(), ...(data.bizSituations ?? [])]);
 }
-export function savePhrase(data: ProfileData, en: string, ko: string, source: string, now: number, rng: Rng): 'saved' | 'duplicate' | 'invalid' {
-  if (!text(en, 300) || !text(ko, 300) || !text(source, 300) || !Number.isSafeInteger(now) || now < 0 || !Number.isFinite(new Date(now).getTime())) return 'invalid';
+export function savePhrase(data: ProfileData, en: string, ko: string, source: string, now: number, rng: Rng): 'saved' | 'updated' | 'duplicate' | 'invalid' {
+  if (!text(en, 300) || typeof ko !== 'string' || ko.length > 300 || !text(source, 300) || !Number.isSafeInteger(now) || now < 0 || !Number.isFinite(new Date(now).getTime())) return 'invalid';
   const cards = data.customCards ?? [];
-  if (cards.some(card => englishKey(card.en) === englishKey(en))) return 'duplicate';
+  const existing = cards.find(card => englishKey(card.en) === englishKey(en));
+  if (existing) {
+    if (!existing.ko.trim() && ko.trim()) { existing.ko = ko.trim(); return 'updated'; }
+    return 'duplicate';
+  }
   const suffix = Math.floor(rng() * 36 ** 4), ids = new Set(cards.map(card => card.id));
   for (let offset = 0; offset <= cards.length; offset++) {
     const id = `mp-${now}-${((suffix + offset) % (36 ** 4)).toString(36).padStart(4, '0')}`;
@@ -74,11 +79,11 @@ export function enableBusinessTalkOnce(settings: ProfileSettings, alreadyEnabled
   }
   settings.bizTalkEnabledOnce = true;
 }
-export function businessRequest(scenarioId: string, situation: string, memory: string): Omit<SessionRequest, 'offerSdp'> {
+export function businessRequest(scenarioId: string, situation: string, memory: string, speed?: ParentSpeed): Omit<SessionRequest, 'offerSdp'> {
   if (!BUSINESS_SCENARIOS.some(row => row.id === scenarioId) || (scenarioId === 'biz-custom' && !text(situation, 300))) throw new Error('대화 상황을 확인해 주세요.');
   return { profileId: 'parent', level: 'adult', mode: 'biz-talk', scenarioId,
     ...(scenarioId === 'biz-custom' ? { situation: situation.trim() } : {}),
-    persona: { friendName: 'Alex', personaId: 'calm', voice: 'cedar' }, memory: memory.slice(0, 1500) };
+    persona: { friendName: 'Alex', personaId: 'calm', voice: 'cedar' }, memory: memory.slice(0, 1500), ...(speed !== undefined ? { speed } : {}) };
 }
 /** 기존 기억 합치기 API의 요약 형태로 표현과 연습 상황을 전달한다. */
 export function businessMemorySummary(log: TalkLog, feedback: BizFeedback): TalkSummary {

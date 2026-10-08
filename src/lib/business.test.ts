@@ -135,6 +135,7 @@ describe('보호자 저장과 대화 요청', () => {
     for (const [pid, level] of [['kid1', 'g5'], ['kid2', 'g3']] as const) {
       const settings = defaultTalkSettings(level, pid), req = talkRequest(pid, level, settings, 'memory', 'topic');
       expect(req.mode).toBe('kid-friend'); expect(req.scenarioId).toBeUndefined(); expect(req.situation).toBeUndefined();
+      expect(req.speed).toBeUndefined(); expect(req.coach).toBeUndefined(); expect(req.coachTopic).toBeUndefined();
       expect(req.persona.friendHobbies).toBe(settings.friendHobbies);
     }
     expect(maskSubtitle('This is a useful expression.', 50, 'id')).toContain('▢▢▢');

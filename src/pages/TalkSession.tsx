@@ -1,9 +1,14 @@
 import { BusinessFeedback } from '../components/BusinessFeedback';
+import { CoachSubtitle } from '../components/CoachSubtitle';
+import { CoachPhrase } from '../components/CoachPhrase';
+import { CoachWrapup } from '../components/CoachWrapup';
+import { COACH_TOPICS, coachRequest, coachTitle, extractRepeatSentence, normalizeCoachSettings, subtitleVisible } from '../lib/coach';
 import { BUSINESS_SCENARIOS, businessRequest, isShortFeedback, rememberSituation, scenarioTitle } from '../lib/business';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useStore } from '../store/StoreContext';
-import type { ProfileId, TalkLine, TalkLog, TalkSettings } from '../types';
+import type { CoachSettings, ProfileId, TalkLine, TalkLog, TalkSettings } from '../types';
+import type { CoachTopic } from '../../shared/ai';
 import type { Go } from '../route';
 import { ProgressBar, TopBar } from '../components/common';
 import { AiError, fetchUsage, generate, type AiConfig } from '../lib/ai';
@@ -13,7 +18,7 @@ import { toDateKey } from '../lib/date';
 import { scienceTalkTopics } from '../content/science/session';
 import { uid } from '../lib/random';
 
-type StreamLine = TalkLine & { itemId: string; done: boolean };
+type StreamLine = TalkLine & { itemId: string; done: boolean; audioDone?: boolean; responseId?: string };
 interface Run {
   id: string;
   date: string;
@@ -21,6 +26,10 @@ interface Run {
   settings: TalkSettings;
   memory: string;
   business?: { scenarioId: string; situation?: string };
+  coach?: { topic: CoachTopic; settings: CoachSettings };
+  coachAudioEnded?: boolean;
+  coachFinishedResponses?: Set<string>;
+  replaying?: boolean;
   start?: number;
   cap: number;
   credited: number;
@@ -71,6 +80,9 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
   const [remaining, setRemaining] = useState<number>();
   const [topic, setTopic] = useState('');
   const [scenarioId, setScenarioId] = useState<string>('biz-standup'), [situation, setSituation] = useState('');
+  const [parentMode, setParentMode] = useState<'biz' | 'coach'>('biz'), [coachTopic, setCoachTopic] = useState<CoachTopic>('daily');
+  const coach = business && parentMode === 'coach';
+  const coachSettings = normalizeCoachSettings(state.settings.parent.coach);
   const [alternatives, setAlternatives] = useState<{ said: string; values: string[] }>();
   const [shortPending, setShortPending] = useState(false), [shortError, setShortError] = useState('');
   const shortBusy = useRef(false);
@@ -150,13 +162,13 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
     const seconds = elapsed(run);
     credit(run, seconds, true);
     if (run.start !== undefined) {
-      const log: TalkLog = { ...(run.business ?? {}), id: run.id, date: run.date, seconds, lines: run.lines.map(({ role, text, at, peeked }) => ({ role, text, at, ...(peeked ? { peeked } : {}) })), englishRatio: englishRatio(run.lines) };
+      const log: TalkLog = { ...(run.business ?? {}), ...(run.coach ? { mode: 'coach', coachTopic: run.coach.topic } : {}), id: run.id, date: run.date, seconds, lines: run.lines.map(({ role, text, at, peeked }) => ({ role, text, at, ...(peeked ? { peeked } : {}) })), englishRatio: englishRatio(run.lines) };
       update((draft) => {
         const data = draft.data[profileId];
         if (!data.talks.some((talk) => talk.id === log.id)) data.talks = [...data.talks, log].slice(-60);
       });
       if (alive.current) { setDoneLog(log); setPhase('done'); setRemaining(Math.max(0, run.cap - seconds)); }
-      if (!run.business) void summarize(run, log);
+      if (!run.business && !run.coach) void summarize(run, log);
     } else if (alive.current) setPhase('error');
   };
   const stuck = (run: Run) => {
@@ -166,25 +178,30 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
   };
   const start = async () => {
     if (runRef.current && !runRef.current.finished) return;
-    if (!aiReady(state.ai) || (profile.level === 'adult' && !business) || (business && scenarioId === 'biz-custom' && !situation.trim())) return;
+    if (!aiReady(state.ai) || (profile.level === 'adult' && !business) || (business && !coach && scenarioId === 'biz-custom' && !situation.trim())) return;
     const run: Run = { id: uid(), date: toDateKey(), cfg: { ...state.ai }, settings: { ...settings, ...(business ? { pushToTalk: false, subtitleHidePercent: 0 } : {}) }, memory: state.data[profileId].friendMemory,
       cap: 0, credited: 0, savedSeconds: 0, carry: (state.data[profileId].days[toDateKey()]?.talkSeconds ?? 0) % 60,
-      ...(business ? { business: { scenarioId, ...(scenarioId === 'biz-custom' ? { situation: situation.trim() } : {}) } } : {}),
+      ...(coach ? { coach: { topic: coachTopic, settings: { ...coachSettings } }, coachFinishedResponses: new Set<string>() } : business ? { business: { scenarioId, ...(scenarioId === 'biz-custom' ? { situation: situation.trim() } : {}) } } : {}),
       lines: [], finished: false, paused: false, stuckSent: false, wrapSent: false, abort: new AbortController() };
     runRef.current = run;
     leave.current = () => finish(run);
     setPhase('connecting'); setError(''); setAlternatives(undefined); setShortError(''); setLines([]); setPaused(false); setPressing(false);
-    const append = (itemId: string, role: TalkLine['role'], text: string, done: boolean) => {
+    const append = (itemId: string, role: TalkLine['role'], text: string, done: boolean, responseId?: string) => {
       if (run.finished) return;
       const old = run.lines.find((line) => line.itemId === itemId && line.role === role);
       if (old) { old.text = (done ? text : old.text + text).slice(0, 2000); old.done = done; }
-      else run.lines.push({ itemId, role, text: text.slice(0, 2000), at: Date.now(), done });
+      else run.lines.push({ itemId, role, text: text.slice(0, 2000), at: Date.now(), done, ...(run.coach ? { responseId, audioDone: responseId ? run.coachFinishedResponses!.has(responseId) : run.coachAudioEnded === true } : {}) });
+      if (old && run.coach) {
+        old.responseId ??= responseId;
+        if (old.responseId ? run.coachFinishedResponses!.has(old.responseId) : run.coachAudioEnded) old.audioDone = true;
+      }
       if (alive.current) setLines(run.lines.slice(-60).map((line) => ({ ...line })));
     };
     try {
-      const request = business ? businessRequest(scenarioId, situation, run.memory) : talkRequest(profileId, profile.level, settings, run.memory, topic);
+      const request = run.coach ? coachRequest(run.coach.topic, run.coach.settings, run.memory, settings.interests) : business ? businessRequest(scenarioId, situation, run.memory, coachSettings.speed) : talkRequest(profileId, profile.level, settings, run.memory, topic);
       const handle = await startTalk(run.cfg, request, {
         onState: (value) => {
+          if (run.coach && (value === 'thinking' || value === 'speaking')) run.coachAudioEnded = false;
           if (alive.current) setTalkState(value);
           if (value === 'ended') finish(run);
         },
@@ -199,16 +216,24 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
             credit(run, seconds);
             if (alive.current) setRemaining(left);
             // 보호자는 생각할 시간을 두고, 도움 버튼을 눌렀을 때만 막힘 신호를 보낸다.
-            const signals = talkSignals({ remaining: left, now: performance.now(), friendFinishedAt: run.friendFinishedAt, stuckSent: run.stuckSent, wrapSent: run.wrapSent, paused: run.paused, autoStuck: !run.business });
+            const signals = talkSignals({ remaining: left, now: performance.now(), friendFinishedAt: run.friendFinishedAt, stuckSent: run.stuckSent, wrapSent: run.wrapSent, paused: run.paused, autoStuck: !run.business && !run.coach });
             if (signals.wrapUp) { run.wrapSent = true; run.handle?.sendSystemNote('[WRAP_UP]'); }
             if (signals.stuck) stuck(run);
             if (!left) finish(run);
           }, 1000);
         },
-        onAssistantText: (id, text, done) => append(id, 'friend', text, done),
+        onAssistantText: (id, text, done, responseId) => append(id, 'friend', text, done, responseId),
         onUserText: (id, text) => append(id, 'kid', text, true),
         onUserSpeaking: () => { run.stuckSent = false; run.friendFinishedAt = undefined; },
-        onFriendFinished: () => { run.friendFinishedAt = performance.now(); },
+        onFriendFinished: (responseId) => {
+          run.friendFinishedAt = performance.now();
+          if (run.coach && !run.finished) {
+            if (responseId) run.coachFinishedResponses!.add(responseId);
+            else run.coachAudioEnded = true;
+            for (const line of run.lines) if (line.role === 'friend' && (!responseId || line.responseId === responseId)) line.audioDone = true;
+            if (alive.current) setLines(run.lines.slice(-60).map(line => ({ ...line })));
+          }
+        },
         onCharged: (seconds) => {
           if (run.start === undefined) return;
           finish(run);
@@ -251,6 +276,14 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
   };
   const back = () => { leave.current?.(); go({ name: 'home', profileId }); };
   const run = runRef.current;
+  const replay = useCallback((playing: boolean) => {
+    const current = runRef.current;
+    if (!current?.coach) return;
+    current.replaying = playing;
+    current.handle?.setMicEnabled(!playing && !current.paused && !current.finished);
+  }, []);
+  const repeatLine = run?.coach ? [...lines].reverse().find(line => line.role === 'friend' && line.done && line.audioDone && subtitleVisible(run.coach!.settings.subtitle, { audioDone: true, peeked: line.peeked }) && extractRepeatSentence(line.text)) : undefined;
+  const repeatSentence = repeatLine ? extractRepeatSentence(repeatLine.text) : null;
   const friendName = business ? 'Alex' : run?.settings.friendName ?? settings.friendName;
   const mission = state.settings[profileId].missions.find((m) => m.type === 'talk');
   const completed = (state.data[profileId].days[toDateKey()]?.progress.talk ?? 0) >= (mission?.target ?? settings.dailyMinutes);
@@ -259,7 +292,7 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
     if (line) { line.peeked = true; setLines(runRef.current!.lines.slice(-60).map((line) => ({ ...line }))); }
   };
   return <div className="page talk-page">
-    <TopBar title={business ? '💼 비즈니스 프리토킹' : `🗣️ ${friendName}와 대화`} onBack={back} />
+    <TopBar title={coach ? '🌱 코치 모드' : business ? '💼 비즈니스 프리토킹' : `🗣️ ${friendName}와 대화`} onBack={back} />
     {error && <p className="panel bad-text" role="alert">{error}</p>}
     {error && phase === 'ready' && <button className="btn" onClick={back}>홈으로</button>}
     {phase === 'ready' && <div className="panel talk-ready">
@@ -267,6 +300,8 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
       <h2>{business ? '어떤 상황을 연습할까요?' : `${settings.friendName}와 무슨 이야기 할까요?`}</h2>
       <p>{remaining === undefined ? '오늘 남은 시간을 확인하고 있어요.' : `오늘 남은 시간 ${duration(remaining)}`}</p>
       {business ? <>
+        <button className={`business-scenario coach-choice ${coach ? 'on' : ''}`} aria-pressed={coach} onClick={() => setParentMode('coach')}><strong>🌱 코치 모드</strong><span>한국어로 대답하고 쉬운 영어를 따라 해요.</span></button>
+        {coach ? <><div className="business-scenarios" role="group" aria-label="코치 주제">{COACH_TOPICS.map(row => <button key={row.id} className={`business-scenario ${coachTopic === row.id ? 'on' : ''}`} aria-pressed={coachTopic === row.id} onClick={() => setCoachTopic(row.id)}>{row.title}</button>)}</div><button className="btn btn-ghost" onClick={() => setParentMode('biz')}>비즈니스 상황극 고르기</button></> : <>
         <div className="business-scenarios" role="group" aria-label="비즈니스 상황">
           {BUSINESS_SCENARIOS.map(row => <button key={row.id} className={`business-scenario ${scenarioId === row.id ? 'on' : ''}`} aria-pressed={scenarioId === row.id} onClick={() => setScenarioId(row.id)}><strong>{row.title}</strong><span className="small muted">상대: {row.role}</span></button>)}
         </div>
@@ -275,14 +310,15 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
           <p className="small muted">회사 이름, 사람 이름, 숫자 같은 민감한 정보는 빼고 적어 주세요. · {situation.length} / 300자</p>
           {!!state.data.parent.bizSituations?.length && <><h3>최근 입력 상황</h3><div className="chip-wrap">{state.data.parent.bizSituations.map(value => <button className="chip business-situation" key={value} onClick={() => setSituation(value)}>{value}</button>)}</div></>}
         </div>}
+        </>}
       </> : <>
       <div className="chip-wrap">{[...new Set([...scienceTalkTopics(state.data[profileId], toDateKey()), ...talkTopics(settings, state.data[profileId].talks)])].map((value) => <button key={value} className={`chip ${topic === value ? 'on' : ''}`} lang={value.startsWith('오늘 과학:') ? 'ko' : 'en'} onClick={() => setTopic(value)}>{value}</button>)}<button className={`chip ${!topic ? 'on' : ''}`} onClick={() => setTopic('')}>아무 얘기나</button></div>
       </>}
       <p>처음에는 마이크 사용을 허용해 주세요. 헤드셋을 쓰면 더 잘 들려요.</p>
       {!aiReady(state.ai) && <p>{business ? '보호자 모드에서 AI 연결을 설정해 주세요.' : '보호자에게 AI 연결을 부탁하세요.'}</p>}
       {remaining === 0 && <p>{business ? '오늘 대화 시간을 다 썼어요. 내일 다시 연습해 주세요.' : '오늘 대화 시간을 다 썼어요. 내일 다시 친구를 만나요!'}</p>}
-      <button className="btn btn-primary btn-lg" disabled={!aiReady(state.ai) || (profile.level === 'adult' && !business) || (business && scenarioId === 'biz-custom' && !situation.trim()) || remaining === undefined || remaining === 0} onClick={() => { void start(); }}>대화 시작</button>
-      {business && <p className="small muted">AI는 대화 중 교정하지 않아요. 필요한 순간에 대안 표현을 받고, 끝난 뒤 피드백을 확인해요.</p>}
+      <button className="btn btn-primary btn-lg" disabled={!aiReady(state.ai) || (profile.level === 'adult' && !business) || (business && !coach && scenarioId === 'biz-custom' && !situation.trim()) || remaining === undefined || remaining === 0} onClick={() => { void start(); }}>대화 시작</button>
+      {business && <p className="small muted">{coach ? '영어가 떠오르지 않으면 한국어로 말해도 괜찮아요. 소리를 먼저 듣고 짧게 따라 해 봐요.' : 'AI는 대화 중 교정하지 않아요. 필요한 순간에 대안 표현을 받고, 끝난 뒤 피드백을 확인해요.'}</p>}
     </div>}
     {phase === 'connecting' && <div className="panel"><p role="status">{business ? '대화 상대와 연결하고 있어요…' : '친구와 연결하고 있어요…'}</p><button className="btn" onClick={back}>홈으로</button></div>}
     {phase === 'talking' && run && <>
@@ -292,8 +328,9 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
         <p>남은 시간 {duration(remaining ?? 0)}</p><ProgressBar value={remaining ?? 0} max={run.cap} />
         {completed && <p className="good-text">오늘 미션 완료! 더 이야기해도 돼</p>}
       </div>
-      <p className="small muted">{business ? `${scenarioTitle(run.business?.scenarioId)} · 전체 자막을 보여요. 최근 60줄을 보여 주고 있어요.` : '자막을 꾹 누르면 그 문장이 보여요. 최근 60줄을 보여 주고 있어요.'}</p>
-      <div className="talk-lines" ref={transcript} role="log" aria-label="대화 자막">{lines.map((line) => business ? <p className={line.role === 'kid' ? 'talk-kid' : 'talk-subtitle'} key={`${line.role}:${line.itemId}`} lang="en"><span>{line.role === 'kid' ? '나:' : 'Alex:'}</span> {line.text}</p> : <Subtitle key={`${line.role}:${line.itemId}`} line={line} percent={run.settings.subtitleHidePercent} onPeek={() => peek(line.itemId)} />)}</div>
+      <p className="small muted">{run.coach ? `${coachTitle(run.coach.topic)} · ${run.coach.settings.subtitle === 'now' ? '자막을 바로 보여요.' : run.coach.settings.subtitle === 'after' ? 'AI의 말이 끝나면 자막을 보여요.' : '자막 보기 버튼으로 글자를 확인해요.'}` : business ? `${scenarioTitle(run.business?.scenarioId)} · 전체 자막을 보여요. 최근 60줄을 보여 주고 있어요.` : '자막을 꾹 누르면 그 문장이 보여요. 최근 60줄을 보여 주고 있어요.'}</p>
+      <div className="talk-lines" ref={transcript} role="log" aria-label="대화 자막">{lines.map((line) => run.coach && line.role === 'friend' ? <CoachSubtitle key={`${line.role}:${line.itemId}`} line={line} mode={run.coach!.settings.subtitle} cfg={run.cfg} onReveal={() => peek(line.itemId)} /> : business ? <p className={line.role === 'kid' ? 'talk-kid' : 'talk-subtitle'} key={`${line.role}:${line.itemId}`} lang="en"><span>{line.role === 'kid' ? '나:' : 'Alex:'}</span> {line.text}</p> : <Subtitle key={`${line.role}:${line.itemId}`} line={line} percent={run.settings.subtitleHidePercent} onPeek={() => peek(line.itemId)} />)}</div>
+      {run.coach && repeatSentence && <CoachPhrase key={repeatLine!.itemId} sentence={repeatSentence} source={coachTitle(run.coach.topic)} speed={run.coach.settings.speed} onReplay={replay} />}
       {!business && run.settings.pushToTalk && <button className={`btn btn-primary talk-ptt ${pressing ? 'on' : ''}`} disabled={paused} aria-pressed={pressing}
         onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); run.handle?.beginPushToTalk(); setPressing(true); }}
         onPointerUp={() => { run.handle?.endPushToTalk(); setPressing(false); }} onPointerCancel={() => { run.handle?.endPushToTalk(); setPressing(false); }}
@@ -301,22 +338,22 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
         onKeyUp={(event) => { if ([' ', 'Enter'].includes(event.key)) { event.preventDefault(); run.handle?.endPushToTalk(); setPressing(false); } }}
         onBlur={() => { run.handle?.endPushToTalk(); setPressing(false); }}>🎤 누르는 동안 말하기</button>}
       <div className="row-center talk-controls">
-        <button className="btn btn-soft" disabled={paused} onClick={() => stuck(run)}>{business ? '💡 도움' : '🤔 막혔어요'}</button>
-        {business && <button className="btn btn-soft" disabled={shortPending || !lines.some(line => line.role === 'kid' && line.done && line.text.trim())} onClick={() => { void improve(run); }}>방금 내 말 더 자연스럽게</button>}
-        <button className="btn" onClick={() => {
+        <button className="btn btn-soft" disabled={paused} onClick={() => stuck(run)}>{run.coach ? '🤔 한국어로 도와줘' : business ? '💡 도움' : '🤔 막혔어요'}</button>
+        {business && !run.coach && <button className="btn btn-soft" disabled={shortPending || !lines.some(line => line.role === 'kid' && line.done && line.text.trim())} onClick={() => { void improve(run); }}>방금 내 말 더 자연스럽게</button>}
+        <button className={`btn${run.coach ? ' btn-ghost' : ''}`} onClick={() => {
           run.paused = !run.paused; run.friendFinishedAt = undefined;
           if (run.settings.pushToTalk) run.handle?.endPushToTalk();
-          run.handle?.setMicEnabled(!run.paused && !run.settings.pushToTalk);
+          run.handle?.setMicEnabled(!run.paused && !run.settings.pushToTalk && !run.replaying);
           setPressing(false); setPaused(run.paused);
         }}>{paused ? '다시 이야기' : '잠깐 멈춤'}</button>
-        <button className="btn" onClick={() => finish(run)}>끝내기</button>
+        <button className={`btn${run.coach ? ' btn-ghost' : ''}`} onClick={() => finish(run)}>끝내기</button>
       </div>
       {business && shortPending && <p role="status">대안 표현을 찾고 있어요. 대화는 계속할 수 있어요.</p>}
       {business && shortError && <p className="bad-text" role="alert">{shortError}</p>}
       {business && alternatives && <aside className="panel business-alternatives"><h3>더 자연스러운 표현</h3><p className="small muted" lang="en">내 말: {alternatives.said}</p>{alternatives.values.map(value => <p key={value} lang="en">{value}</p>)}</aside>}
       {paused && <p className="small muted">마이크가 꺼졌어요. 연결 시간은 계속 지나가요.</p>}
     </>}
-    {phase === 'done' && doneLog && business && <><div className="panel"><h2>{scenarioTitle(doneLog.scenarioId)} · {duration(doneLog.seconds)} 연습했어요</h2><p>대화 기록과 미션 진행을 저장했어요.</p></div><BusinessFeedback key={doneLog.id} log={doneLog} auto /><button className="btn btn-primary" onClick={back}>홈으로</button></>}
+    {phase === 'done' && doneLog && business && <><div className="panel"><h2>{doneLog.mode === 'coach' ? coachTitle(doneLog.coachTopic) : scenarioTitle(doneLog.scenarioId)} · {duration(doneLog.seconds)} 연습했어요</h2><p>대화 기록과 미션 진행을 저장했어요.</p></div>{doneLog.mode === 'coach' ? <CoachWrapup key={doneLog.id} log={doneLog} settings={run?.coach?.settings} auto onSkip={back} /> : <BusinessFeedback key={doneLog.id} log={doneLog} auto />}<button className="btn btn-primary" onClick={back}>홈으로</button></>}
     {phase === 'done' && doneLog && !business && <div className="panel form">
       <div className="talk-avatar" aria-hidden="true">👋</div><h2>{friendName}와 {duration(doneLog.seconds)} 이야기했어요!</h2>
       <p>완성한 1분마다 별을 받았어요. 하루 별은 미션 목표까지만 모을 수 있어요.</p>

@@ -1,4 +1,6 @@
 import { BusinessFeedback } from '../components/BusinessFeedback';
+import { CoachWrapup } from '../components/CoachWrapup';
+import { coachTitle } from '../lib/coach';
 import { scenarioTitle } from '../lib/business';
 import { useState } from 'react';
 import { useStore } from '../store/StoreContext';
@@ -54,17 +56,17 @@ function ProfileRecords({ profileId }: { profileId: ProfileId }) {
       <h2>대화 기록</h2><p className="small muted">{business ? '상황과 길이, 피드백을 최근 60개까지 기기에 저장해요.' : '최근 60개를 기기에 저장해요. 영어 비율은 아이가 말한 라틴 단어와 한글 어절로 계산해요.'}</p>
       {data.talks.length === 0 && <p>아직 대화 기록이 없어요.</p>}
       {[...data.talks].reverse().map((talk) => <button key={talk.id} className="talk-record" aria-expanded={selected === talk.id} onClick={() => setSelected(selected === talk.id ? undefined : talk.id)}>
-        <strong>{business && `${scenarioTitle(talk.scenarioId)} · `}{talk.date} · {Math.floor(talk.seconds / 60)}분 {talk.seconds % 60}초 · 영어 {Math.round(talk.englishRatio * 100)}% {talk.flagged && <span aria-label="보호자 확인 필요">⚠️</span>}</strong>
-        <span>{business ? talk.feedback?.overallKo ?? '피드백을 다시 받을 수 있어요.' : talk.summary?.highlightKo ?? '요약이 없는 대화예요.'}</span>
+        <strong>{business && `${talk.mode === 'coach' ? coachTitle(talk.coachTopic) : scenarioTitle(talk.scenarioId)} · `}{talk.date} · {Math.floor(talk.seconds / 60)}분 {talk.seconds % 60}초 · 영어 {Math.round(talk.englishRatio * 100)}% {talk.flagged && <span aria-label="보호자 확인 필요">⚠️</span>}</strong>
+        <span>{business ? talk.mode === 'coach' ? talk.coachWrapup?.sentences.map(row => row.en).join(' / ') || '마무리 문장을 다시 받을 수 있어요.' : talk.feedback?.overallKo ?? '피드백을 다시 받을 수 있어요.' : talk.summary?.highlightKo ?? '요약이 없는 대화예요.'}</span>
       </button>)}
     </div>
     {log && <div className="panel form">
-      <h2>{business && `${scenarioTitle(log.scenarioId)} · `}{log.date} 대화 상세</h2>
+      <h2>{business && `${log.mode === 'coach' ? coachTitle(log.coachTopic) : scenarioTitle(log.scenarioId)} · `}{log.date} 대화 상세</h2>
       {business && log.situation && <p className="pre">{log.situation}</p>}
       {log.flagged && <p className="bad-text">⚠️ 보호자 확인이 필요한 대화예요.</p>}
       <h3>전체 자막</h3>{log.lines.map((line, index) => <p className="talk-record-line" key={index}><strong>{business ? line.role === 'kid' ? '나' : '상대' : line.role === 'kid' ? '아이' : '친구'}:</strong> {line.text}{line.peeked && <span className="small muted"> (자막을 봤어요)</span>}</p>)}
       {!log.lines.length && <p>저장된 자막이 없어요.</p>}
-      {business && <BusinessFeedback key={log.id} log={log} />}
+      {business && (log.mode === 'coach' ? <CoachWrapup key={log.id} log={log} /> : <BusinessFeedback key={log.id} log={log} />)}
       {!business && log.summary && <><h3>요약</h3><p>{log.summary.highlightKo}</p><div className="chip-wrap">{log.summary.topicsKo.map((topic) => <span className="chip" key={topic}>{topic}</span>)}</div><h3>새 표현</h3>{log.summary.newExpressions.map((expression, index) => <p key={index}><span lang="en">{expression.en}</span> · {expression.ko}</p>)}<h3>다음 주제</h3><div className="chip-wrap">{log.summary.nextTopics.map((topic) => <span className="chip" key={topic}>{topic}</span>)}</div></>}
     </div>}
   </div>;

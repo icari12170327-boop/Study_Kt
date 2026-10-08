@@ -3,6 +3,7 @@ import type { GenerateKind } from '../../shared/ai';
 export const profiles = ['kid1', 'kid2', 'parent'] as const;
 const profileId = z.enum(profiles);
 const level = z.enum(['g3', 'g5', 'adult']);
+const coachLevel = z.enum(['zero', 'words', 'short', 'daily']);
 const text = (max: number, min = 1) => z.string().min(min).max(max);
 export const scenarioRoles = {
   'biz-standup': 'an overseas team manager',
@@ -18,7 +19,10 @@ export const sessionSchema = z
   .strictObject({
     profileId,
     level,
-    mode: z.enum(['kid-friend', 'biz-talk']),
+    mode: z.enum(['kid-friend', 'biz-talk', 'parent-coach']),
+    coachTopic: z.enum(['daily', 'work', 'money']).optional(),
+    coach: z.strictObject({ level: coachLevel, repeat: z.enum(['low', 'mid', 'high']) }).optional(),
+    speed: z.union([z.literal(0.85), z.literal(0.9), z.literal(1)]).optional(),
     offerSdp: text(64000).startsWith('v=0'),
     persona: z.strictObject({
       friendName: z.enum(['Max', 'Lily', 'Alex']),
@@ -37,10 +41,11 @@ export const sessionSchema = z
   })
   .refine((r) =>
     r.profileId === 'parent'
-      ? r.level === 'adult' && r.mode === 'biz-talk' && !!r.scenarioId
-      : r.level !== 'adult' && r.mode === 'kid-friend' && !r.scenarioId,
+      ? r.level === 'adult' && ((r.mode === 'biz-talk' && !!r.scenarioId) || (r.mode === 'parent-coach' && r.scenarioId === undefined))
+      : r.level !== 'adult' && r.mode === 'kid-friend' && !r.scenarioId && r.speed === undefined,
   )
-  .refine((r) => r.scenarioId === 'biz-custom' ? !!r.situation?.trim() : r.situation === undefined);
+  .refine((r) => r.scenarioId === 'biz-custom' ? !!r.situation?.trim() : r.situation === undefined)
+  .refine((r) => r.mode === 'parent-coach' ? !!r.coachTopic && !!r.coach : r.coachTopic === undefined && r.coach === undefined);
 export const endSchema = z.strictObject({
   sessionId: text(100).regex(/^[\w-]+$/),
   seconds: z.number().finite().min(0).max(86400),
@@ -61,6 +66,9 @@ export const summarySchema = z.strictObject({
   nextTopics: z.array(text(40)).max(3),
 });
 export const inputSchemas = {
+  'coach-gloss': z.strictObject({ text: text(300) }),
+  'coach-wrapup': z.strictObject({ lines }),
+  'coach-check': z.strictObject({ text: text(300), level: coachLevel }),
   'talk-summary': z.strictObject({ lines }),
   'biz-feedback': z.union([z.strictObject({ lines }), z.strictObject({ mode: z.literal('short'), text: text(2000) })]),
   'memory-merge': z.strictObject({
@@ -92,6 +100,9 @@ export const inputSchemas = {
   }),
 };
 export const outputSchemas = {
+  'coach-gloss': z.strictObject({ ko: text(200) }),
+  'coach-wrapup': z.strictObject({ sentences: z.array(z.strictObject({ en: text(120), ko: text(120) })).max(3) }),
+  'coach-check': z.strictObject({ corrected: text(200), noteKo: text(200) }),
   'talk-summary': summarySchema,
   'biz-feedback': z.strictObject({
     overallKo: text(300),
@@ -121,4 +132,4 @@ export const generateSchema = z
     input: z.unknown(),
   })
   .refine((r) => (r.profileId === 'parent' ? r.level === 'adult' : r.level !== 'adult'))
-  .refine((r) => r.kind !== 'biz-feedback' || r.profileId === 'parent');
+  .refine((r) => (r.kind !== 'biz-feedback' && !r.kind.startsWith('coach-')) || r.profileId === 'parent');

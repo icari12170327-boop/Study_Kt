@@ -1,4 +1,5 @@
 import { MyPhrases } from '../components/MyPhrases';
+import { CoachSettings } from '../components/CoachSettings';
 import { normalizeBingoSettings, type ProductMix } from '../content/math/bingo';
 import { useRef, useState } from 'react';
 import { useStore } from '../store/StoreContext';
@@ -310,7 +311,7 @@ function Settings() {
           ))}
         </div>
       </div>
-      {pid === 'parent' && profile.level === 'adult' && <MyPhrases />}
+      {pid === 'parent' && profile.level === 'adult' && <><CoachSettings /><MyPhrases /></>}
     </div>
   );
 }

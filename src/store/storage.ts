@@ -1,4 +1,5 @@
 import { enableBusinessTalkOnce, normalizeBizSituations, normalizeCustomCards } from '../lib/business';
+import { normalizeCoachSettings } from '../lib/coach';
 import { normalizeBingoData, normalizeBingoSettings } from '../content/math/bingo';
 import { normalizeScience, normalizeScienceDay } from '../content/science/session';
 import type { AppState } from '../types';
@@ -30,6 +31,9 @@ export function normalizeState(raw: unknown): AppState {
     settings[p.id].bingo = normalizeBingoSettings(s.settings?.[p.id]?.bingo, p.level);
     const talk = normalizeTalkSettings(settings[p.id].talk, p.level, p.id);
     settings[p.id].talk = talk;
+    if (p.id === 'parent' && p.level === 'adult') {
+      settings[p.id].coach = normalizeCoachSettings(s.settings?.[p.id]?.coach);
+    } else delete settings[p.id].coach;
     const mission = settings[p.id].missions.find((m) => m.type === 'talk');
     if (mission) {
       mission.target = Math.max(1, Math.min(100, Math.round(mission.target) || talk.dailyMinutes));
