@@ -12,6 +12,7 @@ describe('하루 한 화 잠금', () => {
     const initial = initialStoryProgress(), started = startStory(initial, '2026-10-08');
     expect(initial.lastUnlockDate).toBeUndefined(); expect(storyCardState(undefined, '2026-10-08')).toBe('new');
     expect(started.unlocked).toBe(1);
+    expect(storyCardState({ ...started, answers: { '1:0': [] } }, '2026-10-08')).toBe('new');
     const wrong = recordAnswer(started, story, 1, 0, false, '2026-10-08');
     expect(storyCardState(wrong, '2026-10-08')).toBe('reading');
     expect(canOpenNext(wrong, '2026-10-09')).toBe(false);

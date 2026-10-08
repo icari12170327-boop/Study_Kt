@@ -1,4 +1,5 @@
 import type { PuzzleData } from './content/puzzles/types';
+import type { StoryProgress } from './content/stories/types';
 
 export type ProfileId = 'kid1' | 'kid2' | 'parent';
 
@@ -46,6 +47,7 @@ export interface MissionConfig {
 }
 
 export interface ProfileSettings {
+  stories?: { enabled: boolean };
   wordProblemRatio?: number;
   puzzles?: { enabled: boolean };
   gamesPerDay?: number;
@@ -213,6 +215,7 @@ export type GameId = 'fishing' | 'duel';
 export interface GameRecord { date: string; game: GameId; score: number; caught?: number; golden?: number; opponent?: ProfileId; won?: boolean }
 
 export interface ProfileData {
+  stories?: Record<string, StoryProgress>;
   puzzles?: PuzzleData;
   games?: GameRecord[];
   crownUntil?: string;

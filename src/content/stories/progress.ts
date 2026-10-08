@@ -10,8 +10,8 @@ const object = (value: unknown): value is Record<string, unknown> => !!value && 
 const bound = (value: unknown, min: number, max: number, fallback: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, Math.floor(value))) : fallback;
 
-export function normalizeStorySettings(raw: unknown): { enabled: boolean } {
-  return { enabled: !object(raw) || typeof raw.enabled !== 'boolean' ? true : raw.enabled };
+export function normalizeStorySettings(raw: unknown, enabledByDefault = true): { enabled: boolean } {
+  return { enabled: !object(raw) || typeof raw.enabled !== 'boolean' ? enabledByDefault : raw.enabled };
 }
 export function normalizeStories(raw: unknown): Record<string, StoryProgress> {
   if (!object(raw)) return {};
@@ -20,9 +20,10 @@ export function normalizeStories(raw: unknown): Record<string, StoryProgress> {
     if (!object(entry)) return [];
     const unlocked = bound(entry.unlocked, 1, story.episodes.length, 1);
     const answers: StoryProgress['answers'] = {};
-    if (object(entry.answers)) for (const episode of story.episodes.slice(0, unlocked)) {
+    const rawAnswers = entry.answers;
+    if (object(rawAnswers)) for (const episode of story.episodes.slice(0, unlocked)) {
       episode.questions.forEach((_q, i) => {
-        const key = answerKey(episode.n, i), history = entry.answers[key];
+        const key = answerKey(episode.n, i), history = rawAnswers[key];
         if (Array.isArray(history)) answers[key] = history.filter((v): v is boolean => typeof v === 'boolean');
       });
     }
@@ -65,7 +66,7 @@ export function storyCardState(progress: StoryProgress | undefined, today: strin
   if (progress.finished >= total) return 'finished';
   if (canOpenNext(progress, today, total)) return 'new';
   if (progress.finished >= progress.unlocked) return 'locked-until-tomorrow';
-  return Object.keys(progress.answers).some(key => key.startsWith(`${progress.unlocked}:`)) ? 'reading' : 'new';
+  return Object.entries(progress.answers).some(([key, history]) => key.startsWith(`${progress.unlocked}:`) && history.length > 0) ? 'reading' : 'new';
 }
 export function answerRate(history: readonly boolean[]): { correct: number; total: number; percent: number } {
   const correct = history.filter(Boolean).length;
