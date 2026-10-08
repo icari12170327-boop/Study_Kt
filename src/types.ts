@@ -46,6 +46,7 @@ export interface MissionConfig {
 }
 
 export interface ProfileSettings {
+  wordProblemRatio?: number;
   puzzles?: { enabled: boolean };
   gamesPerDay?: number;
   coach?: CoachSettings;
@@ -116,6 +117,8 @@ export type Answer =
   | { kind: 'qr'; q: number; r: number };
 
 export interface MathProblem {
+  /** 검증된 이야기와 물음. question은 원래 식으로 유지한다. */
+  story?: string;
   skill: string;
   question: string;
   answer: Answer;
@@ -142,6 +145,8 @@ export interface DayLog {
 }
 
 export interface MathAttempt {
+  /** 문장제는 정답률에 포함하고 시간·찍기 평가에서 제외한다. */
+  story?: boolean;
   /** T07부터 오늘 시도에만 저장한다. */
   problem?: MathProblem;
   skill: string;

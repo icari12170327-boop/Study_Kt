@@ -533,3 +533,7 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 .blocks-map { text-align: center; max-width: 300px; }
 .blocks-heights { display: grid; gap: 4px; width: fit-content; margin: 8px auto; }
 .blocks-heights span { display: flex; justify-content: center; align-items: center; min-width: 48px; min-height: 48px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; font-weight: 700; }
+
+/* T10: 이야기와 물음은 원문 텍스트로 읽기 쉽게 표시한다. */
+.word-problem-text { font-size: 1.2rem; line-height: 1.8; text-align: left; white-space: pre-line; overflow-wrap: anywhere; margin: 20px 0; }
+.word-problem .btn { margin-bottom: 12px; }
