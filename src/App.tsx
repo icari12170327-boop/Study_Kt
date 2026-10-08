@@ -9,6 +9,7 @@ import { MathSession } from './pages/MathSession';
 import { VocabSession } from './pages/VocabSession';
 import { SpeakingSession } from './pages/SpeakingSession';
 import { Reading } from './pages/Reading';
+import { StoryReading } from './pages/StoryReading';
 import { Rewards } from './pages/Rewards';
 import { Parent } from './pages/Parent';
 import { PinGate } from './components/PinGate';
@@ -44,6 +45,8 @@ export function App() {
       return <SpeakingSession profileId={route.profileId} go={setRoute} />;
     case 'reading':
       return <Reading profileId={route.profileId} go={setRoute} />;
+    case 'stories':
+      return <StoryReading key={route.profileId} profileId={route.profileId} go={setRoute} />;
     case 'science':
       return <ScienceSession key={route.profileId} profileId={route.profileId} go={setRoute} />;
     case 'science-collection':
