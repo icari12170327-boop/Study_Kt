@@ -444,3 +444,13 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 .business-alternatives { border-left: 4px solid var(--primary); overflow-wrap: anywhere; }
 .business-feedback { overflow-wrap: anywhere; }
 @media (max-width: 520px) { .business-scenarios { grid-template-columns: 1fr; } }
+
+/* 소리를 먼저 듣는 보호자 코치 화면 */
+.coach-choice { width: 100%; margin-bottom: 14px; border-color: var(--primary); }
+.coach-line { padding: 12px 16px; border-radius: var(--radius); background: var(--card); overflow-wrap: anywhere; }
+.coach-line p { margin: 0 0 8px; }
+.coach-meaning { margin-top: 8px; }
+.coach-meaning .btn { min-height: 44px; }
+.coach-repeat { border: 2px solid var(--primary); }
+.coach-sentence { font-size: 1.35rem; font-weight: 700; line-height: 1.6; overflow-wrap: anywhere; }
+.coach-wrapup { overflow-wrap: anywhere; }
