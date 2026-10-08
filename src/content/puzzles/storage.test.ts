@@ -22,6 +22,30 @@ describe('자유 놀이 저장 호환', () => {
     migrated.settings.kid2.puzzles = { enabled: false };
     expect(normalizeState(migrated).settings.kid2.puzzles?.enabled).toBe(false);
   });
+  it('T06a 배포 기록에 새 세 종류를 기록해도 기존 기록·보상·설정이 유지되고 백업된다', () => {
+    const state = defaultState();
+    state.settings.kid2.puzzles = { enabled: false };
+    for (const type of ['sudoku', 'train', 'pyramid'] as const) {
+      recordPuzzle(state.data.kid1, 'g5', { ...row, type }, clean);
+    }
+    const baseline = normalizeState(state), before = structuredClone(baseline);
+    const data = baseline.data.kid1;
+    for (const type of ['balance', 'pattern', 'blocks'] as const) {
+      for (let i = 0; i < 3; i++) recordPuzzle(data, 'g5', { ...row, type, difficulty: 2 }, clean);
+      recordPuzzle(data, 'g5', { ...row, type, correct: false, hinted: true }, { correct: false, hinted: true, revealed: true, wrong: 3 });
+      expect(data.puzzles!.levels[type]).toMatchObject({ level: 3, solved: 3, hinted: 1 });
+    }
+    for (const type of ['sudoku', 'train', 'pyramid'] as const) expect(data.puzzles!.levels[type]).toEqual(before.data.kid1.puzzles!.levels[type]);
+    expect(data.puzzles!.recent.slice(0, 3)).toEqual(before.data.kid1.puzzles!.recent);
+    const after = structuredClone(baseline);
+    delete after.data.kid1.puzzles; delete before.data.kid1.puzzles;
+    expect(after).toEqual(before);
+    const normalized = normalizeState(baseline), restored = importState(exportState(baseline));
+    expect(normalized.version).toBe(2); expect(restored.version).toBe(2);
+    expect(normalized.data.kid1.puzzles).toEqual(data.puzzles);
+    expect(restored.data.kid1.puzzles).toEqual(data.puzzles);
+    expect(restored.settings.kid2.puzzles).toEqual({ enabled: false });
+  });
   it('범위 밖 레벨·잘못된 형식은 정규화하고 최근 100개만 남긴다', () => {
     const data = normalizePuzzleData({ levels: { sudoku: { level: 99, streak: -2, fails: Infinity, solved: '3', hinted: 2 }, train: { level: 4, streak: 100, fails: 100 } },
       recent: [null, {}, { ...row, type: 'bad' }, { ...row, activeSec: Infinity }, { ...row, difficulty: 9 },
