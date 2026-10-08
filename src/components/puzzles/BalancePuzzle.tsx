@@ -6,7 +6,7 @@ export function BalancePuzzle({ puzzle }: PuzzleRendererProps) {
   return <div className="balance-puzzle" role="group" aria-label="저울 그림 식">
     {view.equations.map((equation, i) => {
       const pictures = view.symbols.flatMap((symbol, index) => Array.from({ length: equation.counts[index] }, () => symbol));
-      return <div className="balance-equation" key={i} aria-label={`${pictures.map(symbol => symbol.label).join(' 더하기 ')} 는 ${equation.total}`}>
+      return <div className="balance-equation" key={i} role="img" aria-label={`${pictures.map(symbol => symbol.label).join(' 더하기 ')} 는 ${equation.total}`}>
         {pictures.map((symbol, j) => <span className="balance-term" key={j} aria-hidden="true">{j > 0 && <span className="balance-sign">+</span>}<span>{symbol.emoji}</span></span>)}
         <span aria-hidden="true">= {equation.total}</span>
       </div>;
