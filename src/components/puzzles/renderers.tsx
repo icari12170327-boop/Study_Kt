@@ -32,7 +32,7 @@ function PuzzleGrid({ puzzle, input, selected, select, disabled }: PuzzleRendere
   const { rows } = puzzle.view as NumberGrid;
   const sudoku = puzzle.type === 'sudoku' ? puzzle.view as SudokuView : undefined;
   const values = input as string[][];
-  const cell = (r: number, c: number) => <button key={c} type="button"
+  const cell = (r: number, c: number) => <button key={`${r}-${c}`} type="button"
     className={`puzzle-cell ${rows[r][c] ? 'given' : ''} ${selected.r === r && selected.c === c ? 'selected' : ''}`}
     style={sudoku ? { borderRightWidth: (c + 1) % sudoku.boxCols === 0 && c < sudoku.size - 1 ? 3 : 1,
       borderBottomWidth: (r + 1) % sudoku.boxRows === 0 && r < sudoku.size - 1 ? 3 : 1 } : undefined}
