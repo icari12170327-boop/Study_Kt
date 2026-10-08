@@ -44,7 +44,7 @@ export function errorForResponse(status: number, error?: unknown): AiError {
   if (error === 'unsafe') return new AiError('unsafe');
   return new AiError('server');
 }
-export async function aiRequest(cfg: AiConfig, path: string, input?: unknown, keepalive = false): Promise<unknown> {
+export async function aiRequest(cfg: AiConfig, path: string, input?: unknown, keepalive = false, signal?: AbortSignal): Promise<unknown> {
   const { endpoint, token } = normalizeAiConfig(cfg);
   let response: Response;
   try {
@@ -56,7 +56,7 @@ export async function aiRequest(cfg: AiConfig, path: string, input?: unknown, ke
       },
       ...(input === undefined ? {} : { body: JSON.stringify(input) }),
       keepalive,
-      signal: AbortSignal.timeout(25000),
+      signal: signal ?? AbortSignal.timeout(25000),
     });
   } catch {
     throw new AiError('network');
@@ -71,8 +71,8 @@ export async function aiRequest(cfg: AiConfig, path: string, input?: unknown, ke
   if (!response.ok) throw errorForResponse(response.status, error);
   return body;
 }
-export async function generate<T = unknown>(cfg: AiConfig, request: GenerateRequest): Promise<T> {
-  const body = await aiRequest(cfg, '/api/generate', request);
+export async function generate<T = unknown>(cfg: AiConfig, request: GenerateRequest, signal?: AbortSignal): Promise<T> {
+  const body = await aiRequest(cfg, '/api/generate', request, false, signal);
   if (!body || typeof body !== 'object' || !('ok' in body) || body.ok !== true || !('data' in body))
     throw new AiError('server');
   return body.data as T;
