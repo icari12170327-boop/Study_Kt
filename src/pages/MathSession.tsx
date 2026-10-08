@@ -1,3 +1,4 @@
+import { canPlay } from '../content/games/limits';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/StoreContext';
 import type { ProfileId } from '../types';
@@ -103,7 +104,7 @@ export function MathSession({ profileId, go }: { profileId: ProfileId; go: Go })
         total: 1,
         skill: item.problem.skill,
       }, { aiReady: aiReady(draft.ai) });
-      d.days[today].mathAttempts.push(attempt);
+      d.days[today].mathAttempts.push({ ...attempt, problem: item.problem });
       if (correct && item.wrongId) {
         d.wrongNotes = d.wrongNotes.filter((w) => w.id !== item.wrongId);
       } else if (!correct && !item.wrongId) {
@@ -125,6 +126,7 @@ export function MathSession({ profileId, go }: { profileId: ProfileId; go: Go })
       <div className="page">
         <TopBar title="🔢 수학 도전" onBack={() => go({ name: 'home', profileId })} />
         <SessionDone correct={score.correct} total={score.total} completedToday={completedNow} rewardLabel={settings.rewardLabel}>
+          {profileId !== 'parent' && grade !== 'adult' && canPlay(settings, data, today).ok && <button className="btn btn-primary" onClick={() => go({ name: 'games', profileId, game: 'fishing' })}>🎣 게임 열림!</button>}
           <button className="btn btn-primary" onClick={() => go({ name: 'home', profileId })}>
             미션 목록으로
           </button>

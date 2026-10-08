@@ -1,3 +1,4 @@
+import { normalizeGamesPerDay } from '../content/games/limits';
 import { MyPhrases } from '../components/MyPhrases';
 import { CoachSettings } from '../components/CoachSettings';
 import { normalizeBingoSettings, type ProductMix } from '../content/math/bingo';
@@ -251,6 +252,15 @@ function Settings() {
           </div>
         ))}
       </div>
+
+      {pid !== 'parent' && profile.level !== 'adult' && <div className="panel">
+        <label>하루 게임 판 수
+          <select value={normalizeGamesPerDay(settings.gamesPerDay)} onChange={event => update(draft => { draft.settings[pid].gamesPerDay = Number(event.target.value); })}>
+            {Array.from({ length: 10 }, (_, i) => i + 1).map(count => <option key={count} value={count}>{count}판</option>)}
+          </select>
+        </label>
+        <p className="small muted">낚시와 형제 대결의 하루 상한이에요. 대결 한 번은 각자 한 판이에요.</p>
+      </div>}
 
       {pid !== 'parent' && profile.level !== 'adult' && <div className="panel">
         <label className="check">
