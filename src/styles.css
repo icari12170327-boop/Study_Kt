@@ -454,3 +454,19 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 .coach-repeat { border: 2px solid var(--primary); }
 .coach-sentence { font-size: 1.35rem; font-weight: 700; line-height: 1.6; overflow-wrap: anywhere; }
 .coach-wrapup { overflow-wrap: anywhere; }
+
+/* 오늘 문제 게임은 학습 보상과 분리해 표시한다. */
+.game-buttons { display: flex; flex-wrap: wrap; gap: 12px; }
+.game-buttons > button { flex: 1; min-width: 130px; }
+.game-status { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding: 16px; border-radius: 16px; background: var(--card); font-size: 1.15rem; }
+.game-score { display: block; font-size: 2rem; color: var(--primary); }
+.game-crown { border-radius: 12px; padding: 12px; background: var(--card); font-weight: bold; }
+.fish-pond { position: relative; height: 475px; overflow: hidden; border: 2px solid var(--primary); border-radius: 24px; background: linear-gradient(180deg, var(--card), var(--primary-soft)); }
+.fish { position: absolute; top: 0; left: 0; width: min(42%, 240px); min-height: 90px; padding: 6px 8px; border: 2px solid transparent; border-radius: 16px; background: var(--card); color: var(--text); display: grid; gap: 2px; justify-items: center; will-change: transform; touch-action: manipulation; }
+.fish.chosen, .fish:focus-visible { border-color: var(--primary); outline: 3px solid var(--primary); outline-offset: 2px; }
+.fish.golden { background: var(--primary-soft); border-color: var(--warn); }
+.fish-emoji { font-size: 1.5rem; line-height: 1; }
+.fish-question { max-width: 100%; overflow-wrap: anywhere; font-size: .85rem; line-height: 1.25; }
+.pond-empty { padding: 30px; text-align: center; }
+.reward-game .done { display: grid; gap: 14px; }
+@media (prefers-reduced-motion: reduce) { .fish { will-change: auto; } }
