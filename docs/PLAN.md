@@ -209,14 +209,14 @@
 - [x] [T02](tasks/T02-ai-proxy.md) AI 프록시: Realtime 연결, 텍스트 생성, 하루 시간 상한
 - [x] [T03](tasks/T03-ai-friend-talk.md) 아이용 AI 친구 프리토킹 (자막 가림, 기억, 대화 기록)
 - [x] [T04](tasks/T04-parent-business-talk.md) 보호자 비즈니스 프리토킹과 "내 표현"
-- [ ] **[T18](tasks/T18-parent-coach-mode.md) 보호자 코치 모드 (왕초보: 한국어 대답 OK → 영어로 바꿔 따라 말하기 → 마무리 쓰기)**
+- [x] [T18](tasks/T18-parent-coach-mode.md) 보호자 코치 모드 (왕초보: 한국어 대답 OK → 영어로 바꿔 따라 말하기 → 마무리 쓰기)
 
 ### 3단계 — 수학과 재미 (T02와 병행 가능, AI 불필요)
 - [x] [T05](tasks/T05-adaptive-math.md) 수학 도전: 레벨, 숫자 키패드, 꼼수 방지 (PR #8)
 - [x] [T15](tasks/T15-dex-keyboard.md) DeX 물리 키보드로 수학 도전 끝까지 풀기
 - [x] [T16](tasks/T16-math-bingo.md) 수학 빙고판 (첫째 아이디어: 합이 맞는 숫자 3개 찾아 줄 긋기)
 - [ ] [T06](tasks/T06-brain-puzzles.md) 두뇌 퍼즐 6종 (10분, 유휴 시간 제외, 힌트)
-- [ ] [T07](tasks/T07-reward-games.md) 오늘의 문제 게임과 형제 대결
+- [ ] **[T07](tasks/T07-reward-games.md) 오늘의 문제 게임과 형제 대결**
 
 ### 4단계 — 과학과 읽기 콘텐츠
 - [x] [T08](tasks/T08-science-cards.md) 과학 문제(첫째, 둘째 모두), 도감, 배지, 캐릭터 옷차림 (v2: 문제 중심)
