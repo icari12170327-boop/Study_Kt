@@ -470,3 +470,38 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 .pond-empty { padding: 30px; text-align: center; }
 .reward-game .done { display: grid; gap: 14px; }
 @media (prefers-reduced-motion: reduce) { .fish { will-change: auto; } }
+
+/* 두뇌 퍼즐: 작은 화면에서도 숫자 칸은 최소 44px를 유지한다. */
+.puzzle-home { margin-top: 12px; }
+.puzzle-home .mission-icon { background: var(--primary-soft); }
+.puzzle-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.puzzle-choice { display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--text); cursor: pointer; padding: 20px 10px; }
+.puzzle-choice-icon { font-size: 42px; }
+.puzzle-example { font-size: 16px; color: var(--muted); }
+.puzzle-random, .puzzle-next, .puzzle-other { display: block; width: 100%; margin: 16px auto; }
+.puzzle-status { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); }
+.puzzle-instruction { text-align: center; line-height: 1.7; }
+.puzzle-grid { display: grid; max-width: 390px; width: 100%; margin: 16px auto; gap: 0; border: 2px solid var(--text); }
+.puzzle-cell { min-width: 44px; min-height: 44px; height: 54px; padding: 4px; border: 1px solid var(--muted); background: var(--card); color: var(--text); font-size: 22px; font-weight: 700; border-radius: 0; cursor: pointer; }
+.puzzle-cell.given { background: var(--bg); opacity: 1; cursor: default; }
+.puzzle-cell.selected { background: var(--primary-soft); box-shadow: inset 0 0 0 3px var(--primary); color: var(--text); }
+.puzzle-cell:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; position: relative; z-index: 1; }
+.puzzle-pyramid { margin: 20px auto; }
+.puzzle-pyramid-row { display: flex; justify-content: center; gap: 4px; margin-top: 4px; }
+.puzzle-pyramid .puzzle-cell { width: 54px; border-radius: 8px; }
+.puzzle-train { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 24px 0; }
+.puzzle-car { display: grid; place-items: center; min-width: 44px; min-height: 54px; padding: 8px; border: 2px solid var(--line); border-radius: 12px; background: var(--card); font-size: 22px; font-weight: 700; position: relative; }
+.puzzle-car.selected { border-color: var(--primary); background: var(--primary-soft); }
+.puzzle-feedback { min-height: 28px; text-align: center; color: var(--text); }
+.puzzle-resume { display: block; margin: 12px auto; }
+.puzzle-hint { text-align: center; }
+.puzzle-hint-ready { animation: puzzle-glow 1s ease-in-out infinite alternate; }
+.puzzle-overview { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 8px; }
+@keyframes puzzle-glow { to { box-shadow: 0 0 0 4px var(--primary-soft); } }
+@media (max-width: 480px) {
+  .puzzle-picker { grid-template-columns: 1fr; }
+  .puzzle-choice { display: grid; grid-template-columns: 54px 1fr; text-align: left; gap: 8px; }
+  .puzzle-choice-icon { grid-row: span 3; }
+  .puzzle-grid .puzzle-cell { height: 48px; }
+}
+@media (prefers-reduced-motion: reduce) { .puzzle-hint-ready { animation: none; border: 2px solid var(--primary); } }

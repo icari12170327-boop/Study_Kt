@@ -1,3 +1,5 @@
+import { PuzzleOverview } from '../components/PuzzleOverview';
+import { normalizePuzzleSettings } from '../content/puzzles/state';
 import { normalizeGamesPerDay } from '../content/games/limits';
 import { MyPhrases } from '../components/MyPhrases';
 import { CoachSettings } from '../components/CoachSettings';
@@ -139,6 +141,7 @@ function Overview() {
             )}
 
             {p.level !== 'adult' && <ScienceOverview data={data} />}
+            {p.id !== 'parent' && p.level !== 'adult' && <PuzzleOverview data={data} grade={p.level} today={today} />}
 
             {data.wrongNotes.length > 0 && (
               <>
@@ -252,6 +255,16 @@ function Settings() {
           </div>
         ))}
       </div>
+
+      {pid !== 'parent' && profile.level !== 'adult' && <div className="panel">
+        <label className="check">
+          <input type="checkbox" checked={normalizePuzzleSettings(settings.puzzles).enabled} onChange={event => update(draft => {
+            draft.settings[pid].puzzles = { enabled: event.target.checked };
+          })} />
+          🧩 두뇌 퍼즐: 켜기/끄기
+        </label>
+        <p className="small muted">미션과 보상에 영향을 주지 않는 자유 놀이예요.</p>
+      </div>}
 
       {pid !== 'parent' && profile.level !== 'adult' && <div className="panel">
         <label>하루 게임 판 수
