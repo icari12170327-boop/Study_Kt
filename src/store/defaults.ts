@@ -9,7 +9,7 @@ import { defaultBingoSettings } from '../content/math/bingo';
 import { defaultTalkSettings } from '../lib/talk';
 
 export function emptyProfileData(level: Level = 'g3'): ProfileData {
-  return { customCards: [], bizSituations: [], bingo: { recent: [], best: {} }, science: { collected: {}, experiments: {}, badges: [], recentWrong: [] }, math: defaultMathState(level), stars: 0, streak: 0, days: {}, wrongNotes: [], srs: {}, coupons: [], notes: [], talks: [], friendMemory: '' };
+  return { games: [], customCards: [], bizSituations: [], bingo: { recent: [], best: {} }, science: { collected: {}, experiments: {}, badges: [], recentWrong: [] }, math: defaultMathState(level), stars: 0, streak: 0, days: {}, wrongNotes: [], srs: {}, coupons: [], notes: [], talks: [], friendMemory: '' };
 }
 
 /** 학년별 기본 미션. 10월 기준 2학기 단원과 1학기 복습 단원을 모두 켠다. */
@@ -20,6 +20,7 @@ export function defaultSettings(level: Level, id?: ProfileId): ProfileSettings {
   switch (level) {
     case 'g3':
       return {
+        gamesPerDay: 3,
         scienceV2: true,
         bingo: defaultBingoSettings(level),
         talk: defaultTalkSettings(level, id),
@@ -38,6 +39,7 @@ export function defaultSettings(level: Level, id?: ProfileId): ProfileSettings {
       };
     case 'g5':
       return {
+        gamesPerDay: 3,
         scienceV2: true,
         bingo: defaultBingoSettings(level),
         talk: defaultTalkSettings(level, id),
@@ -58,6 +60,7 @@ export function defaultSettings(level: Level, id?: ProfileId): ProfileSettings {
       return {
         coach: normalizeCoachSettings(undefined),
         bizTalkEnabledOnce: true,
+        gamesPerDay: 3,
         scienceV2: true,
         bingo: defaultBingoSettings(level),
         talk: defaultTalkSettings(level, id),

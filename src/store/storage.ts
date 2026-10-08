@@ -1,3 +1,5 @@
+import { normalizeGameAttempts, normalizeGames, normalizeGamesPerDay, validGameDate } from '../content/games/limits';
+import { toDateKey } from '../lib/date';
 import { enableBusinessTalkOnce, normalizeBizSituations, normalizeCustomCards } from '../lib/business';
 import { normalizeCoachSettings } from '../lib/coach';
 import { normalizeBingoData, normalizeBingoSettings } from '../content/math/bingo';
@@ -11,7 +13,7 @@ import { migrateV1toV2, normalizeTalkLogs, normalizeTalkSettings } from '../lib/
 const KEY = 'study-kt:v1';
 
 /** 저장된 값이 일부 빠져 있어도(이전 버전 등) 기본값으로 채운다. */
-export function normalizeState(raw: unknown): AppState {
+export function normalizeState(raw: unknown, today = toDateKey()): AppState {
   const base = defaultState();
   if (!raw || typeof raw !== 'object') return base;
   const s = raw as Partial<Omit<AppState, 'version'>> & { version?: number };
@@ -21,6 +23,7 @@ export function normalizeState(raw: unknown): AppState {
   const data = { ...base.data };
   for (const p of profiles) {
     settings[p.id] = { ...defaultSettings(p.level, p.id), ...s.settings?.[p.id] };
+    settings[p.id].gamesPerDay = normalizeGamesPerDay(s.settings?.[p.id]?.gamesPerDay);
     settings[p.id].missions = settings[p.id].missions.map((m) => ({ ...m }));
     if (!settings[p.id].missions.some(m => m.type === 'science')) settings[p.id].missions.push({ type: 'science', enabled: p.level !== 'adult', target: 5 });
     if (s.settings?.[p.id]?.scienceV2 !== true) {
@@ -40,6 +43,9 @@ export function normalizeState(raw: unknown): AppState {
       talk.dailyMinutes = mission.target;
     } else settings[p.id].missions = [...settings[p.id].missions, { type: 'talk', enabled: p.level !== 'adult', target: talk.dailyMinutes }];
     data[p.id] = { ...base.data[p.id], ...s.data?.[p.id] };
+    data[p.id].games = normalizeGames(s.data?.[p.id]?.games);
+    if (validGameDate(s.data?.[p.id]?.crownUntil)) data[p.id].crownUntil = s.data![p.id].crownUntil;
+    else delete data[p.id].crownUntil;
     data[p.id].customCards = normalizeCustomCards(s.data?.[p.id]?.customCards);
     data[p.id].bizSituations = normalizeBizSituations(s.data?.[p.id]?.bizSituations);
     data[p.id].bingo = normalizeBingoData(s.data?.[p.id]?.bingo);
@@ -57,7 +63,7 @@ export function normalizeState(raw: unknown): AppState {
         Number.isFinite(row.guesses) && Number.isFinite(row.medianSec)).slice(-30) : [],
     };
     data[p.id].days = Object.fromEntries(Object.entries(data[p.id].days).map(([date, day]) =>
-      [date, { ...day, ...(day.science !== undefined ? { science: normalizeScienceDay(day.science) } : {}), talkSeconds: typeof day.talkSeconds === 'number' && Number.isFinite(day.talkSeconds) && day.talkSeconds >= 0 ? Math.floor(day.talkSeconds) : (day.progress.talk ?? 0) * 60, mathAttempts: Array.isArray(day.mathAttempts) ? day.mathAttempts : [] }]));
+      [date, { ...day, ...(day.science !== undefined ? { science: normalizeScienceDay(day.science) } : {}), talkSeconds: typeof day.talkSeconds === 'number' && Number.isFinite(day.talkSeconds) && day.talkSeconds >= 0 ? Math.floor(day.talkSeconds) : (day.progress.talk ?? 0) * 60, mathAttempts: normalizeGameAttempts(day.mathAttempts, date, today) }]));
   }
   const ai = {
     ...(typeof s.ai?.endpoint === 'string' ? { endpoint: s.ai.endpoint } : {}),
@@ -78,9 +84,16 @@ export function loadState(): AppState {
   }
 }
 
+/** 날짜가 바뀐 채 앱을 계속 열어도 저장·백업에는 지난 문제 본문을 남기지 않는다. */
+function pruneProblems(today = toDateKey()) {
+  return function (this: Record<string, unknown>, key: string, value: unknown): unknown {
+    return key === 'mathAttempts' ? normalizeGameAttempts(value, String(this.date), today) : value;
+  };
+}
+
 export function saveState(state: AppState): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(state));
+    localStorage.setItem(KEY, JSON.stringify(state, pruneProblems()));
   } catch {
     // 저장 공간 부족 등: 다음 변경 때 다시 시도한다.
   }
@@ -88,7 +101,7 @@ export function saveState(state: AppState): void {
 
 export function exportState(state: AppState): string {
   // 가족 토큰은 이 기기에만 두고 백업으로 복사하지 않는다.
-  return JSON.stringify({ ...state, ai: { endpoint: state.ai.endpoint } }, null, 2);
+  return JSON.stringify({ ...state, ai: { endpoint: state.ai.endpoint } }, pruneProblems(), 2);
 }
 
 export function importState(text: string, localAi: AiConfig = {}): AppState {

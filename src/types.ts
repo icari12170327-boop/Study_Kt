@@ -44,6 +44,7 @@ export interface MissionConfig {
 }
 
 export interface ProfileSettings {
+  gamesPerDay?: number;
   coach?: CoachSettings;
   bizTalkEnabledOnce?: true;
   bingo?: { enabled: boolean; productMix: 'off' | 'few' | 'normal' | 'many'; limitSec: number };
@@ -138,6 +139,8 @@ export interface DayLog {
 }
 
 export interface MathAttempt {
+  /** T07부터 오늘 시도에만 저장한다. */
+  problem?: MathProblem;
   skill: string;
   correct: boolean;
   activeMs: number;
@@ -198,7 +201,12 @@ export interface BingoRecord {
   hints: number;
 }
 
+export type GameId = 'fishing' | 'duel';
+export interface GameRecord { date: string; game: GameId; score: number; caught?: number; golden?: number; opponent?: ProfileId; won?: boolean }
+
 export interface ProfileData {
+  games?: GameRecord[];
+  crownUntil?: string;
   customCards?: CustomCard[];
   bizSituations?: string[];
   bingo?: { recent: BingoRecord[]; best: Record<string, BingoRecord> };
