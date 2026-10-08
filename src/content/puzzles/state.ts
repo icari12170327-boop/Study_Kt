@@ -22,13 +22,25 @@ export function adjustPuzzleLevel(state: PuzzleLevel, result: PuzzleResult): Puz
 export function recordPuzzle(data: ProfileData, grade: Level, record: PuzzleRecord, result: PuzzleResult): void {
   const puzzles = data.puzzles ??= emptyPuzzleData(grade);
   puzzles.levels[record.type] = adjustPuzzleLevel(puzzles.levels[record.type] ?? defaultPuzzleLevel(grade), result);
-  puzzles.daily ??= aggregateDays(puzzles.recent);
-  const day = puzzles.daily.find(row => row.date === record.date);
-  if (day) { day.total++; day.solved += +record.correct; day.hinted += +record.hinted; day.activeSec += record.activeSec; }
-  else puzzles.daily.push({ date: record.date, total: 1, solved: +record.correct, hinted: +record.hinted, activeSec: record.activeSec });
-  const dates = new Set(lastNDays(7, record.date));
-  puzzles.daily = puzzles.daily.filter(row => dates.has(row.date)).sort((a, b) => a.date.localeCompare(b.date));
+  recordPuzzleActivity(data, grade, record.date, record.activeSec);
+  const day = puzzles.daily!.find(row => row.date === record.date)!;
+  day.total++; day.solved += +record.correct; day.hinted += +record.hinted;
   puzzles.recent = [...puzzles.recent, record].slice(-100);
+}
+/** 중간에 그만두어도 생각한 시간은 남기되 풀이 개수와 난이도는 바꾸지 않는다. */
+export function recordPuzzleActivity(data: ProfileData, grade: Level, date: string, activeSec: number): void {
+  const puzzles = data.puzzles ??= emptyPuzzleData(grade);
+  puzzles.daily ??= aggregateDays(puzzles.recent);
+  let day = puzzles.daily.find(row => row.date === date);
+  if (!day) { day = { date, total: 0, solved: 0, hinted: 0, activeSec: 0 }; puzzles.daily.push(day); }
+  day.activeSec += activeSec;
+  const dates = new Set(lastNDays(7, date));
+  puzzles.daily = puzzles.daily.filter(row => dates.has(row.date)).sort((a, b) => a.date.localeCompare(b.date));
+}
+export function recordPuzzleExit(data: ProfileData, grade: Level, record: PuzzleRecord, wrong: number): void {
+  if (record.hinted || wrong >= 2) recordPuzzle(data, grade, { ...record, correct: false },
+    { correct: false, hinted: record.hinted, revealed: false, wrong });
+  else recordPuzzleActivity(data, grade, record.date, record.activeSec);
 }
 const object = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const count = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;
@@ -64,7 +76,7 @@ export function normalizePuzzleData(value: unknown, grade: Level): PuzzleData {
     if (!validDate(row.date) ||
       !PUZZLE_TYPES.includes(row.type as PuzzleType) || difficulty(row.difficulty, 1) !== row.difficulty ||
       typeof row.correct !== 'boolean' || typeof row.hinted !== 'boolean' ||
-      typeof row.activeSec !== 'number' || !Number.isFinite(row.activeSec) || row.activeSec < 0) return [];
+      typeof row.activeSec !== 'number' || !Number.isSafeInteger(Math.floor(row.activeSec)) || row.activeSec < 0) return [];
     return [{ date: row.date, type: row.type as PuzzleType, difficulty: row.difficulty as Difficulty,
       correct: row.correct, hinted: row.hinted, activeSec: Math.floor(row.activeSec) }];
   }).slice(-100);

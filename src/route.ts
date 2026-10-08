@@ -4,6 +4,7 @@ export type Route =
   | { name: 'profiles' }
   | { name: 'home'; profileId: ProfileId }
   | { name: 'games'; profileId: ProfileId; game?: GameId }
+  | { name: 'puzzles'; profileId: ProfileId }
   | { name: 'bingo'; profileId: ProfileId }
   | { name: 'math'; profileId: ProfileId }
   | { name: 'vocab'; profileId: ProfileId }

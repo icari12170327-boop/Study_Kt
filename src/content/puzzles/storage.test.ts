@@ -3,7 +3,7 @@ import { defaultState } from '../../store/defaults';
 import { exportState, importState, normalizeState } from '../../store/storage';
 import { emptyDay } from '../../lib/progress';
 import { toDateKey } from '../../lib/date';
-import { defaultPuzzleLevel, normalizePuzzleData, puzzleSummary, recordPuzzle } from './state';
+import { defaultPuzzleLevel, normalizePuzzleData, puzzleSummary, recordPuzzle, recordPuzzleExit } from './state';
 import type { PuzzleRecord } from './types';
 const today = toDateKey();
 const clean = { correct: true, hinted: false, revealed: false, wrong: 0 };
@@ -55,6 +55,19 @@ describe('자유 놀이 저장 호환', () => {
     expect(after).toEqual(before);
     expect(data.puzzles?.recent).toHaveLength(100);
     expect(puzzleSummary(data.puzzles, today)).toMatchObject({ total: 120, solved: 80, hinted: 40 });
+  });
+  it('중간 종료는 시간을 유지하며 힌트·반복 오답을 썼을 때만 실패로 기록한다', () => {
+    const state = defaultState(), data = state.data.kid1;
+    const level = structuredClone(data.puzzles!.levels);
+    recordPuzzleExit(data, 'g5', { ...row, correct: false }, 1);
+    expect(data.puzzles!.levels).toEqual(level);
+    expect(data.puzzles!.recent).toHaveLength(0);
+    expect(puzzleSummary(data.puzzles, today)).toMatchObject({ total: 0, activeSec: 17 });
+    recordPuzzleExit(data, 'g5', { ...row, correct: false, hinted: true }, 0);
+    expect(data.puzzles!.levels.train!.fails).toBe(1);
+    recordPuzzleExit(data, 'g5', { ...row, correct: false }, 2);
+    expect(data.puzzles!.levels.train!.level).toBe(1);
+    expect(puzzleSummary(data.puzzles, today)).toMatchObject({ total: 2, solved: 0, hinted: 1, activeSec: 51 });
   });
   it('종류별 난이도를 독립적으로 저장하고 최근 7일만 집계한다', () => {
     const state = defaultState();

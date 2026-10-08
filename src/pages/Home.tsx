@@ -1,3 +1,4 @@
+import { normalizePuzzleSettings } from '../content/puzzles/state';
 import { RewardGameCard } from '../components/RewardGameCard';
 import { normalizeBingoSettings } from '../content/math/bingo';
 import { useStore } from '../store/StoreContext';
@@ -92,6 +93,9 @@ export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
       </div>
       {profileId !== 'parent' && profile.level !== 'adult' && normalizeBingoSettings(settings.bingo, profile.level).enabled && <button className="mission-card bingo-home" onClick={() => go({ name: 'bingo', profileId })}>
         <span className="mission-icon">🎯</span><span className="mission-body"><span className="mission-title">수학 빙고</span><span className="small muted">숫자 3칸을 찾는 자유 놀이</span></span><span className="mission-go">놀기</span>
+      </button>}
+      {profileId !== 'parent' && profile.level !== 'adult' && normalizePuzzleSettings(settings.puzzles).enabled && <button className="mission-card puzzle-home" onClick={() => go({ name: 'puzzles', profileId })}>
+        <span className="mission-icon">🧩</span><span className="mission-body"><span className="mission-title">두뇌 퍼즐</span><span className="small muted">스도쿠·숫자 기차·수 피라미드 · 자유 놀이</span></span><span className="mission-go">놀기</span>
       </button>}
       <RewardGameCard profileId={profileId} today={today} go={go} />
       {missions.some((m) => m.type === 'talk') && !aiReady(state.ai) && <p className="panel">{profileId === 'parent' ? '보호자 모드에서 AI 연결을 설정해 주세요. 지금은 다른 미션만 끝내도 쿠폰을 받을 수 있어요.' : '보호자에게 AI 연결을 부탁하세요. 지금은 다른 미션만 끝내도 쿠폰을 받을 수 있어요.'}</p>}
