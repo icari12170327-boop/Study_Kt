@@ -45,7 +45,7 @@ export function BusinessFeedback({ log, auto = false }: { log: TalkLog; auto?: b
     update(draft => { savePhrase(draft.data.parent, en, ko, scenarioTitle(log.scenarioId), now, () => random); });
     setMessage('내 표현에 저장했어요. 단어와 따라 말하기에서 복습해요.');
   };
-  const saved = (en: string) => (state.data.parent.customCards ?? []).some(card => card.en.trim().toLowerCase() === en.trim().toLowerCase());
+  const saved = (en: string) => (state.data.parent.customCards ?? []).some(card => card.en.trim().toLowerCase() === en.trim().toLowerCase() && !!card.ko.trim());
   const saveButton = (en: string, ko: string) => <button className="btn btn-soft" disabled={saved(en)} onClick={() => save(en, ko)}>{saved(en) ? '✓ 내 표현에 저장됨' : '⭐ 내 표현에 저장'}</button>;
   return <section className="panel form business-feedback" aria-label="비즈니스 대화 피드백">
     <h2>대화 피드백</h2>

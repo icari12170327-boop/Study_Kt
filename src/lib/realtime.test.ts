@@ -61,6 +61,7 @@ class FakePeer extends EventTarget {
     send: vi.fn(),
     close: vi.fn(),
     onmessage: null as ((e: { data: string }) => void) | null,
+    onopen: null as (() => void) | null,
     onclose: null,
     onerror: null,
   };
@@ -112,6 +113,24 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 describe('WebRTC 연결과 자원 해제', () => {
+  it.each(['kid-friend', 'biz-talk', 'parent-coach'] as const)('%s: 코치만 채널이 열리면 한 번 먼저 인사를 요청한다', async mode => {
+    const input = mode === 'kid-friend' ? req : { ...req, profileId: 'parent' as const, level: 'adult' as const, mode,
+      ...(mode === 'parent-coach' ? { coachTopic: 'daily' as const, coach: { level: 'zero' as const, repeat: 'mid' as const }, speed: 0.85 as const } : { scenarioId: 'biz-free' }) };
+    const handle = await startTalk(cfg, input, cb);
+    FakePeer.instance.channel.onopen?.(); FakePeer.instance.channel.onopen?.();
+    expect(FakePeer.instance.channel.send.mock.calls.map(([text]) => JSON.parse(text).type)).toEqual(mode === 'parent-coach' ? ['response.create'] : []);
+    await handle.stop(); expect(FakePeer.instance.channel.onopen).toBeNull();
+  });
+  it('코치의 음성 종료와 자막은 응답 ID로 연결하고 텍스트 완료를 음성 종료로 바꾸지 않는다', async () => {
+    cb.onFriendFinished = vi.fn();
+    const handle = await startTalk(cfg, { ...req, profileId: 'parent', level: 'adult', mode: 'parent-coach', coachTopic: 'daily', coach: { level: 'zero', repeat: 'mid' } }, cb);
+    const emit = (data: object) => FakePeer.instance.channel.onmessage?.({ data: JSON.stringify(data) });
+    emit({ type: 'response.output_audio_transcript.done', item_id: 'a', response_id: 'response-a', transcript: 'Hi!' });
+    expect(cb.onAssistantText).toHaveBeenCalledWith('a', 'Hi!', true, 'response-a'); expect(cb.onFriendFinished).not.toHaveBeenCalled();
+    emit({ type: 'response.done', response: { status: 'completed' } }); expect(cb.onFriendFinished).not.toHaveBeenCalled();
+    emit({ type: 'output_audio_buffer.stopped', response_id: 'response-a' }); expect(cb.onFriendFinished).toHaveBeenCalledExactlyOnceWith('response-a');
+    await handle.stop();
+  });
   it('종료 응답의 서버 기록 시간을 한 번만 전달한다', async () => {
     cb.onCharged = vi.fn();
     const handle = await startTalk(cfg, req, cb);
