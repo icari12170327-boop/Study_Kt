@@ -224,7 +224,7 @@
 - [ ] [T09](tasks/T09-story-reading.md) 국어 연재 이야기 읽기
 
 ### 5단계 — 확장
-- [ ] [T10](tasks/T10-ai-word-problems.md) AI 수학 문장제 (관심사 맞춤)
+- [x] [T10](tasks/T10-ai-word-problems.md) AI 수학 문장제 (관심사 맞춤)
 - [ ] [T11](tasks/T11-ai-reading-quiz.md) 독서노트 AI 질문 생성
 - [ ] T12 자막 가림 비율 자동 조절 (대화 기록으로 이해도 판단)
 - [ ] T13 주간 학습 리포트 (AI 요약)
