@@ -218,6 +218,7 @@
 - [x] [T16](tasks/T16-math-bingo.md) 수학 빙고판 (첫째 아이디어: 합이 맞는 숫자 3개 찾아 줄 긋기)
 - [x] [T06](tasks/T06-brain-puzzles.md) 두뇌 퍼즐 6종 (자유 놀이, T06a → T06b)
 - [x] [T07](tasks/T07-reward-games.md) 오늘의 문제 게임과 형제 대결
+- [ ] **[T19](tasks/T19-obby-run.md) 오비 달리기 (첫째 아이디어, 수학 미션 보상)**
 
 ### 4단계 — 과학과 읽기 콘텐츠
 - [x] [T08](tasks/T08-science-cards.md) 과학 문제(첫째, 둘째 모두), 도감, 배지, 캐릭터 옷차림 (v2: 문제 중심)
@@ -225,7 +226,7 @@
 
 ### 5단계 — 확장
 - [x] [T10](tasks/T10-ai-word-problems.md) AI 수학 문장제 (관심사 맞춤)
-- [ ] **[T11](tasks/T11-ai-reading-quiz.md) 독서노트·독서록 AI 복습 질문**
+- [x] [T11](tasks/T11-ai-reading-quiz.md) 독서노트·독서록 AI 복습 질문
 - [ ] T12 자막 가림 비율 자동 조절 (대화 기록으로 이해도 판단)
 - [x] [T13](tasks/T13-weekly-report.md) 주간 학습 리포트 (숫자 요약 + 선택 AI 한마디)
 - [ ] T14 기기 간 동기화 (아이마다 기기가 따로 생기면 필요)
