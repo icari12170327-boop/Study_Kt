@@ -590,3 +590,19 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 .weekly-ai p { white-space: pre-wrap; }
 .weekly-notice { width: 100%; margin: 12px 0; }
 @media (max-width: 600px) { .weekly-sections { grid-template-columns: minmax(0, 1fr); } }
+
+/* AI 독서 질문 후보는 기본 입력과 네이티브 체크박스로 편집한다. */
+.reading-quiz { min-width: 0; }
+.reading-quiz-candidate { border-top: 1px solid var(--line); padding: 16px 0; }
+.reading-quiz-candidate label:not(.check) { display: block; margin-top: 10px; }
+.reading-quiz .check { min-height: 48px; }
+.reading-quiz input:not([type=checkbox]), .reading-quiz textarea { width: 100%; min-width: 0; box-sizing: border-box; }
+.reading-quiz p { overflow-wrap: anywhere; }
+.reading-editor .qa-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px; }
+.reading-editor input:not([type=checkbox]) { min-width: 0; min-height: 48px; }
+@media (max-width: 600px) {
+  .reading-editor .qa-row { grid-template-columns: minmax(0, 1fr) 44px; }
+  .reading-editor .qa-row input:first-child { grid-column: 1; grid-row: 1; }
+  .reading-editor .qa-row input:nth-child(2) { grid-column: 1; grid-row: 2; }
+  .reading-editor .qa-row button { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+}

@@ -1,3 +1,5 @@
+import { ReadingQuizPanel } from '../components/ReadingQuizPanel';
+import { mergeCandidates, normalizeReadingQuiz } from '../lib/readingQuiz';
 import { useMemo, useState } from 'react';
 import { useStore } from '../store/StoreContext';
 import type { ProfileId, QaCard, ReadingNote } from '../types';
@@ -68,7 +70,7 @@ export function Reading({ profileId, go }: { profileId: ProfileId; go: Go }) {
 }
 
 function NoteEditor({ profileId, isAdult, note, onDone }: { profileId: ProfileId; isAdult: boolean; note?: ReadingNote; onDone: () => void }) {
-  const { update } = useStore();
+  const { state, update } = useStore();
   const [title, setTitle] = useState(note?.title ?? '');
   const [author, setAuthor] = useState(note?.author ?? '');
   const [summary, setSummary] = useState(note?.summary ?? '');
@@ -91,7 +93,7 @@ function NoteEditor({ profileId, isAdult, note, onDone }: { profileId: ProfileId
   };
 
   return (
-    <div className="form">
+    <div className="form reading-editor">
       <label>
         책 제목
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 어린 왕자" />
@@ -104,6 +106,10 @@ function NoteEditor({ profileId, isAdult, note, onDone }: { profileId: ProfileId
         {isAdult ? '핵심 요약' : '줄거리와 느낀 점'}
         <textarea rows={5} value={summary} onChange={(e) => setSummary(e.target.value)} placeholder={isAdult ? '이 책에서 가져갈 핵심 3가지는?' : '가장 기억에 남는 장면은? 왜 그렇게 생각했나요?'} />
       </label>
+      {(profileId === 'parent' || normalizeReadingQuiz(state.settings[profileId].readingQuiz).enabled) && <ReadingQuizPanel
+        existing={cards} level={state.profiles.find(p => p.id === profileId)!.level} profileId={profileId}
+        title={title} author={author} summary={summary} onAdd={chosen => setCards(current => mergeCandidates(current, chosen))}
+      />}
       <div className="form-label">기억할 질문과 답 (복습 카드)</div>
       {cards.map((c, i) => (
         <div key={c.id} className="qa-row">
