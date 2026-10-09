@@ -218,7 +218,7 @@
 - [x] [T16](tasks/T16-math-bingo.md) 수학 빙고판 (첫째 아이디어: 합이 맞는 숫자 3개 찾아 줄 긋기)
 - [x] [T06](tasks/T06-brain-puzzles.md) 두뇌 퍼즐 6종 (자유 놀이, T06a → T06b)
 - [x] [T07](tasks/T07-reward-games.md) 오늘의 문제 게임과 형제 대결
-- [ ] **[T19](tasks/T19-obby-run.md) 오비 달리기 (첫째 아이디어, 수학 미션 보상)**
+- [x] [T19](tasks/T19-obby-run.md) 오비 달리기 (첫째 아이디어, 수학 미션 보상)
 - [x] [T20](tasks/T20-field-fixes-1.md) 실사용 수정 1차: 대화 종료 버그, 목소리, 스도쿠 5×5, 블록 그림, 코치 뜻
 
 ### 4단계 — 과학과 읽기 콘텐츠
