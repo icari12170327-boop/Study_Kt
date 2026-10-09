@@ -1,3 +1,4 @@
+import { normalizeReadingQuiz } from '../lib/readingQuiz';
 import { WeeklyReport } from './WeeklyReport';
 import { WordProblemSettings } from '../components/WordProblemSettings';
 import { PuzzleOverview } from '../components/PuzzleOverview';
@@ -309,6 +310,10 @@ function Settings() {
         <p className="small muted">다음 게임부터 적용해요. 별과 쿠폰 없이 자유롭게 놀아요.</p>
       </div>}
 
+      {pid !== 'parent' && <div className="panel"><label className="check">
+        <input type="checkbox" checked={normalizeReadingQuiz(settings.readingQuiz).enabled} onChange={event => update(draft => { draft.settings[pid].readingQuiz = { enabled: event.target.checked }; })} />
+        독서록 AI 질문 켜기/끄기
+      </label><p className="small muted">끄면 이 아이에게 질문 만들기 버튼이 보이지 않아요. 직접 쓴 질문과 복습 기록은 유지돼요.</p></div>}
       {pid !== 'parent' && profile.level !== 'adult' && <WordProblemSettings key={pid} profileId={pid} />}
       {pid !== 'parent' && profile.level !== 'adult' && <StorySettings key={`story-${pid}`} profileId={pid} />}
 
