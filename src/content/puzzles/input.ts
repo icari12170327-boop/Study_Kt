@@ -17,7 +17,7 @@ export function setPuzzleGridInput(input: string[][], cell: Cell, value: string,
 export function completePuzzleGrid(input: unknown, type: GridPuzzleType): boolean {
   if (!Array.isArray(input)) return false;
   const size = input.length;
-  if (type === 'sudoku' ? ![4, 6].includes(size) : size < 3 || size > 5) return false;
+  if (type === 'sudoku' ? ![4, 5, 6].includes(size) : size < 3 || size > 5) return false;
   return input.every((row, r) => Array.isArray(row) && row.length === (type === 'sudoku' ? size : r + 1) &&
     row.every(value => typeof value === 'string' && (type === 'sudoku' ? /^[1-9]$/.test(value) && Number(value) <= size : /^\d{1,3}$/.test(value))));
 }
