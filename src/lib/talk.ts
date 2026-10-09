@@ -4,7 +4,8 @@ import type { AppState, Level, ProfileData, ProfileId, ProfileSettings, TalkLine
 import { normalizeAiConfig, type AiConfig, type SessionRequest } from './ai';
 import { seededRng } from './random';
 import { applyProgress, ensureDay } from './progress';
-export const TALK_VOICES = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse', 'marin', 'cedar'] as const;
+import { CHILD_VOICES, PARENT_VOICES, TALK_VOICES, parentPersona } from './voices';
+export { TALK_VOICES } from './voices';
 type LegacyState = Omit<AppState, 'version' | 'data'> & {
   version: 1;
   data: Record<ProfileId, Omit<ProfileData, 'talks' | 'friendMemory'> & Partial<Pick<ProfileData, 'talks' | 'friendMemory'>>>;
@@ -15,9 +16,10 @@ export function aiReady(cfg: AiConfig): boolean {
 export function defaultTalkSettings(level: Level, id?: ProfileId): TalkSettings {
   const first = id ? id === 'kid1' : level === 'g5';
   return {
-    friendName: level === 'adult' ? 'Alex' : first ? 'Max' : 'Lily',
+    friendName: level === 'adult' ? PARENT_VOICES[0].friendName : first ? 'Max' : 'Lily',
     personaId: first ? 'funny' : 'cheerful',
-    voice: first ? 'marin' : 'coral',
+    voice: level === 'adult' ? PARENT_VOICES[0].voice : CHILD_VOICES[first ? 0 : 1].voice,
+    voiceStyle: level === 'adult' ? PARENT_VOICES[0].voiceStyle : CHILD_VOICES[first ? 0 : 1].voiceStyle,
     dailyMinutes: level === 'adult' ? 15 : level === 'g5' ? 20 : 15,
     interests: level === 'adult' ? [] : first ? ['Roblox', 'building games', 'science experiments'] : ['Animal Crossing', 'animals', 'fishing and bug catching', 'decorating my island'],
     friendHobbies: first ? 'loves Roblox obbies and building tycoon games, always trying to beat a hard level' : 'loves Animal Crossing, decorating an island, catching bugs and fish, and taking care of animals',
@@ -30,10 +32,18 @@ const bounded = (value: unknown, fallback: number, min: number, max: number): nu
 export function normalizeTalkSettings(raw: unknown, level: Level, id?: ProfileId): TalkSettings {
   const base = defaultTalkSettings(level, id);
   const s = raw && typeof raw === 'object' ? raw as Partial<TalkSettings> : {};
+  const first = id ? id === 'kid1' : level === 'g5';
+  const oldDefault = first ? 'marin' : 'coral';
+  const migrate = level !== 'adult' && s.voice === oldDefault && s.voiceStyle === undefined;
+  const voice = migrate ? base.voice : TALK_VOICES.some(v => v === s.voice) ? s.voice! : base.voice;
+  const allowed = level === 'adult' ? PARENT_VOICES : CHILD_VOICES;
+  const style = allowed.some(v => v.voiceStyle === s.voiceStyle) ? s.voiceStyle : migrate || !s.voice ? base.voiceStyle : undefined;
+  const parent = parentPersona({ voice, voiceStyle: style });
   return {
-    friendName: ['Max', 'Lily', 'Alex'].includes(s.friendName ?? '') ? s.friendName! : base.friendName,
+    ...(level === 'adult' ? { voiceStyle: parent.voiceStyle } : style ? { voiceStyle: style } : {}),
+    friendName: level === 'adult' ? parent.friendName : ['Max', 'Lily', 'Alex'].includes(s.friendName ?? '') ? s.friendName! : base.friendName,
     personaId: ['cheerful', 'calm', 'funny'].includes(s.personaId ?? '') ? s.personaId! : base.personaId,
-    voice: TALK_VOICES.some((v) => v === s.voice) ? s.voice! : base.voice,
+    voice,
     dailyMinutes: bounded(s.dailyMinutes, base.dailyMinutes, 1, 100),
     interests: Array.isArray(s.interests) ? s.interests.filter((v) => typeof v === 'string' && v.trim()).map((v) => v.trim().slice(0, 80)).slice(0, 8) : base.interests,
     friendHobbies: typeof s.friendHobbies === 'string' ? s.friendHobbies.slice(0, 400) : base.friendHobbies,
@@ -81,7 +91,7 @@ export function talkTopics(settings: TalkSettings, logs: TalkLog[]): string[] {
   return [...new Set([...(latest?.summary?.nextTopics ?? []), ...settings.interests])].slice(0, 12);
 }
 export function talkRequest(profileId: ProfileId, level: Level, settings: TalkSettings, memory: string, topic: string): Omit<SessionRequest, 'offerSdp'> {
-  return { profileId, level, mode: 'kid-friend', persona: { friendName: settings.friendName, personaId: settings.personaId, voice: settings.voice, friendHobbies: settings.friendHobbies }, memory: memory.slice(0, 1500), interests: settings.interests, topic: topic.slice(0, 40), pushToTalk: settings.pushToTalk };
+  return { profileId, level, mode: 'kid-friend', persona: { friendName: settings.friendName, personaId: settings.personaId, voice: settings.voice, ...(settings.voiceStyle ? { voiceStyle: settings.voiceStyle } : {}), friendHobbies: settings.friendHobbies }, memory: memory.slice(0, 1500), interests: settings.interests, topic: topic.slice(0, 40), pushToTalk: settings.pushToTalk };
 }
 /** 긴 대화의 전체 기록은 로컬에 두고 요약 요청만 본문 상한 아래로 줄인다. */
 export function summaryLines(lines: TalkLine[]): TalkLine[] {

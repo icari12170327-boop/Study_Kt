@@ -80,7 +80,7 @@ describe('대화 저장 마이그레이션', () => {
     expect(restored.settings.kid1.talk).toEqual(state.settings.kid1.talk);
     state.data.kid1.friendMemory = '가'.repeat(1600);
     expect(normalizeState(state).data.kid1.friendMemory).toHaveLength(1500);
-    expect(normalizeTalkSettings({ subtitleHidePercent: 200, dailyMinutes: -1, voice: 'unknown' }, 'g3')).toMatchObject({ subtitleHidePercent: 100, dailyMinutes: 1, voice: 'coral' });
+    expect(normalizeTalkSettings({ subtitleHidePercent: 200, dailyMinutes: -1, voice: 'unknown' }, 'g3')).toMatchObject({ subtitleHidePercent: 100, dailyMinutes: 1, voice: 'shimmer' });
   });
 });
 describe('자막 가림과 영어 비율', () => {

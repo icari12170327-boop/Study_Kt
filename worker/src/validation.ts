@@ -26,10 +26,11 @@ export const sessionSchema = z
     speed: z.union([z.literal(0.85), z.literal(0.9), z.literal(1)]).optional(),
     offerSdp: text(64000).startsWith('v=0'),
     persona: z.strictObject({
-      friendName: z.enum(['Max', 'Lily', 'Alex']),
+      friendName: z.enum(['Max', 'Lily', 'Alex', 'Emma']),
       personaId: z.enum(['cheerful', 'calm', 'funny']),
       voice: z.enum(['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse', 'marin', 'cedar']),
       friendHobbies: text(400, 0).optional(),
+      voiceStyle: z.enum(['kid-boy', 'kid-girl', 'young-woman', 'calm-man']).optional(),
     }),
     pushToTalk: z.boolean().optional(),
     memory: text(1500, 0).optional(),
@@ -45,6 +46,8 @@ export const sessionSchema = z
       ? r.level === 'adult' && ((r.mode === 'biz-talk' && !!r.scenarioId) || (r.mode === 'parent-coach' && r.scenarioId === undefined))
       : r.level !== 'adult' && r.mode === 'kid-friend' && !r.scenarioId && r.speed === undefined,
   )
+  .refine(r => r.persona.voiceStyle === undefined || (r.profileId === 'parent' ? ['young-woman', 'calm-man'] : ['kid-boy', 'kid-girl']).includes(r.persona.voiceStyle))
+  .refine(r => r.profileId === 'parent' || r.persona.friendName !== 'Emma')
   .refine((r) => r.scenarioId === 'biz-custom' ? !!r.situation?.trim() : r.situation === undefined)
   .refine((r) => r.mode === 'parent-coach' ? !!r.coachTopic && !!r.coach : r.coachTopic === undefined && r.coach === undefined);
 export const endSchema = z.strictObject({

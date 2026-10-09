@@ -1,3 +1,4 @@
+export type VoiceStyle = 'kid-boy' | 'kid-girl' | 'young-woman' | 'calm-man';
 export type AiProfileId = 'kid1' | 'kid2' | 'parent';
 export type AiLevel = 'g3' | 'g5' | 'adult';
 export type CoachTopic = 'daily' | 'work' | 'money';
@@ -13,7 +14,7 @@ export interface SessionRequest {
   level: AiLevel;
   mode: 'kid-friend' | 'biz-talk' | 'parent-coach';
   offerSdp: string;
-  persona: { friendName: string; personaId: string; voice: string; friendHobbies?: string };
+  persona: { friendName: string; personaId: string; voice: string; voiceStyle?: VoiceStyle; friendHobbies?: string };
   pushToTalk?: boolean;
   memory?: string;
   interests?: string[];

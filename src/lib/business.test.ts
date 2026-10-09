@@ -120,10 +120,10 @@ describe('보호자 저장과 대화 요청', () => {
     expect(restored.data.parent.talks[1].feedback).toBeUndefined();
     expect(normalizeCustomCards(undefined)).toEqual([]); expect(normalizeBizSituations(undefined)).toEqual([]);
   });
-  it('8개 요청은 고정 보호자 persona를 쓰고 직접 입력에서만 situation을 전달한다', () => {
+  it('8개 요청은 새 기본 보호자 persona를 쓰고 직접 입력에서만 situation을 전달한다', () => {
     for (const scenario of BUSINESS_SCENARIOS) {
       const req = businessRequest(scenario.id, '일정 지연 회의', '지난 연습 기억');
-      expect(req).toMatchObject({ profileId: 'parent', level: 'adult', mode: 'biz-talk', persona: { friendName: 'Alex', personaId: 'calm', voice: 'cedar' } });
+      expect(req).toMatchObject({ profileId: 'parent', level: 'adult', mode: 'biz-talk', persona: { friendName: 'Emma', personaId: 'calm', voice: 'coral', voiceStyle: 'young-woman' } });
       expect(req.situation).toBe(scenario.id === 'biz-custom' ? '일정 지연 회의' : undefined);
     }
     expect(() => businessRequest('biz-custom', ' ', '')).toThrow();

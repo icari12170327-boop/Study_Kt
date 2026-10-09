@@ -1,3 +1,4 @@
+import { parentPersona } from '../lib/voices';
 import { useState } from 'react';
 import { useStore } from '../store/StoreContext';
 import { normalizeCoachInterests, normalizeCoachSettings } from '../lib/coach';
@@ -8,7 +9,7 @@ export function CoachSettings() {
   const [interests, setInterests] = useState(normalizeCoachInterests(state.settings.parent.talk?.interests).join(', '));
   const set = (patch: Partial<Settings>) => update(draft => { draft.settings.parent.coach = { ...normalizeCoachSettings(draft.settings.parent.coach), ...patch }; });
   return <section className="panel form" aria-label="코치 모드 설정">
-    <h2>🌱 코치 모드 · 내 사용설명서</h2><p className="small muted">친구는 Alex예요. 설정은 다음 대화부터 적용해요.</p>
+    <h2>🌱 코치 모드 · 내 사용설명서</h2><p className="small muted">친구는 {parentPersona(state.settings.parent.talk).friendName}예요. 설정은 다음 대화부터 적용해요.</p>
     <div className="form-grid">
       <label><span id="coach-level">수준</span><select aria-labelledby="coach-level" value={settings.level} onChange={e => set({ level: e.target.value as Settings['level'] })}>
         <option value="zero">완전 처음</option><option value="words">단어 몇 개 앎</option><option value="short">짧은 대화 됨</option><option value="daily">일상 대화 됨</option>

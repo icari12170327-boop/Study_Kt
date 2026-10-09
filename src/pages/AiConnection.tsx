@@ -1,3 +1,4 @@
+import { parentPersona } from '../lib/voices';
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store/StoreContext';
 import { AiError, endActiveSessions, fetchActiveSessions, fetchUsage, normalizeAiConfig, type ActiveSession, type Usage } from '../lib/ai';
@@ -121,7 +122,7 @@ export function AiConnection() {
           level: 'adult',
           mode: 'biz-talk',
           scenarioId: 'biz-free',
-          persona: { friendName: 'Alex', personaId: 'cheerful', voice: 'marin' },
+          persona: parentPersona(state.settings.parent.talk),
         },
         {
           onState: (s) => {

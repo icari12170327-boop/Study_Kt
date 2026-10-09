@@ -2,6 +2,7 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { ParentVoiceSettings, TalkRecords } from './TalkRecords';
 import { TalkSession } from './TalkSession';
 import { StoreProvider } from '../store/StoreContext';
 import { defaultState } from '../store/defaults';
@@ -34,4 +35,27 @@ it.each(['kid1', 'parent'] as const)('%s 완료 화면은 확인 대기·실패 
   await act(async () => callbacks.onEndStatus?.('confirmed'));
   expect(host.textContent).not.toContain('대화를 정리하고 있어요…');
   expect(host.textContent).not.toContain('연결 정리가 안 됐어요.');
+});
+
+it('보호자 목소리 카드는 저장되고 코치·비즈니스 요청과 화면 이름을 바꾼다', async () => {
+  await act(async () => root.render(createElement(StoreProvider, null, createElement(ParentVoiceSettings))));
+  await click('🧑 차분한 남성 · Alex');
+  expect(JSON.parse(localStorage.getItem('study-kt:v1')!).settings.parent.talk).toMatchObject({ voice: 'cedar', voiceStyle: 'calm-man', friendName: 'Alex' });
+  await click('👩 젊고 친절한 여성 · Emma');
+  await act(async () => root.render(createElement(StoreProvider, null, createElement(TalkSession, { profileId: 'parent', go: vi.fn() }))));
+  expect(host.textContent).toContain('대화 상대: Emma');
+  await click('🌱 코치 모드한국어로 대답하고 쉬운 영어를 따라 해요.');
+  const start = [...host.querySelectorAll('button')].find(b => b.textContent?.includes('시작') && !b.disabled)!;
+  await act(async () => start.click());
+  expect(vi.mocked(startTalk).mock.lastCall![1].persona).toMatchObject({ voice: 'coral', voiceStyle: 'young-woman', friendName: 'Emma' });
+  await act(async () => callbacks.onAssistantText('a', 'Hello!', true));
+  expect(host.textContent).toContain('Emma의 말을 먼저 들어 보세요…');
+  expect(host.textContent).not.toContain('Alex의 말을');
+});
+it('아이 목소리 카드는 저장되고 고급 설정에 열 가지 목소리를 남긴다', async () => {
+  await act(async () => root.render(createElement(StoreProvider, null, createElement(TalkRecords))));
+  await click('👧 또래 여자아이');
+  expect(JSON.parse(localStorage.getItem('study-kt:v1')!).settings.kid1.talk).toMatchObject({ voice: 'shimmer', voiceStyle: 'kid-girl' });
+  expect(host.querySelector('details select')!.querySelectorAll('option')).toHaveLength(10);
+  expect(host.textContent).toContain('다음 대화부터 바뀌어요');
 });

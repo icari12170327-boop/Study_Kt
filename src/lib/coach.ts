@@ -1,3 +1,4 @@
+import { parentPersona } from './voices';
 import type { CoachCheck, CoachSettings, CoachWrapup, ProfileData } from '../types';
 import type { CoachTopic, SessionRequest } from '../../shared/ai';
 
@@ -32,10 +33,10 @@ export function normalizeCoachSettings(raw: unknown): CoachSettings {
 export function normalizeCoachInterests(raw: unknown): string[] {
   return Array.isArray(raw) ? [...new Set(raw.filter(value => typeof value === 'string').map(value => value.trim().slice(0, 80)).filter(Boolean))].slice(0, 5) : [];
 }
-export function coachRequest(topic: CoachTopic, settings: CoachSettings, memory: string, interests: string[]): Omit<SessionRequest, 'offerSdp'> {
+export function coachRequest(topic: CoachTopic, settings: CoachSettings, memory: string, interests: string[], voiceSettings?: Parameters<typeof parentPersona>[0]): Omit<SessionRequest, 'offerSdp'> {
   return { profileId: 'parent', level: 'adult', mode: 'parent-coach', coachTopic: topic,
     coach: { level: settings.level, repeat: settings.repeat }, speed: settings.speed,
-    persona: { friendName: 'Alex', personaId: 'calm', voice: 'cedar' }, memory: memory.slice(0, 1500), interests: normalizeCoachInterests(interests) };
+    persona: parentPersona(voiceSettings), memory: memory.slice(0, 1500), interests: normalizeCoachInterests(interests) };
 }
 const object = (raw: unknown): Record<string, unknown> => raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
 const text = (value: unknown, max: number): value is string => typeof value === 'string' && !!value.trim() && value.length <= max;

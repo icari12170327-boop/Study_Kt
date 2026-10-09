@@ -1,3 +1,4 @@
+import { parentPersona } from '../lib/voices';
 import { BusinessFeedback } from '../components/BusinessFeedback';
 import { CoachSubtitle } from '../components/CoachSubtitle';
 import { CoachPhrase } from '../components/CoachPhrase';
@@ -201,7 +202,7 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
       if (alive.current) setLines(run.lines.slice(-60).map((line) => ({ ...line })));
     };
     try {
-      const request = run.coach ? coachRequest(run.coach.topic, run.coach.settings, run.memory, settings.interests) : business ? businessRequest(scenarioId, situation, run.memory, coachSettings.speed) : talkRequest(profileId, profile.level, settings, run.memory, topic);
+      const request = run.coach ? coachRequest(run.coach.topic, run.coach.settings, run.memory, settings.interests, run.settings) : business ? businessRequest(scenarioId, situation, run.memory, coachSettings.speed, run.settings) : talkRequest(profileId, profile.level, settings, run.memory, topic);
       const handle = await startTalk(run.cfg, request, {
         onState: (value) => {
           if (run.coach && (value === 'thinking' || value === 'speaking')) run.coachAudioEnded = false;
@@ -290,7 +291,7 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
   }, []);
   const repeatLine = run?.coach ? [...lines].reverse().find(line => line.role === 'friend' && line.done && line.audioDone && subtitleVisible(run.coach!.settings.subtitle, { audioDone: true, peeked: line.peeked }) && extractRepeatSentence(line.text)) : undefined;
   const repeatSentence = repeatLine ? extractRepeatSentence(repeatLine.text) : null;
-  const friendName = business ? 'Alex' : run?.settings.friendName ?? settings.friendName;
+  const friendName = business ? parentPersona(run?.settings ?? settings).friendName : run?.settings.friendName ?? settings.friendName;
   const mission = state.settings[profileId].missions.find((m) => m.type === 'talk');
   const completed = (state.data[profileId].days[toDateKey()]?.progress.talk ?? 0) >= (mission?.target ?? settings.dailyMinutes);
   const peek = (itemId: string) => {
@@ -303,6 +304,7 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
     {error && phase === 'ready' && <button className="btn" onClick={back}>홈으로</button>}
     {phase === 'ready' && <div className="panel talk-ready">
       <div className="talk-avatar" aria-hidden="true">{business ? '💼' : profileId === 'kid1' ? '🤖' : '🐻'}</div>
+      {business && <p>대화 상대: {friendName}</p>}
       <h2>{business ? '어떤 상황을 연습할까요?' : `${settings.friendName}와 무슨 이야기 할까요?`}</h2>
       <p>{remaining === undefined ? '오늘 남은 시간을 확인하고 있어요.' : `오늘 남은 시간 ${duration(remaining)}`}</p>
       {business ? <>
@@ -335,7 +337,7 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
         {completed && <p className="good-text">오늘 미션 완료! 더 이야기해도 돼</p>}
       </div>
       <p className="small muted">{run.coach ? `${coachTitle(run.coach.topic)} · ${run.coach.settings.subtitle === 'now' ? '자막을 바로 보여요.' : run.coach.settings.subtitle === 'after' ? 'AI의 말이 끝나면 자막을 보여요.' : '자막 보기 버튼으로 글자를 확인해요.'}` : business ? `${scenarioTitle(run.business?.scenarioId)} · 전체 자막을 보여요. 최근 60줄을 보여 주고 있어요.` : '자막을 꾹 누르면 그 문장이 보여요. 최근 60줄을 보여 주고 있어요.'}</p>
-      <div className="talk-lines" ref={transcript} role="log" aria-label="대화 자막">{lines.map((line) => run.coach && line.role === 'friend' ? <CoachSubtitle key={`${line.role}:${line.itemId}`} line={line} mode={run.coach!.settings.subtitle} cfg={run.cfg} onReveal={() => peek(line.itemId)} /> : business ? <p className={line.role === 'kid' ? 'talk-kid' : 'talk-subtitle'} key={`${line.role}:${line.itemId}`} lang="en"><span>{line.role === 'kid' ? '나:' : 'Alex:'}</span> {line.text}</p> : <Subtitle key={`${line.role}:${line.itemId}`} line={line} percent={run.settings.subtitleHidePercent} onPeek={() => peek(line.itemId)} />)}</div>
+      <div className="talk-lines" ref={transcript} role="log" aria-label="대화 자막">{lines.map((line) => run.coach && line.role === 'friend' ? <CoachSubtitle key={`${line.role}:${line.itemId}`} line={line} friendName={friendName} mode={run.coach!.settings.subtitle} cfg={run.cfg} onReveal={() => peek(line.itemId)} /> : business ? <p className={line.role === 'kid' ? 'talk-kid' : 'talk-subtitle'} key={`${line.role}:${line.itemId}`} lang="en"><span>{line.role === 'kid' ? '나:' : `${friendName}:`}</span> {line.text}</p> : <Subtitle key={`${line.role}:${line.itemId}`} line={line} percent={run.settings.subtitleHidePercent} onPeek={() => peek(line.itemId)} />)}</div>
       {run.coach && repeatSentence && <CoachPhrase key={repeatLine!.itemId} sentence={repeatSentence} source={coachTitle(run.coach.topic)} speed={run.coach.settings.speed} onReplay={replay} />}
       {!business && run.settings.pushToTalk && <button className={`btn btn-primary talk-ptt ${pressing ? 'on' : ''}`} disabled={paused} aria-pressed={pressing}
         onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); run.handle?.beginPushToTalk(); setPressing(true); }}
