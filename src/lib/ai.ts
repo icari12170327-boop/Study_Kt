@@ -105,8 +105,8 @@ export async function fetchActiveSessions(cfg: AiConfig): Promise<ActiveSession[
       nonnegative(s.startedAt) && nonnegative(s.elapsedSeconds) && nonnegative(s.remainingSeconds))) throw new AiError('server');
   return body.sessions;
 }
-export async function endActiveSessions(cfg: AiConfig, profileId: AiProfileId | 'all'): Promise<EndActiveResponse> {
-  const body = await aiRequest(cfg, '/api/realtime/end-active', { profileId });
+export async function endActiveSessions(cfg: AiConfig, profileId: AiProfileId | 'all', keepalive = false): Promise<EndActiveResponse> {
+  const body = await aiRequest(cfg, '/api/realtime/end-active', { profileId }, keepalive);
   if (!body || typeof body !== 'object' || !('ok' in body) || body.ok !== true || !('closed' in body) || !nonnegative(body.closed) ||
     !('chargedSeconds' in body) || !nonnegative(body.chargedSeconds)) throw new AiError('server');
   return body as EndActiveResponse;

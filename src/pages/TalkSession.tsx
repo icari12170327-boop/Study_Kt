@@ -12,7 +12,7 @@ import type { CoachTopic } from '../../shared/ai';
 import type { Go } from '../route';
 import { ProgressBar, TopBar } from '../components/common';
 import { AiError, fetchUsage, generate, type AiConfig } from '../lib/ai';
-import { startTalk, type TalkHandle, type TalkState } from '../lib/realtime';
+import { startTalk, type TalkHandle, type TalkState, type TalkEndStatus } from '../lib/realtime';
 import { aiReady, defaultTalkSettings, englishRatio, isTalkSummary, maskSubtitle, recordTalkSeconds, summaryLines, talkRequest, talkSignals, talkTopics } from '../lib/talk';
 import { toDateKey } from '../lib/date';
 import { scienceTalkTopics } from '../content/science/session';
@@ -92,6 +92,7 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
   const [error, setError] = useState('');
   const [doneLog, setDoneLog] = useState<TalkLog>();
   const [summaryPending, setSummaryPending] = useState(false);
+  const [endStatus, setEndStatus] = useState<TalkEndStatus>();
   const alive = useRef(true);
   const runRef = useRef<Run | undefined>(undefined);
   const leave = useRef<(() => void) | undefined>(undefined);
@@ -157,6 +158,7 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
     if (run.finished) return;
     run.finished = true;
     clearInterval(run.timer);
+    if (alive.current) setEndStatus('pending');
     run.abort.abort();
     void run.handle?.stop();
     const seconds = elapsed(run);
@@ -185,6 +187,7 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
       lines: [], finished: false, paused: false, stuckSent: false, wrapSent: false, abort: new AbortController() };
     runRef.current = run;
     leave.current = () => finish(run);
+    setEndStatus(undefined);
     setPhase('connecting'); setError(''); setAlternatives(undefined); setShortError(''); setLines([]); setPaused(false); setPressing(false);
     const append = (itemId: string, role: TalkLine['role'], text: string, done: boolean, responseId?: string) => {
       if (run.finished) return;
@@ -233,6 +236,9 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
             for (const line of run.lines) if (line.role === 'friend' && (!responseId || line.responseId === responseId)) line.audioDone = true;
             if (alive.current) setLines(run.lines.slice(-60).map(line => ({ ...line })));
           }
+        },
+        onEndStatus: (status) => {
+          if (alive.current && runRef.current === run) setEndStatus(status);
         },
         onCharged: (seconds) => {
           if (run.start === undefined) return;
@@ -353,6 +359,8 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
       {business && alternatives && <aside className="panel business-alternatives"><h3>더 자연스러운 표현</h3><p className="small muted" lang="en">내 말: {alternatives.said}</p>{alternatives.values.map(value => <p key={value} lang="en">{value}</p>)}</aside>}
       {paused && <p className="small muted">마이크가 꺼졌어요. 연결 시간은 계속 지나가요.</p>}
     </>}
+    {phase === 'done' && endStatus === 'pending' && <p className="panel" role="status">대화를 정리하고 있어요…</p>}
+    {phase === 'done' && endStatus === 'failed' && <div className="panel" role="alert"><p>연결 정리가 안 됐어요. 보호자 모드 → AI 연결에서 끝내 주세요</p>{business && <button className="btn" onClick={() => go({ name: 'parent' })}>보호자 모드로 가기</button>}</div>}
     {phase === 'done' && doneLog && business && <><div className="panel"><h2>{doneLog.mode === 'coach' ? coachTitle(doneLog.coachTopic) : scenarioTitle(doneLog.scenarioId)} · {duration(doneLog.seconds)} 연습했어요</h2><p>대화 기록과 미션 진행을 저장했어요.</p></div>{doneLog.mode === 'coach' ? <CoachWrapup key={doneLog.id} log={doneLog} settings={run?.coach?.settings} auto onSkip={back} /> : <BusinessFeedback key={doneLog.id} log={doneLog} auto />}<button className="btn btn-primary" onClick={back}>홈으로</button></>}
     {phase === 'done' && doneLog && !business && <div className="panel form">
       <div className="talk-avatar" aria-hidden="true">👋</div><h2>{friendName}와 {duration(doneLog.seconds)} 이야기했어요!</h2>

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { parseRealtimeEvent, startTalk, stopLocalTalks, type TalkCallbacks } from './realtime';
+import { endRealtimeSession, parseRealtimeEvent, startTalk, stopLocalTalks, type TalkCallbacks } from './realtime';
 const cfg = { endpoint: 'https://worker.example', token: 'f'.repeat(32) };
 const req = {
   profileId: 'kid1' as const,
@@ -102,7 +102,7 @@ beforeEach(() => {
       Response.json(
         url.endsWith('/session')
           ? { sessionId: 'session', answerSdp: 'v=0\r\nanswer', remainingSeconds: 60 }
-          : { ok: true },
+          : url.endsWith('/active') ? { sessions: [] } : url.endsWith('/end-active') ? { ok: true, closed: 1, chargedSeconds: 60 } : { ok: true, seconds: 60 },
       ),
     );
   vi.stubGlobal('fetch', fetcher);
@@ -225,7 +225,7 @@ describe('WebRTC 연결과 자원 해제', () => {
     expect(cb.onUserText).toHaveBeenCalledWith('kid', 'Hi');
     await Promise.all([handle.stop(), handle.stop()]);
     expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith('/end'))).toHaveLength(1);
-    expect(fetcher.mock.calls[1][1].keepalive).toBe(true);
+    expect(fetcher.mock.calls.find(([url]) => String(url).endsWith('/end'))![1].keepalive).toBe(true);
     expect(track.stop).toHaveBeenCalledTimes(1);
     expect(FakePeer.instance.close).toHaveBeenCalledTimes(1);
     expect(audio.srcObject).toBeNull();
@@ -274,5 +274,68 @@ describe('WebRTC 연결과 자원 해제', () => {
     await vi.waitFor(() => expect(cb.onState).toHaveBeenCalledWith('ended'));
     expect(cb.onError).toHaveBeenCalledWith(expect.objectContaining({ kind: 'network' }));
     expect(track.stop).toHaveBeenCalled();
+  });
+});
+
+
+describe('서버 종료 복구', () => {
+  it('실패 뒤 /end를 한 번 재시도하고 서버 시간을 반환한다', async () => {
+    fetcher.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(Response.json({ ok: true, seconds: 12 }));
+    expect(await endRealtimeSession(cfg, 'kid1', 'session', 99)).toBe(12);
+    expect(fetcher.mock.calls.map(([url]) => new URL(url).pathname)).toEqual(['/api/realtime/end', '/api/realtime/end']);
+    expect(fetcher.mock.calls.every(([, init]) => init.keepalive)).toBe(true);
+  });
+  it('두 번 실패하거나 응답이 잘못되면 같은 프로필만 대체 종료한다', async () => {
+    fetcher.mockResolvedValueOnce(Response.json({ ok: false })).mockRejectedValueOnce(new Error('offline'));
+    expect(await endRealtimeSession(cfg, 'kid2', 'session', 10)).toBeUndefined();
+    expect(fetcher.mock.calls.map(([url]) => new URL(url).pathname)).toEqual(['/api/realtime/end', '/api/realtime/end', '/api/realtime/end-active']);
+    expect(JSON.parse(fetcher.mock.calls[2][1].body)).toEqual({ profileId: 'kid2' });
+    expect(fetcher.mock.calls[2][1].keepalive).toBe(true);
+  });
+  it('대체 경로까지 실패하면 종료 미확인을 알린다', async () => {
+    fetcher.mockRejectedValue(new Error('offline'));
+    await expect(endRealtimeSession(cfg, 'kid1', 'session', 10)).rejects.toMatchObject({ kind: 'network' });
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
+  it('시작 전에 같은 프로필의 남은 세션만 정리한다', async () => {
+    fetcher.mockResolvedValueOnce(Response.json({ sessions: [{ profileId: 'kid1', sessionId: 'old', startedAt: 0, elapsedSeconds: 1, remainingSeconds: 59 }] }));
+    const handle = await startTalk(cfg, req, cb);
+    expect(fetcher.mock.calls.map(([url]) => new URL(url).pathname)).toEqual(['/api/realtime/active', '/api/realtime/end-active', '/api/realtime/session']);
+    expect(JSON.parse(fetcher.mock.calls[1][1].body)).toEqual({ profileId: 'kid1' });
+    await handle.stop();
+  });
+  it.each(['stop', 'pagehide', 'abort', 'time', 'error'] as const)('%s도 같은 재시도·대체 종료와 상태를 전달한다', async path => {
+    const abort = new AbortController(); cb.onEndStatus = vi.fn();
+    const handle = await startTalk(cfg, req, cb, abort.signal);
+    fetcher.mockRejectedValueOnce(new Error('offline')).mockRejectedValueOnce(new Error('offline'));
+    if (path === 'stop') await handle.stop();
+    if (path === 'pagehide') win.dispatchEvent(new Event('pagehide'));
+    if (path === 'abort') abort.abort();
+    if (path === 'time') await vi.advanceTimersByTimeAsync(60000);
+    if (path === 'error') FakePeer.instance.channel.onmessage?.({ data: JSON.stringify({ type: 'error' }) });
+    await handle.stop();
+    expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith('/end'))).toHaveLength(2);
+    expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith('/end-active'))).toHaveLength(1);
+    expect(cb.onEndStatus).toHaveBeenNthCalledWith(1, 'pending');
+    expect(cb.onEndStatus).toHaveBeenLastCalledWith('confirmed');
+    expect(track.stop).toHaveBeenCalledTimes(1);
+  });
+  it('종료가 모두 실패하면 pending 다음 failed 상태를 알린다', async () => {
+    cb.onEndStatus = vi.fn(); const handle = await startTalk(cfg, req, cb);
+    fetcher.mockRejectedValue(new Error('offline')); await handle.stop();
+    expect(vi.mocked(cb.onEndStatus!).mock.calls).toEqual([['pending'], ['failed']]);
+  });
+  it('이탈 뒤 늦게 생성된 세션도 재시도와 대체 경로로 정리한다', async () => {
+    let resolve!: (response: Response) => void;
+    fetcher.mockImplementationOnce(async () => Response.json({ sessions: [] }))
+      .mockImplementationOnce(() => new Promise(done => { resolve = done; }));
+    const abort = new AbortController(), opening = startTalk(cfg, req, cb, abort.signal);
+    await vi.waitFor(() => expect(resolve).toBeDefined());
+    abort.abort();
+    fetcher.mockRejectedValueOnce(new Error('offline')).mockRejectedValueOnce(new Error('offline'));
+    resolve(Response.json({ sessionId: 'late', answerSdp: 'v=0', remainingSeconds: 60 }));
+    await expect(opening).rejects.toMatchObject({ kind: 'network' });
+    expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith('/end'))).toHaveLength(2);
+    expect(fetcher.mock.calls.some(([url]) => String(url).endsWith('/end-active'))).toBe(true);
   });
 });

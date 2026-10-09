@@ -359,14 +359,15 @@ describe('대화 시간 제한과 서버 종료', () => {
     expect(usage.month.talkSeconds).toBe(0);
     expect((await start()).status).toBe(200);
   });
-  it('종료 API 오류는 세션과 예약을 유지하고 알람이 재시도한다', async () => {
+  it('만료 종료 API 오류도 종료를 기록하고 알람이 외부 정리를 재시도한다', async () => {
     env.TALK_MINUTES_kid1 = '1';
     await start();
     vi.setSystemTime(now + 60000);
     failHangup = true;
     await family.alarm();
     expect(alarm).toHaveBeenLastCalledWith(now + 65000);
-    expect(kv.has('active:kid1')).toBe(true);
+    expect(kv.has('active:kid1')).toBe(false);
+    expect(Object.values((storage.get('ledger') as Ledger).sessions)[0]).toMatchObject({ ended: true, needsHangup: true });
     failHangup = false;
     vi.setSystemTime(now + 65000);
     await family.alarm();
@@ -559,7 +560,7 @@ describe('저장 잠금 밖의 연결과 종료', () => {
     await family.alarm();
     failHangup = true;
     reply.resolve(new Response('v=0\r\nanswer', { headers: { location: '/v1/realtime/calls/rtc_orphan' } }));
-    expect((await opening).status).toBe(502);
+    expect((await opening).status).toBe(429);
     expect(Object.values((storage.get('ledger') as Ledger).sessions)[0]).toMatchObject({
       ended: true,
       needsHangup: true,
@@ -816,5 +817,34 @@ describe('주간 리포트 생성 한도 공유', () => {
     expect((await req('/api/generate', body)).status).toBe(200);
     expect((await readUsage(await req('/api/usage'))).today.parent.generates).toBe(1);
     expect((await req('/api/generate', body)).status).toBe(429); expect(outgoing).toHaveBeenCalledOnce();
+  });
+});
+
+
+describe('일반 종료의 hangup 장애 복구', () => {
+  it.each([400, 409, 500, 'timeout'] as const)('%s여도 먼저 종료·차감하고 새 대화를 허용하며 재시도를 보존한다', async status => {
+    const opened = await readSession(await start()); vi.setSystemTime(now + 10000);
+    const logger = vi.spyOn(console, 'error').mockImplementation(() => {});
+    outgoing.mockImplementationOnce(async () => {
+      const saved = (storage.get('ledger') as Ledger).sessions[opened.sessionId];
+      expect(saved).toMatchObject({ ended: true, charged: 10, needsHangup: true });
+      if (status === 'timeout') throw new DOMException('timeout', 'TimeoutError');
+      return Response.json({ error: { message: 'private-token' } }, { status });
+    });
+    expect(await (await end(opened.sessionId, 999)).json()).toEqual({ ok: true, seconds: 10 });
+    const saved = (storage.get('ledger') as Ledger).sessions[opened.sessionId];
+    expect(saved).toMatchObject({ ended: true, charged: 10, needsHangup: true, hangupFailures: 1, nextHangupAt: now + 15000 });
+    expect(await (await req('/api/realtime/active')).json()).toEqual({ sessions: [] });
+    expect((await start()).status).toBe(200);
+    expect((await readUsage(await req('/api/usage'))).today.kid1.talkSeconds).toBe(10);
+    family = new FamilyUsage(durableState, env); vi.setSystemTime(now + 15000); await family.alarm();
+    expect((storage.get('ledger') as Ledger).sessions[opened.sessionId].needsHangup).toBe(false);
+    expect(JSON.stringify(logger.mock.calls)).not.toContain('private-token'); logger.mockRestore();
+  });
+  it('이미 없는 통화의 404는 정리 성공으로 기록한다', async () => {
+    const opened = await readSession(await start());
+    outgoing.mockResolvedValueOnce(new Response(null, { status: 404 }));
+    expect(await (await end(opened.sessionId, 0)).json()).toEqual({ ok: true, seconds: 0 });
+    expect((storage.get('ledger') as Ledger).sessions[opened.sessionId].needsHangup).toBe(false);
   });
 });
