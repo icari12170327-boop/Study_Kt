@@ -159,7 +159,7 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
     if (run.finished) return;
     run.finished = true;
     clearInterval(run.timer);
-    if (alive.current) setEndStatus('pending');
+    if (alive.current) setEndStatus(status => status === 'failed' || status === 'confirmed' ? status : 'pending');
     run.abort.abort();
     void run.handle?.stop();
     const seconds = elapsed(run);

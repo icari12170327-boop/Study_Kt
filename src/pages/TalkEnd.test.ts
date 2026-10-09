@@ -7,7 +7,7 @@ import { TalkSession } from './TalkSession';
 import { StoreProvider } from '../store/StoreContext';
 import { defaultState } from '../store/defaults';
 import { startTalk, type TalkCallbacks } from '../lib/realtime';
-import { fetchUsage, generate } from '../lib/ai';
+import { AiError, fetchUsage, generate } from '../lib/ai';
 vi.mock('../lib/realtime', async original => ({ ...await original<typeof import('../lib/realtime')>(), startTalk: vi.fn() }));
 vi.mock('../lib/ai', async original => ({ ...await original<typeof import('../lib/ai')>(), fetchUsage: vi.fn(), generate: vi.fn() }));
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -35,6 +35,19 @@ it.each(['kid1', 'parent'] as const)('%s 완료 화면은 확인 대기·실패 
   await act(async () => callbacks.onEndStatus?.('confirmed'));
   expect(host.textContent).not.toContain('대화를 정리하고 있어요…');
   expect(host.textContent).not.toContain('연결 정리가 안 됐어요.');
+});
+it.each(['failed', 'confirmed'] as const)('먼저 확정된 종료 상태 %s를 오류·완료 콜백이 대기로 되돌리지 않는다', async status => {
+  await act(async () => root.render(createElement(StoreProvider, null, createElement(TalkSession, { profileId: 'kid1', go: vi.fn() }))));
+  await act(async () => [...host.querySelectorAll('button')].find(b => b.textContent?.includes('시작') && !b.disabled)!.click());
+  // 시간 종료처럼 stop이 이미 진행된 뒤 화면의 finish가 호출되는 순서를 재현한다.
+  stop.mockResolvedValue(undefined);
+  await act(async () => {
+    callbacks.onEndStatus?.(status);
+    if (status === 'failed') callbacks.onError(new AiError('network'));
+    callbacks.onState('ended');
+  });
+  expect(host.textContent).not.toContain('대화를 정리하고 있어요…');
+  expect(host.textContent?.includes('연결 정리가 안 됐어요.')).toBe(status === 'failed');
 });
 
 it('보호자 목소리 카드는 저장되고 코치·비즈니스 요청과 화면 이름을 바꾼다', async () => {
