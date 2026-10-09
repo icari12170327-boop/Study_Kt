@@ -74,5 +74,10 @@ describe('T20b 블록 그림', () => {
     const puzzle = blocksGenerator.generate(5, seededRng(72)), renderer = PUZZLE_RENDERERS.blocks!;
     const html = renderToStaticMarkup(createElement(renderer.Component, { puzzle, input: '', selected: { r: 0, c: 0 }, select() {}, change() {}, disabled: false }));
     for (const [index, label] of BLOCK_SLOT_LABELS.entries()) { expect(html).toContain(`바닥 자리 ${index + 1}`); expect(html).toContain(`${label} 자리`); }
+    const geometry = blocksGeometry([[2, 0], [0, 1]]);
+    expect(geometry.columnLabels).toEqual([{ x: 5, y: -35, index: 0 }, { x: 15, y: 15, index: 3 }]);
+    expect(html).toContain('동그라미 번호는 자리 표시예요.');
+    expect(html.match(/class="blocks-column-label"/g)).toHaveLength(puzzle.view.heights.flat().filter(Boolean).length);
+    expect(html.match(/class="blocks-top"/g)).toHaveLength(puzzle.answer);
   });
 });

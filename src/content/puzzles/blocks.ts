@@ -24,7 +24,11 @@ export function blocksGeometry(heights: number[][]) {
   const cells = blockCells(heights).sort((a, b) => blockOrigin(a.x, a.y).y - blockOrigin(b.x, b.y).y || a.z - b.z);
   const origins = heights.flatMap((row, y) => row.map((_, x) => blockOrigin(x, y)));
   const floor = origins.map(floorFace);
-  const labels = origins.map(origin => ({ x: origin.x + 10, y: origin.y + 36 }));
+  const labels = origins.map(origin => ({ x: origin.x + 5, y: origin.y + 13 }));
+  const columnLabels = labels.flatMap((point, index) => {
+    const height = heights[Math.floor(index / heights.length)][index % heights.length];
+    return height ? [{ x: point.x, y: point.y - height * 24, index }] : [];
+  });
   const cubes = cells.map(cell => {
     const origin = blockOrigin(cell.x, cell.y);
     const top = floorFace({ x: origin.x, y: origin.y - (cell.z + 1) * 24 });
@@ -35,7 +39,7 @@ export function blocksGeometry(heights: number[][]) {
     ...labels.flatMap(point => [{ x: point.x - 9, y: point.y - 9 }, { x: point.x + 9, y: point.y + 9 }])];
   const minX = Math.min(...points.map(point => point.x)), maxX = Math.max(...points.map(point => point.x));
   const minY = Math.min(...points.map(point => point.y)), maxY = Math.max(...points.map(point => point.y));
-  return { floor, cubes, labels, offsetX: 16 - minX, offsetY: 16 - minY, width: maxX - minX + 32, height: maxY - minY + 32 };
+  return { floor, cubes, labels, columnLabels, offsetX: 16 - minX, offsetY: 16 - minY, width: maxX - minX + 32, height: maxY - minY + 32 };
 }
 const cross = (a: BlockPoint, b: BlockPoint, p: BlockPoint) => (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
 /** 볼록한 면을 변마다 잘라 접하기만 하는 선과 면적이 있는 겹침을 구별한다. */

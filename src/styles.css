@@ -643,7 +643,7 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 }
 
 /* 블록 바닥과 지도는 같은 자리 번호로 연결한다. */
-.blocks-slot circle { fill: var(--card); stroke: var(--primary); }
-.blocks-slot text { fill: var(--text); stroke: none; text-anchor: middle; font-size: 9px; font-weight: 700; }
+.blocks-slot circle, .blocks-column-label circle { fill: var(--card); stroke: var(--primary); }
+.blocks-slot text, .blocks-column-label text { fill: var(--text); stroke: none; text-anchor: middle; font-size: 9px; font-weight: 700; }
 .blocks-heights span { flex-direction: column; gap: 2px; padding: 4px; }
 .blocks-heights small { color: var(--muted); font-weight: 400; }
