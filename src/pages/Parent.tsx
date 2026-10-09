@@ -28,7 +28,7 @@ import { ScienceOverview } from '../components/ScienceOverview';
 import { MathOverview } from '../components/MathOverview';
 import { AiConnection } from './AiConnection';
 import { aiReady } from '../lib/talk';
-import { TalkRecords } from './TalkRecords';
+import { ParentVoiceSettings, TalkRecords } from './TalkRecords';
 
 type Tab = 'overview' | 'settings' | 'coupons' | 'backup' | 'ai' | 'talks' | 'weekly';
 
@@ -349,7 +349,7 @@ function Settings() {
           ))}
         </div>
       </div>
-      {pid === 'parent' && profile.level === 'adult' && <><CoachSettings /><MyPhrases /></>}
+      {pid === 'parent' && profile.level === 'adult' && <><ParentVoiceSettings /><CoachSettings /><MyPhrases /></>}
     </div>
   );
 }

@@ -3,6 +3,8 @@ import type { Env } from './env';
 import { generateText, hangup, openCall, ProxyError } from './openai';
 import {
   chargeSession,
+  abandonHangup,
+  hangupDeadline,
   dateKeys,
   emptyLedger,
   elapsedSeconds,
@@ -67,7 +69,7 @@ export class FamilyUsage {
       .filter((s) => !s.ended || s.needsHangup)
       .map((s) =>
         s.needsHangup
-          ? Math.max(Date.now() + 1000, s.nextHangupAt ?? Date.now() + 5000)
+          ? Math.max(Date.now() + 1000, Math.min(s.nextHangupAt ?? Date.now() + 5000, hangupDeadline(s)))
           : this.closing.has(s.id)
           ? Date.now() + 5000
           : Math.max(Date.now() + 1000, s.start + s.remaining * 1000),
@@ -107,23 +109,39 @@ export class FamilyUsage {
   }
   private async closeOnce(id: string): Promise<number> {
     for (;;) {
-      const snapshot = await this.snapshot((ledger) => ledger.sessions[id]);
-      if (!snapshot) throw new ProxyError('invalid', 400);
-      if (snapshot.ended && !snapshot.needsHangup) return snapshot.charged ?? 0;
+      const snapshot = await this.update((ledger) => {
+        const current = ledger.sessions[id];
+        if (!current) throw new ProxyError('invalid', 400);
+        if (!current.ended) {
+          // 외부 종료 실패와 무관하게 사용 시간을 먼저 확정하고 다음 대화를 허용한다.
+          chargeSession(ledger, current, Date.now());
+          current.needsHangup = !!current.callId;
+        }
+        const failures = current.hangupFailures ?? 0;
+        if (abandonHangup(current, Date.now())) console.error('hangup retry limit', failures);
+        return { ...current };
+      });
+      if (snapshot.ended && (!snapshot.needsHangup || (snapshot.nextHangupAt ?? 0) > Date.now())) return snapshot.charged ?? 0;
       // OpenAI를 기다리는 동안 다른 프로필·사용량 조회·알람의 저장 잠금을 막지 않는다.
       if (snapshot.callId) {
         try {
           await hangup(this.env, snapshot.callId);
-        } catch (error) {
+        } catch {
           await this.update((ledger) => {
             const current = ledger.sessions[id];
             if (!current?.ended || !current.needsHangup) return;
             current.hangupFailures = (current.hangupFailures ?? 0) + 1;
+            const failures = current.hangupFailures;
+            if (abandonHangup(current, Date.now())) {
+              // 실패 횟수만 기록하고 통화 정보나 외부 응답 본문은 남기지 않는다.
+              console.error('hangup retry limit', failures);
+              return;
+            }
             // 계속 실패할 때 호출 비용을 줄이도록 5초 → 1분 → 최대 10분으로 늦춘다.
             const delay = current.hangupFailures === 1 ? 5000 : current.hangupFailures === 2 ? 60000 : 600000;
-            current.nextHangupAt = Date.now() + delay;
+            current.nextHangupAt = Math.min(Date.now() + delay, hangupDeadline(current));
           });
-          throw error;
+          return snapshot.charged ?? 0;
         }
       }
       const charged = await this.update((ledger) => {
@@ -148,7 +166,10 @@ export class FamilyUsage {
     }
     const seconds = await job;
     // 종료 직후 연결 응답이 도착한 경쟁 상황도 같은 종료 경로로 정리한다.
-    if (await this.snapshot((ledger) => ledger.sessions[id]?.needsHangup)) return this.closeSession(id);
+    if (await this.snapshot((ledger) => {
+      const session = ledger.sessions[id];
+      return session?.needsHangup && session.nextHangupAt === undefined;
+    })) return this.closeSession(id);
     return seconds;
   }
   private async expire(): Promise<void> {
@@ -156,7 +177,7 @@ export class FamilyUsage {
       Object.values(ledger.sessions)
         .filter(
           (session) =>
-            (session.needsHangup && Date.now() >= (session.nextHangupAt ?? 0)) || (!session.ended && Date.now() >= session.start + session.remaining * 1000),
+            (session.needsHangup && !this.closing.has(session.id) && Date.now() >= Math.min(session.nextHangupAt ?? 0, hangupDeadline(session))) || (!session.ended && Date.now() >= session.start + session.remaining * 1000),
         )
         .map((session) => session.id),
     );

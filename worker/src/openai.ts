@@ -73,7 +73,11 @@ export async function hangup(env: Env, callId: string): Promise<void> {
     headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}` },
     signal: AbortSignal.timeout(5000),
   });
-  if (!response.ok && response.status !== 404) throw new ProxyError('server', 502);
+  // 400·409는 이미 종료됐다는 근거가 없으므로 성공으로 추정하지 않고 재시도한다.
+  if (!response.ok && response.status !== 404) {
+    console.error('realtime.hangup failed', { status: response.status });
+    throw new ProxyError('server', 502);
+  }
 }
 export async function generateText(env: Env, req: GenerateRequest): Promise<unknown> {
   const input = inputSchemas[req.kind].parse(req.input);

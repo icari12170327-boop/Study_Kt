@@ -5,7 +5,8 @@ import { scenarioTitle } from '../lib/business';
 import { useState } from 'react';
 import { useStore } from '../store/StoreContext';
 import type { ProfileId, TalkSettings } from '../types';
-import { defaultTalkSettings, TALK_VOICES } from '../lib/talk';
+import { defaultTalkSettings } from '../lib/talk';
+import { CHILD_VOICES, PARENT_VOICES, TALK_VOICES } from '../lib/voices';
 
 function FriendSettings({ profileId }: { profileId: ProfileId }) {
   const { state, update } = useStore();
@@ -18,10 +19,13 @@ function FriendSettings({ profileId }: { profileId: ProfileId }) {
   });
   return <div className="panel form">
     <h2>친구 설정</h2>
+    <h3>친구 목소리</h3><div className="business-scenarios" role="group" aria-label="친구 목소리">{CHILD_VOICES.map(choice => <button key={choice.voiceStyle} className={`business-scenario ${settings.voice === choice.voice && settings.voiceStyle === choice.voiceStyle ? 'on' : ''}`} aria-pressed={settings.voice === choice.voice && settings.voiceStyle === choice.voiceStyle} onClick={() => set({ voice: choice.voice, voiceStyle: choice.voiceStyle })}>{choice.label}</button>)}</div>
+    <p className="small muted">다음 대화부터 바뀌어요</p>
+    <details><summary>고급 목소리 설정</summary><label><span id={`friend-voice-${profileId}`}>목소리 이름</span><select aria-labelledby={`friend-voice-${profileId}`} value={settings.voice} onChange={e => set({ voice: e.target.value, voiceStyle: settings.voiceStyle ?? (profileId === 'kid1' ? 'kid-boy' : 'kid-girl') })}>{TALK_VOICES.map(voice => <option key={voice}>{voice}</option>)}</select></label></details>
     <div className="form-grid">
       <label><span id={`friend-name-${profileId}`}>친구 이름</span><select aria-labelledby={`friend-name-${profileId}`} value={settings.friendName} onChange={(e) => set({ friendName: e.target.value })}>{['Max', 'Lily', 'Alex'].map((name) => <option key={name}>{name}</option>)}</select></label>
       <label><span id={`friend-persona-${profileId}`}>친구 성격</span><select aria-labelledby={`friend-persona-${profileId}`} value={settings.personaId} onChange={(e) => set({ personaId: e.target.value as TalkSettings['personaId'] })}><option value="cheerful">다정하고 밝은</option><option value="calm">차분하고 편안한</option><option value="funny">장난스럽고 신나는</option></select></label>
-      <label><span id={`friend-voice-${profileId}`}>친구 목소리</span><select aria-labelledby={`friend-voice-${profileId}`} value={settings.voice} onChange={(e) => set({ voice: e.target.value })}>{TALK_VOICES.map((voice) => <option key={voice}>{voice}</option>)}</select></label>
+
       <label>하루 대화 목표 (분)<input type="number" min={1} max={100} value={settings.dailyMinutes} onChange={(e) => set({ dailyMinutes: Math.max(1, Math.min(100, Math.round(Number(e.target.value)) || 1)) })} /></label>
       <label>자막 가림 비율 (%)<input type="number" min={0} max={100} value={settings.subtitleHidePercent} onChange={(e) => set({ subtitleHidePercent: Math.max(0, Math.min(100, Math.round(Number(e.target.value)) || 0)) })} /></label>
     </div>
@@ -32,6 +36,11 @@ function FriendSettings({ profileId }: { profileId: ProfileId }) {
     <p className="small muted">관심사는 입력 후 다른 곳을 누르면 저장돼요. 설정은 다음 대화부터 반영돼요. 실명·학교·주소·연락처는 적지 마세요.</p>
   </div>;
 }
+export function ParentVoiceSettings() {
+  const { state, update } = useStore();
+  const settings = state.settings.parent.talk ?? defaultTalkSettings('adult', 'parent');
+  return <div className="panel form"><h2>대화 상대 목소리</h2><div className="business-scenarios" role="group" aria-label="대화 상대 목소리">{PARENT_VOICES.map(choice => <button key={choice.voiceStyle} className={`business-scenario ${settings.voiceStyle === choice.voiceStyle ? 'on' : ''}`} aria-pressed={settings.voiceStyle === choice.voiceStyle} onClick={() => update(draft => { draft.settings.parent.talk = { ...settings, voice: choice.voice, voiceStyle: choice.voiceStyle, friendName: choice.friendName }; })}>{choice.label} · {choice.friendName}</button>)}</div><p className="small muted">비즈니스·코치 모드에 함께 적용돼요. 다음 대화부터 바뀌어요</p></div>;
+}
 function ProfileRecords({ profileId }: { profileId: ProfileId }) {
   const { state, update } = useStore();
   const data = state.data[profileId];
@@ -41,7 +50,7 @@ function ProfileRecords({ profileId }: { profileId: ProfileId }) {
   const [message, setMessage] = useState('');
   const log = data.talks.find((talk) => talk.id === selected);
   return <div className="form">
-    {!business && <FriendSettings profileId={profileId} />}
+    {business ? <ParentVoiceSettings /> : <FriendSettings profileId={profileId} />}
     <div className="panel form">
       <h2>{business ? '대화 기억' : '친구 기억'}</h2>
       <label><span id={`friend-memory-${profileId}`}>기억 내용</span><textarea aria-labelledby={`friend-memory-${profileId}`} rows={5} maxLength={1500} value={memory} onChange={(e) => setMemory(e.target.value)} /></label>

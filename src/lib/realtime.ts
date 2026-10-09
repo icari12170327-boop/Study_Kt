@@ -1,4 +1,4 @@
-import { AiError, aiRequest, normalizeAiConfig, type AiConfig, type SessionRequest, type SessionResponse } from './ai';
+import { AiError, aiRequest, fetchActiveSessions, endActiveSessions, normalizeAiConfig, type AiConfig, type SessionRequest, type SessionResponse } from './ai';
 export type TalkState = 'connecting' | 'listening' | 'thinking' | 'speaking' | 'ended' | 'error';
 export type TalkEvent =
   | { type: 'state'; state: TalkState }
@@ -12,6 +12,7 @@ export interface TalkHandle {
   beginPushToTalk(): void;
   endPushToTalk(): void;
 }
+export type TalkEndStatus = 'pending' | 'confirmed' | 'failed';
 export interface TalkCallbacks {
   onState(state: TalkState): void;
   onAssistantText(itemId: string, delta: string, done: boolean, responseId?: string): void;
@@ -21,6 +22,7 @@ export interface TalkCallbacks {
   onUserSpeaking?(): void;
   onFriendFinished?(responseId?: string): void;
   onCharged?(seconds: number): void;
+  onEndStatus?(status: TalkEndStatus): void;
 }
 const localTalks = new Set<{ profileId: SessionRequest['profileId']; cfg: AiConfig; stop: () => Promise<void> }>();
 export async function stopLocalTalks(cfg: AiConfig, profileId: SessionRequest['profileId'] | 'all'): Promise<void> {
@@ -65,6 +67,19 @@ export function parseRealtimeEvent(json: unknown): TalkEvent | null {
   if (e.type === 'response.output_audio_transcript.done' && typeof e.transcript === 'string')
     return { type: 'assistant', itemId: e.item_id, text: e.transcript, done: true };
   return null;
+}
+// 종료 응답이 없거나 잘못됐을 때 한 번 재시도한 뒤 해당 프로필의 서버 세션을 정리한다.
+export async function endRealtimeSession(cfg: AiConfig, profileId: SessionRequest['profileId'], sessionId: string, seconds: number): Promise<number | undefined> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const receipt = await aiRequest(cfg, '/api/realtime/end', { sessionId, seconds }, true);
+      if (receipt && typeof receipt === 'object' && 'ok' in receipt && receipt.ok === true && 'seconds' in receipt && typeof receipt.seconds === 'number' && Number.isFinite(receipt.seconds) && receipt.seconds >= 0 && receipt.seconds <= 86400)
+        return Math.floor(receipt.seconds);
+    } catch { /* 최종 실패는 대체 종료 경로의 결과로 알린다. */ }
+  }
+  await endActiveSessions(cfg, profileId, true);
+  // 이미 /end가 저장됐을 수 있어 대체 경로의 0초를 현재 대화의 사용 시간으로 전달하지 않는다.
+  return undefined;
 }
 function waitForIce(pc: RTCPeerConnection): Promise<void> {
   if (pc.iceGatheringState === 'complete') return Promise.resolve();
@@ -163,16 +178,13 @@ export async function startTalk(
       cleanup();
       try {
         if (session) {
-          const receipt = await aiRequest(
-            cfg,
-            '/api/realtime/end',
-            { sessionId: session.sessionId, seconds: Math.max(0, Math.floor((performance.now() - started) / 1000)) },
-            true,
-          );
-          if (receipt && typeof receipt === 'object' && 'ok' in receipt && receipt.ok === true && 'seconds' in receipt && typeof receipt.seconds === 'number' && Number.isFinite(receipt.seconds) && receipt.seconds >= 0 && receipt.seconds <= 86400)
-            cb.onCharged?.(Math.floor(receipt.seconds));
+          cb.onEndStatus?.('pending');
+          const seconds = await endRealtimeSession(cfg, req.profileId, session.sessionId, Math.max(0, Math.floor((performance.now() - started) / 1000)));
+          if (seconds !== undefined) cb.onCharged?.(seconds);
+          cb.onEndStatus?.('confirmed');
         }
       } catch (e) {
+        cb.onEndStatus?.('failed');
         cb.onError(e instanceof AiError ? e : new AiError('server'));
       } finally {
         cb.onState('ended');
@@ -266,6 +278,10 @@ export async function startTalk(
     await pc.setLocalDescription(await pc.createOffer());
     await waitForIce(pc);
     if (stopped) throw new AiError('network');
+    const active = await fetchActiveSessions(cfg);
+    if (stopped) throw new AiError('network');
+    if (active.some((entry) => entry.profileId === req.profileId)) await endActiveSessions(cfg, req.profileId);
+    if (stopped) throw new AiError('network');
     const result = await aiRequest(cfg, '/api/realtime/session', { ...req, offerSdp: pc.localDescription?.sdp ?? '' });
     if (
       !result ||
@@ -283,7 +299,10 @@ export async function startTalk(
     session = result as SessionResponse;
     expiresAt = performance.now() + session.remainingSeconds * 1000;
     if (stopped) {
-      await aiRequest(cfg, '/api/realtime/end', { sessionId: session.sessionId, seconds: 0 }, true);
+      // 권한·연결 대기 중 끝낸 뒤 늦게 열린 세션도 같은 재시도 경로로 종료한다.
+      await stopping;
+      stopping = undefined;
+      await stop();
       throw new AiError('network');
     }
     capTimer = setTimeout(() => {

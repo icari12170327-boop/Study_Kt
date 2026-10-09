@@ -69,6 +69,7 @@ export interface TalkSettings {
   friendName: string;
   personaId: 'cheerful' | 'calm' | 'funny';
   voice: string;
+  voiceStyle?: import('../shared/ai').VoiceStyle;
   dailyMinutes: number;
   interests: string[];
   friendHobbies: string;

@@ -1,3 +1,4 @@
+import { parentPersona } from './voices';
 import type { BizFeedback, CustomCard, ProfileData, ProfileSettings, TalkLog, TalkSummary } from '../types';
 import type { SessionRequest } from './ai';
 import type { ParentSpeed } from '../../shared/ai';
@@ -79,11 +80,11 @@ export function enableBusinessTalkOnce(settings: ProfileSettings, alreadyEnabled
   }
   settings.bizTalkEnabledOnce = true;
 }
-export function businessRequest(scenarioId: string, situation: string, memory: string, speed?: ParentSpeed): Omit<SessionRequest, 'offerSdp'> {
+export function businessRequest(scenarioId: string, situation: string, memory: string, speed?: ParentSpeed, voiceSettings?: Parameters<typeof parentPersona>[0]): Omit<SessionRequest, 'offerSdp'> {
   if (!BUSINESS_SCENARIOS.some(row => row.id === scenarioId) || (scenarioId === 'biz-custom' && !text(situation, 300))) throw new Error('대화 상황을 확인해 주세요.');
   return { profileId: 'parent', level: 'adult', mode: 'biz-talk', scenarioId,
     ...(scenarioId === 'biz-custom' ? { situation: situation.trim() } : {}),
-    persona: { friendName: 'Alex', personaId: 'calm', voice: 'cedar' }, memory: memory.slice(0, 1500), ...(speed !== undefined ? { speed } : {}) };
+    persona: parentPersona(voiceSettings), memory: memory.slice(0, 1500), ...(speed !== undefined ? { speed } : {}) };
 }
 /** 기존 기억 합치기 API의 요약 형태로 표현과 연습 상황을 전달한다. */
 export function businessMemorySummary(log: TalkLog, feedback: BizFeedback): TalkSummary {

@@ -51,10 +51,19 @@ const descriptions: Record<string, string> = {
   calm: 'patient and relaxed',
   funny: 'playful and lighthearted',
 };
+const voiceStyles = {
+  'kid-boy': 'Sound like a cheerful 10–11 year-old friend: playful, energetic, short sentences, simple words. You are a kid, not a teacher.',
+  'kid-girl': 'Sound like a cheerful 10–11 year-old friend: playful, energetic, short sentences, simple words. You are a kid, not a teacher.',
+  'young-woman': 'Sound like a warm, friendly young woman in her late 20s: bright, encouraging, patient.',
+  'calm-man': 'Sound like a calm, patient and relaxed adult male conversation friend.',
+};
 export function instructions(req: SessionRequest, remaining: number): string {
+  return baseInstructions(req, remaining) + (req.persona.voiceStyle ? `\n${voiceStyles[req.persona.voiceStyle]}` : '');
+}
+function baseInstructions(req: SessionRequest, remaining: number): string {
   if (req.mode === 'parent-coach') return coachInstructions(req, remaining);
   if (req.mode === 'biz-talk')
-    return `You are ${scenarioRoles[req.scenarioId as keyof typeof scenarioRoles]}.
+    return `Your name is ${escapeData(req.persona.friendName)}. You are ${scenarioRoles[req.scenarioId as keyof typeof scenarioRoles]}.
 Keep this role consistently. Reply in 2-4 sentences. Ask specific follow-up questions after short answers.
 Do not correct English during the conversation; save corrections for feedback afterward.
 If the user gets stuck in Korean, help once with "You could say …", then continue in English.
@@ -95,7 +104,7 @@ export function coachInstructions(req: SessionRequest, remaining: number): strin
     work: 'work, meetings, AI tools and technology news',
     money: 'long-term investing, asset allocation, diversification, tax-free accounts, pensions and market news',
   };
-  return `You are Alex, an AI English conversation friend coaching a Korean adult beginner. Be honest that you are an AI, never pretend to be a human.
+  return `You are ${escapeData(req.persona.friendName)}, an AI English conversation friend coaching a Korean adult beginner. Be honest that you are an AI, never pretend to be a human.
 Start with a short greeting and just one question about their day.
 Use very easy English (CEFR Pre-A1 to A1), at most two short sentences per turn. Ask just one question at a time and wait for the user.
 ${beginner ? 'Use 6-8 words per sentence, mostly present tense. From the third user reply, gently invite a very easy English answer, never force it.' : 'Use at most ten words per sentence. Offer repetition mainly when the user is stuck.'}
