@@ -16,6 +16,8 @@ export interface PuzzleRendererProps {
   select: (cell: Cell) => void;
   change: (input: unknown) => void;
   disabled: boolean;
+  hinted?: boolean;
+  revealed?: boolean;
   onSubmit?: (input?: unknown) => void;
   onNext?: () => void;
 }
@@ -86,7 +88,7 @@ export const PUZZLE_RENDERERS: Partial<Record<PuzzleType, PuzzleRenderer>> = {
     answerPrompt: '다음 칸에 올 보기를 골라요.', initialInput: () => null, answerInput: puzzle => puzzle.answer,
     complete: input => typeof input === 'number' && Number.isInteger(input) && input >= 1 && input <= 4, toAnswer: input => input },
   blocks: { ...numericAdapter, Component: BlocksPuzzle, icon: '🧊', example: '쌓인 블록은 모두 몇 개?',
-    instruction: '쌓인 블록을 모두 세어요. 가려진 곳은 층 수를 보고 세어요.', answerPrompt: '블록은 모두 몇 개일까요?' },
+    instruction: '빈 곳 없이 바닥부터 쌓았어요. 블록은 모두 몇 개일까요?' },
   sudoku: { ...gridAdapter,
     complete: input => completePuzzleGrid(input, 'sudoku'),
     setPad: (input, selected, value) => setPuzzleGridInput(input as string[][], selected, value, 'sudoku'),

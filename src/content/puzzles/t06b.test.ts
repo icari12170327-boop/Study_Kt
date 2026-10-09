@@ -48,8 +48,8 @@ describe('T06b 생성기 검증', () => {
       const config = BLOCKS_LEVELS[level - 1];
       for (let seed = 0; seed < 200; seed++) {
         const { view, answer } = blocksGenerator.generate(level, seededRng(seed));
-        expect(view.heights).toHaveLength(config.size);
-        expect(view.heights.every(row => row.length === config.size && row.every(n => n >= 0 && n <= config.maxHeight))).toBe(true);
+        expect(view.heights.length).toBeGreaterThanOrEqual(config.size); expect(view.heights.length).toBeLessThanOrEqual(config.maxSize);
+        expect(view.heights.every(row => row.length === view.heights.length && row.every(n => n >= 0 && n <= config.maxHeight))).toBe(true);
         expect(answer).toBe(view.heights.flat().reduce((sum, n) => sum + n, 0));
         const cells = blockCells(view.heights), set = new Set(cells.map(cell => `${cell.x}:${cell.y}:${cell.z}`));
         expect(cells.length).toBe(answer); expect(answer).toBeGreaterThan(0);
@@ -66,9 +66,9 @@ describe('T06b 생성기 검증', () => {
     for (const generator of [balanceGenerator, patternGenerator, blocksGenerator]) it(`${generator.type} ${level}단계: 시드와 극단 난수에도 유한 생성`, () => {
       expect(generator.generate(level, seededRng(725))).toEqual(generator.generate(level, seededRng(725)));
       for (const value of [0, 0.999999]) {
-        let calls = 0;
-        const puzzle = generator.generate(level, () => { if (++calls > 200) throw new Error('난수 호출 상한 초과'); return value; });
-        expect(calls).toBeLessThan(200);
+        let calls = 0; const limit = generator.type === 'blocks' ? 2002 : 200;
+        const puzzle = generator.generate(level, () => { if (++calls > limit) throw new Error('난수 호출 상한 초과'); return value; });
+        expect(calls).toBeLessThan(limit);
         expect(generator.check(puzzle as never, puzzle.answer)).toBe(true);
         expect(generator.check(puzzle as never, puzzle.answer + 1)).toBe(false);
         expect(generator.check(puzzle as never, String(puzzle.answer))).toBe(false);

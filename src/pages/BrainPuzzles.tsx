@@ -180,9 +180,9 @@ function PuzzlePlay({ profileId, go }: { profileId: ProfileId; go: Go }) {
     <div className="puzzle-status"><span>{'★'.repeat(play.puzzle.difficulty)}{'☆'.repeat(5 - play.puzzle.difficulty)}</span><span>활동 {formatTime(Math.floor((summary.activeSec * 1000 + activeMs) / 1000))}</span></div>
     <p className="puzzle-instruction">{puzzleInstruction(play.puzzle)}</p>
     {paused && <button className="btn btn-soft puzzle-resume" onClick={activity}>계속하려면 화면을 눌러요</button>}
-    <Component puzzle={play.puzzle} input={play.revealed ? renderer.answerInput(play.puzzle) : play.input} selected={play.selected} select={select} change={change} disabled={play.finished} onSubmit={submit} onNext={next} />
-    {play.hinted && <p className="panel puzzle-hint">💡 {play.puzzle.hint}</p>}
-    <p className="puzzle-feedback" role="status">{message || renderer.answerPrompt || (renderer.move ? '빈칸을 누르거나 방향키로 이동해요.' : '다음 수는 무엇일까요?')}</p>
+    <Component puzzle={play.puzzle} input={play.revealed ? renderer.answerInput(play.puzzle) : play.input} selected={play.selected} select={select} change={change} disabled={play.finished} hinted={play.hinted} revealed={play.revealed} onSubmit={submit} onNext={next} />
+    {play.hinted && play.puzzle.type !== 'blocks' && <p className="panel puzzle-hint">💡 {play.puzzle.hint}</p>}
+    <p className="puzzle-feedback" role="status">{message || renderer.answerPrompt || (renderer.move ? '빈칸을 누르거나 방향키로 이동해요.' : play.puzzle.type === 'blocks' ? '' : '다음 수는 무엇일까요?')}</p>
     {!play.finished && <div className="row-center">
       {activeMs >= PUZZLE_HINT_MS && !play.hinted && <button className="btn btn-soft puzzle-hint-ready" onClick={() => {
         activity(); setPlay(previous => previous ? { ...previous, hinted: true } : previous);
