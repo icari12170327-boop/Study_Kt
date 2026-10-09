@@ -1,9 +1,10 @@
 import { createElement } from 'react';
+import { createHash } from 'node:crypto';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { seededRng } from '../../lib/random';
 import { sudokuGenerator, solveSudoku } from './sudoku';
-import { blockOrigin, hasColumnOverlap, blocksGenerator, blocksGeometry, BLOCK_SLOT_LABELS } from './blocks';
+import { blockCells, blockOrigin, hasColumnOverlap, hasHiddenBlock, blocksGenerator, blocksGeometry, BLOCK_SLOT_LABELS } from './blocks';
 import { defaultState } from '../../store/defaults';
 import { normalizeState, exportState, importState } from '../../store/storage';
 import { PUZZLE_RENDERERS, puzzleInstruction } from '../../components/puzzles/renderers';
@@ -45,6 +46,48 @@ describe('T20b 블록 그림', () => {
     expect(hasColumnOverlap([[0, 2], [1, 0]])).toBe(false);
     expect(hasColumnOverlap([[4, 0], [0, 0]])).toBe(false);
   });
+  it('일부 겹침과 완전 가림을 구별하고 여러 앞쪽 기둥이 함께 가리는 블록도 찾는다', () => {
+    expect(hasHiddenBlock([[1, 1], [1, 1]])).toBe(false);
+    expect(hasHiddenBlock([[2, 0], [0, 1]])).toBe(false);
+    expect(hasHiddenBlock([[2, 2], [2, 2]])).toBe(true);
+    expect(hasHiddenBlock([[0, 2], [1, 0]])).toBe(false);
+    expect(hasHiddenBlock([[4, 0], [0, 0]])).toBe(false);
+    expect(hasHiddenBlock([[1, 2], [0, 0]])).toBe(false);
+    expect(hasHiddenBlock([[1, 0], [2, 0]])).toBe(false);
+    expect(hasHiddenBlock([[1, 2], [2, 0]])).toBe(true);
+  });
+  it('SVG 면 자르기와 별개인 3차원 시선 검사로 180배치의 가림 판정을 교차 검증한다', () => {
+    function hiddenByRays(heights: number[][]): boolean {
+      const cells = blockCells(heights), direction = [9 / 14, 1, 7 / 8];
+      return cells.some(cell => {
+        for (let face = 0; face < 3; face++) for (let i = 1; i <= 12; i++) for (let j = 1; j <= 12; j++) {
+          const a = i / 13, b = j / 13;
+          const point = face === 0 ? [cell.x + a, cell.y + b, cell.z + 1]
+            : face === 1 ? [cell.x + 1, cell.y + a, cell.z + b] : [cell.x + a, cell.y + 1, cell.z + b];
+          const covered = cells.some(other => {
+            if (other === cell) return false;
+            const min = [other.x, other.y, other.z]; let entry = 0, exit = Infinity;
+            for (let k = 0; k < 3; k++) {
+              entry = Math.max(entry, (min[k] - point[k]) / direction[k]);
+              exit = Math.min(exit, (min[k] + 1 - point[k]) / direction[k]);
+            }
+            return exit > entry + 1e-8;
+          });
+          if (!covered) return false;
+        }
+        return true;
+      });
+    }
+    for (let mask = 1; mask < 81; mask++) {
+      let n = mask;
+      const map = Array.from({ length: 2 }, () => Array.from({ length: 2 }, () => { const h = n % 3; n = Math.floor(n / 3); return h; }));
+      expect(hasHiddenBlock(map)).toBe(hiddenByRays(map));
+    }
+    for (let seed = 0; seed < 100; seed++) {
+      const rng = seededRng(seed), map = Array.from({ length: 3 }, () => Array.from({ length: 3 }, () => Math.floor(rng() * 3)));
+      expect(hasHiddenBlock(map)).toBe(hiddenByRays(map));
+    }
+  });
   it('2×2와 3×3의 모든 기둥은 화면 x가 다르고 깊이·자기 높이 순으로 그린다', () => {
     for (const size of [2, 3]) {
       const map = Array.from({ length: size }, () => Array(size).fill(4));
@@ -57,13 +100,26 @@ describe('T20b 블록 그림', () => {
       }
     }
   });
-  it.each([1, 2, 3] as Difficulty[])('★%s 500판은 기둥 겹침 없이 유한 생성하며 재현 배치가 없다', level => {
+  it.each([1, 2, 3] as Difficulty[])('★%s 500판은 완전 가림 없이 유한 생성하며 재현 배치가 없다', level => {
+    const shapes = new Set<string>(); let total = 0, partialOverlap = 0;
     for (let seed = 0; seed < 500; seed++) {
       const puzzle = blocksGenerator.generate(level, seededRng(seed));
-      expect(hasColumnOverlap(puzzle.view.heights)).toBe(false); expect(puzzle.view.heights).not.toEqual([[2, 0], [0, 1]]);
+      expect(hasHiddenBlock(puzzle.view.heights)).toBe(false); expect(puzzle.view.heights).not.toEqual([[2, 0], [0, 1]]);
       expect(puzzle.answer).toBe(puzzle.view.heights.flat().reduce((sum, n) => sum + n, 0));
       expect(blocksGenerator.generate(level, seededRng(seed))).toEqual(puzzle);
+      shapes.add(JSON.stringify(puzzle.view.heights)); total += puzzle.answer;
+      if (hasColumnOverlap(puzzle.view.heights)) partialOverlap++;
     }
+    // 이전의 과도한 제외로 기둥 하나·같은 대각선에 몰리지 않도록 다양성을 검증한다.
+    expect(shapes.size).toBeGreaterThan([5, 12, 60][level - 1]);
+    expect(total / 500).toBeGreaterThan([1.17, 1.99, 4.4][level - 1]);
+    expect(partialOverlap).toBeGreaterThan(0);
+  });
+  it.each([4, 5] as Difficulty[])('★%s는 리뷰 전 시드 1~300 생성 결과가 그대로다', level => {
+    const puzzles = Array.from({ length: 300 }, (_, seed) => blocksGenerator.generate(level, seededRng(seed + 1)));
+    expect(createHash('sha256').update(JSON.stringify(puzzles)).digest('hex')).toBe(level === 4
+      ? '3eb306b4982301588a6d147c0b94ea69029726cee8a97b4a6776857a1dc31e96'
+      : 'b1f726b9e81c8fc1358da343e4c699a6d97d81896c7563d0d406015cd8fb448a');
   });
   it('항상 겹치는 후보는 16회 뒤 안전한 배치로 끝낸다', () => {
     let calls = 0;

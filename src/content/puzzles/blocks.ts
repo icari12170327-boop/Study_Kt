@@ -59,7 +59,7 @@ function overlapArea(subject: BlockPoint[], clip: BlockPoint[]): number {
   }
   return Math.abs(polygon.reduce((area, p, i) => { const q = polygon[(i + 1) % polygon.length]; return area + p.x * q.y - q.x * p.y; }, 0)) / 2;
 }
-/** 낮은 단계에서는 일부만 보이는 블록도 세기 어려워 서로 다른 기둥의 면 겹침을 보수적으로 거른다. */
+/** 면적이 있는 기둥 겹침 여부. 완전 가림과 일부 겹침을 비교하는 데 쓴다. */
 export function hasColumnOverlap(heights: number[][]): boolean {
   const { cubes } = blocksGeometry(heights);
   for (let i = 0; i < cubes.length; i++) for (let j = i + 1; j < cubes.length; j++) {
@@ -69,6 +69,56 @@ export function hasColumnOverlap(heights: number[][]): boolean {
       if (overlapArea(face, other) > 1e-6) return true;
   }
   return false;
+}
+function polygonArea(polygon: BlockPoint[]): number {
+  return Math.abs(polygon.reduce((area, p, i) => {
+    const q = polygon[(i + 1) % polygon.length]; return area + p.x * q.y - q.x * p.y;
+  }, 0)) / 2;
+}
+function clipSide(polygon: BlockPoint[], a: BlockPoint, b: BlockPoint, inside: boolean): BlockPoint[] {
+  const result: BlockPoint[] = [], sign = inside ? 1 : -1;
+  for (let i = 0; i < polygon.length; i++) {
+    const p = polygon[i], q = polygon[(i + 1) % polygon.length];
+    const dp = sign * cross(a, b, p), dq = sign * cross(a, b, q);
+    if (dp >= 0) result.push(p);
+    if ((dp >= 0) !== (dq >= 0)) {
+      const t = dp / (dp - dq);
+      result.push({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t });
+    }
+  }
+  return result;
+}
+/** 앞쪽 면의 바깥 조각만 남긴다. 여러 기둥이 함께 가리는 경우도 면적 합으로 판정한다. */
+function subtractFace(subject: BlockPoint[], cover: BlockPoint[]): BlockPoint[][] {
+  if (overlapArea(subject, cover) <= 1e-6) return [subject];
+  const pieces: BlockPoint[][] = [];
+  let remaining = subject;
+  for (let i = 0; i < cover.length && remaining.length; i++) {
+    const a = cover[i], b = cover[(i + 1) % cover.length];
+    const outside = clipSide(remaining, a, b, false);
+    if (polygonArea(outside) > 1e-6) pieces.push(outside);
+    remaining = clipSide(remaining, a, b, true);
+  }
+  return pieces;
+}
+/** SVG 그리기 순서에서 한 블록의 세 면이 모두 덮인 경우만 제외한다. 일부 겹침은 허용한다. */
+export function hasHiddenBlock(heights: number[][]): boolean {
+  const { cubes } = blocksGeometry(heights);
+  return cubes.some((cube, index) => [cube.top, cube.left, cube.right].every(face => {
+    let visible = [face];
+    for (let i = index + 1; i < cubes.length && visible.length; i++) {
+      const front = cubes[i];
+      for (const cover of [front.top, front.left, front.right]) {
+        visible = visible.flatMap(piece => subtractFace(piece, cover));
+        if (!visible.length) break;
+      }
+    }
+    return !visible.length;
+  }));
+}
+function needsBlocksRetry(heights: number[][]): boolean {
+  // 명세가 별도로 제외한 최초 재현 배치는 계속 제외한다. 다른 일부 겹침은 허용한다.
+  return hasHiddenBlock(heights) || (heights.length === 2 && heights[0][0] === 2 && heights[0][1] === 0 && heights[1][0] === 0 && heights[1][1] === 1);
 }
 export const BLOCK_SLOT_LABELS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'] as const;
 export const blocksGenerator: PuzzleGenerator<BlocksView, number> = {
@@ -80,11 +130,11 @@ export const blocksGenerator: PuzzleGenerator<BlocksView, number> = {
     if (heights.flat().reduce((sum, height) => sum + height, 0) === 0) heights[0][0] = 1;
     if (difficulty <= 3) {
       // 최대 16후보로 끝낸다. 높이 상한을 유지하고 실패하면 서로 떨어진 대각선에 놓는다.
-      for (let attempt = 1; attempt < 16 && hasColumnOverlap(heights); attempt++) {
+      for (let attempt = 1; attempt < 16 && needsBlocksRetry(heights); attempt++) {
         heights = Array.from({ length: config.size }, () => Array.from({ length: config.size }, () => randInt(0, config.maxHeight, rng)));
         if (!heights.flat().some(Boolean)) heights[0][0] = 1;
       }
-      if (hasColumnOverlap(heights)) {
+      if (needsBlocksRetry(heights)) {
         heights = Array.from({ length: config.size }, (_, y) => Array.from({ length: config.size }, (_, x) => x + y === config.size - 1 ? randInt(1, config.maxHeight, rng) : 0));
       }
     }
