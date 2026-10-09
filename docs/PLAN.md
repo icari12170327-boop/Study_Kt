@@ -219,6 +219,7 @@
 - [x] [T06](tasks/T06-brain-puzzles.md) 두뇌 퍼즐 6종 (자유 놀이, T06a → T06b)
 - [x] [T07](tasks/T07-reward-games.md) 오늘의 문제 게임과 형제 대결
 - [x] [T19](tasks/T19-obby-run.md) 오비 달리기 (첫째 아이디어, 수학 미션 보상)
+- [ ] **[T21](tasks/T21-pattern-rules.md) 도형 규칙 다시 만들기 (속성마다 다른 규칙, 격자)**
 - [x] [T20](tasks/T20-field-fixes-1.md) 실사용 수정 1차: 대화 종료 버그, 목소리, 스도쿠 5×5, 블록 그림, 코치 뜻
 
 ### 4단계 — 과학과 읽기 콘텐츠
