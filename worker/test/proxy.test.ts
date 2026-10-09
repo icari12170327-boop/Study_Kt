@@ -800,3 +800,21 @@ describe('문장제 생성 프록시 재사용', () => {
     expect(outgoing).toHaveBeenCalledOnce();
   });
 });
+
+describe('주간 리포트 생성 한도 공유', () => {
+  it('보호자 생성 횟수를 차감하고 하루 한도 뒤에는 OpenAI를 호출하지 않는다', async () => {
+    env.GENERATE_LIMIT_DAY_TOTAL = '1';
+    output = { goodKo: '꾸준히 했어요.', watchKo: '함께 살펴봐요.', nextKo: '과학 문제를 함께 풀어요.' };
+    const stats = {
+      profileId: 'kid2', range: { start: '2026-10-05', end: '2026-10-11' },
+      attendance: { completedDays: 0, streak: 0, stars: null, coupons: 0 },
+      math: { solved: 0, accuracy: null, currentLevel: 1, levelStart: null, levelEnd: null, weakSkills: [], guesses: 0, storyAccuracy: null },
+      science: { solved: 0, accuracy: null, newCards: 0, newBadges: [] }, talk: { minutes: 0, sessions: 0, highlights: [] },
+      play: { bingoGames: 0, puzzlesSolved: 0, puzzleLevelUps: null, fishing: 0, duels: 0, crowns: 0, storyEpisodes: null },
+    };
+    const body = { profileId: 'parent', level: 'adult', kind: 'weekly-report', input: { stats, level: 'g3' } };
+    expect((await req('/api/generate', body)).status).toBe(200);
+    expect((await readUsage(await req('/api/usage'))).today.parent.generates).toBe(1);
+    expect((await req('/api/generate', body)).status).toBe(429); expect(outgoing).toHaveBeenCalledOnce();
+  });
+});

@@ -1,3 +1,4 @@
+import { WeeklyReportNotice } from './WeeklyReport';
 import { normalizePuzzleSettings } from '../content/puzzles/state';
 import { RewardGameCard } from '../components/RewardGameCard';
 import { StoryHomeCard } from '../components/stories/StoryHomeCard';
@@ -110,6 +111,7 @@ export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
 
       {profile.level !== 'adult' && <button className="btn btn-soft" onClick={() => go({ name: 'science-collection', profileId })}>🔬 {profile.level === 'g5' ? '실험실 빌드' : '나의 과학 박물관'} 열기 · {Object.keys(data.science.collected).length}장 · 🏅 {data.science.badges.length}</button>}
 
+      {profileId === 'parent' && <WeeklyReportNotice profileId={profileId} go={go} />}
       {profileId === 'parent' && <button className="btn btn-soft" onClick={() => go({ name: 'parent' })}>🔒 보호자 모드 · 대화 기록과 내 표현 관리</button>}
 
       <h2 className="section-title">최근 2주 도장</h2>

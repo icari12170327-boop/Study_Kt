@@ -215,6 +215,7 @@ export type GameId = 'fishing' | 'duel';
 export interface GameRecord { date: string; game: GameId; score: number; caught?: number; golden?: number; opponent?: ProfileId; won?: boolean }
 
 export interface ProfileData {
+  weeklyAi?: Record<string, import('../shared/weeklyReport').WeeklyAi>;
   stories?: Record<string, StoryProgress>;
   puzzles?: PuzzleData;
   games?: GameRecord[];

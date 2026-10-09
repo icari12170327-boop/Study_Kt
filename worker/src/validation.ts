@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { GenerateKind } from '../../shared/ai';
+import { weeklyReportInputSchema, weeklyReportOutputSchema } from './weeklyReport';
 export const profiles = ['kid1', 'kid2', 'parent'] as const;
 const profileId = z.enum(profiles);
 const level = z.enum(['g3', 'g5', 'adult']);
@@ -66,6 +67,7 @@ export const summarySchema = z.strictObject({
   nextTopics: z.array(text(40)).max(3),
 });
 export const inputSchemas = {
+  'weekly-report': weeklyReportInputSchema,
   'coach-gloss': z.strictObject({ text: text(300) }),
   'coach-wrapup': z.strictObject({ lines }),
   'coach-check': z.strictObject({ text: text(300), level: coachLevel }),
@@ -100,6 +102,7 @@ export const inputSchemas = {
   }),
 };
 export const outputSchemas = {
+  'weekly-report': weeklyReportOutputSchema,
   'coach-gloss': z.strictObject({ ko: text(200) }),
   'coach-wrapup': z.strictObject({ sentences: z.array(z.strictObject({ en: text(120), ko: text(120) })).max(3) }),
   'coach-check': z.strictObject({ corrected: text(200), noteKo: text(200) }),
@@ -132,4 +135,4 @@ export const generateSchema = z
     input: z.unknown(),
   })
   .refine((r) => (r.profileId === 'parent' ? r.level === 'adult' : r.level !== 'adult'))
-  .refine((r) => (r.kind !== 'biz-feedback' && !r.kind.startsWith('coach-')) || r.profileId === 'parent');
+  .refine((r) => (r.kind !== 'biz-feedback' && r.kind !== 'weekly-report' && !r.kind.startsWith('coach-')) || r.profileId === 'parent');

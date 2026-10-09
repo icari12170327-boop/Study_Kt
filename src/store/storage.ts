@@ -1,5 +1,6 @@
 import { normalizeWordProblemRatio, withoutStory } from '../content/math/wordProblem';
 import { normalizeStories, normalizeStorySettings } from '../content/stories/progress';
+import { normalizeWeeklyAi } from '../lib/weeklyAi';
 import { normalizePuzzleData, normalizePuzzleSettings } from '../content/puzzles/state';
 import { normalizeGameAttempts, normalizeGames, normalizeGamesPerDay, validGameDate } from '../content/games/limits';
 import { toDateKey } from '../lib/date';
@@ -49,6 +50,7 @@ export function normalizeState(raw: unknown, today = toDateKey()): AppState {
       talk.dailyMinutes = mission.target;
     } else settings[p.id].missions = [...settings[p.id].missions, { type: 'talk', enabled: p.level !== 'adult', target: talk.dailyMinutes }];
     data[p.id] = { ...base.data[p.id], ...s.data?.[p.id] };
+    data[p.id].weeklyAi = normalizeWeeklyAi(s.data?.[p.id]?.weeklyAi, today);
     data[p.id].stories = normalizeStories(s.data?.[p.id]?.stories);
     data[p.id].wrongNotes = Array.isArray(data[p.id].wrongNotes) ? data[p.id].wrongNotes.filter(note => note && note.problem).map(note => ({ ...note, problem: withoutStory(note.problem) })) : [];
     data[p.id].puzzles = normalizePuzzleData(s.data?.[p.id]?.puzzles, p.level);

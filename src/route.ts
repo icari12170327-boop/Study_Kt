@@ -15,7 +15,7 @@ export type Route =
   | { name: 'science'; profileId: ProfileId }
   | { name: 'science-collection'; profileId: ProfileId }
   | { name: 'rewards'; profileId: ProfileId }
-  | { name: 'parent' };
+  | { name: 'parent'; tab?: 'weekly' };
 
 export type Go = (route: Route) => void;
 
