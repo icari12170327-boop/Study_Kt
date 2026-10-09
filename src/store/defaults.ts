@@ -21,6 +21,7 @@ export function defaultSettings(level: Level, id?: ProfileId): ProfileSettings {
   switch (level) {
     case 'g3':
       return {
+        readingQuiz: { enabled: true },
         stories: { enabled: true },
         wordProblemRatio: 20,
         puzzles: { enabled: true },
@@ -43,6 +44,7 @@ export function defaultSettings(level: Level, id?: ProfileId): ProfileSettings {
       };
     case 'g5':
       return {
+        readingQuiz: { enabled: true },
         stories: { enabled: true },
         wordProblemRatio: 20,
         puzzles: { enabled: true },
@@ -65,6 +67,7 @@ export function defaultSettings(level: Level, id?: ProfileId): ProfileSettings {
       };
     case 'adult':
       return {
+        readingQuiz: { enabled: true },
         stories: { enabled: false },
         wordProblemRatio: 20,
         coach: normalizeCoachSettings(undefined),

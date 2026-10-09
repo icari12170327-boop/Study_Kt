@@ -1,3 +1,4 @@
+import { normalizeReadingQuiz } from '../lib/readingQuiz';
 import { normalizeWordProblemRatio, withoutStory } from '../content/math/wordProblem';
 import { normalizeStories, normalizeStorySettings } from '../content/stories/progress';
 import { normalizeWeeklyAi } from '../lib/weeklyAi';
@@ -27,6 +28,7 @@ export function normalizeState(raw: unknown, today = toDateKey()): AppState {
   const data = { ...base.data };
   for (const p of profiles) {
     settings[p.id] = { ...defaultSettings(p.level, p.id), ...s.settings?.[p.id] };
+    settings[p.id].readingQuiz = normalizeReadingQuiz(s.settings?.[p.id]?.readingQuiz);
     settings[p.id].stories = normalizeStorySettings(s.settings?.[p.id]?.stories, p.level !== 'adult');
     settings[p.id].wordProblemRatio = normalizeWordProblemRatio(s.settings?.[p.id]?.wordProblemRatio);
     settings[p.id].puzzles = normalizePuzzleSettings(s.settings?.[p.id]?.puzzles);

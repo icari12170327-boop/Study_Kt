@@ -47,6 +47,7 @@ export interface MissionConfig {
 }
 
 export interface ProfileSettings {
+  readingQuiz?: { enabled: boolean };
   stories?: { enabled: boolean };
   wordProblemRatio?: number;
   puzzles?: { enabled: boolean };
