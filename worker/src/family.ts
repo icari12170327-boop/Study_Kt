@@ -3,6 +3,8 @@ import type { Env } from './env';
 import { generateText, hangup, openCall, ProxyError } from './openai';
 import {
   chargeSession,
+  abandonHangup,
+  hangupDeadline,
   dateKeys,
   emptyLedger,
   elapsedSeconds,
@@ -67,7 +69,7 @@ export class FamilyUsage {
       .filter((s) => !s.ended || s.needsHangup)
       .map((s) =>
         s.needsHangup
-          ? Math.max(Date.now() + 1000, s.nextHangupAt ?? Date.now() + 5000)
+          ? Math.max(Date.now() + 1000, Math.min(s.nextHangupAt ?? Date.now() + 5000, hangupDeadline(s)))
           : this.closing.has(s.id)
           ? Date.now() + 5000
           : Math.max(Date.now() + 1000, s.start + s.remaining * 1000),
@@ -115,6 +117,8 @@ export class FamilyUsage {
           chargeSession(ledger, current, Date.now());
           current.needsHangup = !!current.callId;
         }
+        const failures = current.hangupFailures ?? 0;
+        if (abandonHangup(current, Date.now())) console.error('hangup retry limit', failures);
         return { ...current };
       });
       if (snapshot.ended && (!snapshot.needsHangup || (snapshot.nextHangupAt ?? 0) > Date.now())) return snapshot.charged ?? 0;
@@ -127,9 +131,15 @@ export class FamilyUsage {
             const current = ledger.sessions[id];
             if (!current?.ended || !current.needsHangup) return;
             current.hangupFailures = (current.hangupFailures ?? 0) + 1;
+            const failures = current.hangupFailures;
+            if (abandonHangup(current, Date.now())) {
+              // 실패 횟수만 기록하고 통화 정보나 외부 응답 본문은 남기지 않는다.
+              console.error('hangup retry limit', failures);
+              return;
+            }
             // 계속 실패할 때 호출 비용을 줄이도록 5초 → 1분 → 최대 10분으로 늦춘다.
             const delay = current.hangupFailures === 1 ? 5000 : current.hangupFailures === 2 ? 60000 : 600000;
-            current.nextHangupAt = Date.now() + delay;
+            current.nextHangupAt = Math.min(Date.now() + delay, hangupDeadline(current));
           });
           return snapshot.charged ?? 0;
         }
@@ -167,7 +177,7 @@ export class FamilyUsage {
       Object.values(ledger.sessions)
         .filter(
           (session) =>
-            (session.needsHangup && !this.closing.has(session.id) && Date.now() >= (session.nextHangupAt ?? 0)) || (!session.ended && Date.now() >= session.start + session.remaining * 1000),
+            (session.needsHangup && !this.closing.has(session.id) && Date.now() >= Math.min(session.nextHangupAt ?? 0, hangupDeadline(session))) || (!session.ended && Date.now() >= session.start + session.remaining * 1000),
         )
         .map((session) => session.id),
     );

@@ -16,6 +16,7 @@ export interface Session {
   month: string;
   callId?: string;
   ended?: boolean;
+  endedAt?: number;
   charged?: number;
   /** 종료된 예약 뒤 늦게 도착한 통화도 서버에서 정리한다. */
   needsHangup?: boolean;
@@ -62,8 +63,19 @@ export function chargeSession(ledger: Ledger, session: Session, now: number): vo
   if (session.ended) return;
   session.charged = elapsedSeconds(session, now);
   session.ended = true;
+  session.endedAt = now;
   todayUsage(ledger, session.day)[session.profileId].talkSeconds += session.charged;
   ledger.months[session.month] = (ledger.months[session.month] ?? 0) + session.charged;
+}
+/** 예전 저장값은 이미 확정된 사용 시간으로 종료 시각을 복원한다. */
+export const hangupDeadline = (session: Session): number =>
+  (session.endedAt ?? session.start + (session.charged ?? session.remaining) * 1000) + 86400000;
+export function abandonHangup(session: Session, now: number): boolean {
+  if (!session.ended || !session.needsHangup || ((session.hangupFailures ?? 0) < 8 && now < hangupDeadline(session))) return false;
+  session.needsHangup = false;
+  delete session.hangupFailures;
+  delete session.nextHangupAt;
+  return true;
 }
 export function pruneLedger(ledger: Ledger, now: number): void {
   const cutoff = dateKeys(now - 90 * 86400000).day;

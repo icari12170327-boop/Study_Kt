@@ -546,7 +546,7 @@ describe('저장 잠금 밖의 연결과 종료', () => {
     expect((await readUsage(await req('/api/usage'))).today.kid1.talkSeconds).toBe(60);
     expect((await start()).status).toBe(429);
   });
-  it('늦게 생성된 통화의 종료 실패도 저장하고 재시작·하루 경과 뒤 알람으로 복구한다', async () => {
+  it('늦게 생성된 통화의 종료 실패도 저장하고 재시작 뒤 24시간 안에 알람으로 복구한다', async () => {
     env.TALK_MINUTES_kid1 = '1';
     const called = deferred<void>(),
       reply = deferred<Response>();
@@ -568,11 +568,14 @@ describe('저장 잠금 밖의 연결과 종료', () => {
       charged: 60,
     });
     family = new FamilyUsage(durableState, env);
-    vi.setSystemTime(now + 2 * 86400000);
+    vi.setSystemTime(now + 3600000);
     await family.alarm();
     expect(Object.values((storage.get('ledger') as Ledger).sessions)).toHaveLength(1);
     failHangup = false;
-    vi.setSystemTime(now + 2 * 86400000 + 60000);
+    vi.setSystemTime(now + 3600000 + 60000);
+    await family.alarm();
+    expect(Object.values((storage.get('ledger') as Ledger).sessions)[0].needsHangup).toBe(false);
+    vi.setSystemTime(now + 2 * 86400000);
     await family.alarm();
     expect(Object.values((storage.get('ledger') as Ledger).sessions)).toHaveLength(0);
     expect((storage.get('ledger') as Ledger).months['2026-10']).toBe(60);
@@ -822,6 +825,66 @@ describe('주간 리포트 생성 한도 공유', () => {
 
 
 describe('일반 종료의 hangup 장애 복구', () => {
+  it('24시간 직전의 실패는 마감 시각까지만 예약하고 그 시각에 더 이상 호출하지 않는다', async () => {
+    const opened = await readSession(await start());
+    failHangup = true; await end(opened.sessionId, 0);
+    const ledger = storage.get('ledger') as Ledger;
+    ledger.sessions[opened.sessionId].endedAt = now - 86400000 + 2000;
+    ledger.sessions[opened.sessionId].nextHangupAt = now;
+    storage.set('ledger', ledger);
+    family = new FamilyUsage(durableState, env); await family.alarm();
+    expect((storage.get('ledger') as Ledger).sessions[opened.sessionId].nextHangupAt).toBe(now + 2000);
+    vi.setSystemTime(now + 1999); await family.alarm();
+    expect(outgoing.mock.calls.filter(([url]) => String(url).endsWith('/hangup'))).toHaveLength(2);
+    const logger = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.setSystemTime(now + 2000); await family.alarm();
+    expect((storage.get('ledger') as Ledger).sessions[opened.sessionId].needsHangup).toBe(false);
+    expect(outgoing.mock.calls.filter(([url]) => String(url).endsWith('/hangup'))).toHaveLength(2);
+    logger.mockRestore();
+  });
+  it('8회 실패 뒤 재시도를 멈추고 기록을 정리하며 과금·새 대화에 영향이 없다', async () => {
+    const opened = await readSession(await start()); vi.setSystemTime(now + 10000);
+    failHangup = true;
+    const logger = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await end(opened.sessionId, 0);
+    for (let failure = 2; failure <= 8; failure++) {
+      const saved = (storage.get('ledger') as Ledger).sessions[opened.sessionId];
+      vi.setSystemTime(saved.nextHangupAt!);
+      family = new FamilyUsage(durableState, env);
+      await family.alarm();
+    }
+    const saved = (storage.get('ledger') as Ledger).sessions[opened.sessionId];
+    expect(saved).toMatchObject({ ended: true, needsHangup: false, charged: 10 });
+    expect(saved).not.toHaveProperty('nextHangupAt'); expect(saved).not.toHaveProperty('hangupFailures');
+    expect(outgoing.mock.calls.filter(([url]) => String(url).endsWith('/hangup'))).toHaveLength(8);
+    expect(await (await end(opened.sessionId, 999)).json()).toEqual({ ok: true, seconds: 10 });
+    vi.setSystemTime(Date.now() + 600000); await family.alarm();
+    expect(outgoing.mock.calls.filter(([url]) => String(url).endsWith('/hangup'))).toHaveLength(8);
+    expect((await readUsage(await req('/api/usage'))).today.kid1.talkSeconds).toBe(10);
+    expect((await start()).status).toBe(200);
+    vi.setSystemTime(now + 2 * 86400000); await family.alarm();
+    expect((storage.get('ledger') as Ledger).sessions).not.toHaveProperty(opened.sessionId);
+    expect(logger.mock.calls.some(args => args[0] === 'hangup retry limit' && args[1] === 8)).toBe(true);
+    expect(JSON.stringify(logger.mock.calls)).not.toContain(opened.sessionId);
+    expect(JSON.stringify(logger.mock.calls)).not.toContain(token);
+    logger.mockRestore();
+  });
+  it.each([false, true])('종료 후 24시간이 지나면 재시작해도 추가 hangup 없이 정리한다 (예전 기록: %s)', async legacy => {
+    const opened = await readSession(await start()); vi.setSystemTime(now + 10000);
+    failHangup = true; await end(opened.sessionId, 0);
+    const ledger = storage.get('ledger') as Ledger;
+    if (legacy) delete ledger.sessions[opened.sessionId].endedAt;
+    ledger.sessions[opened.sessionId].nextHangupAt = now + 2 * 86400000;
+    storage.set('ledger', ledger);
+    const logger = vi.spyOn(console, 'error').mockImplementation(() => {});
+    family = new FamilyUsage(durableState, env); vi.setSystemTime(now + 10000 + 86400000);
+    await family.alarm();
+    expect((storage.get('ledger') as Ledger).sessions).not.toHaveProperty(opened.sessionId);
+    expect(outgoing.mock.calls.filter(([url]) => String(url).endsWith('/hangup'))).toHaveLength(1);
+    expect((storage.get('ledger') as Ledger).months['2026-10']).toBe(10);
+    expect((await start()).status).toBe(200);
+    logger.mockRestore();
+  });
   it.each([400, 409, 500, 'timeout'] as const)('%s여도 먼저 종료·차감하고 새 대화를 허용하며 재시도를 보존한다', async status => {
     const opened = await readSession(await start()); vi.setSystemTime(now + 10000);
     const logger = vi.spyOn(console, 'error').mockImplementation(() => {});
