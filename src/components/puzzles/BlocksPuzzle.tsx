@@ -1,4 +1,4 @@
-import { blocksGeometry, type BlockPoint, type BlocksView } from '../../content/puzzles/blocks';
+import { BLOCK_SLOT_LABELS, blocksGeometry, type BlockPoint, type BlocksView } from '../../content/puzzles/blocks';
 import type { PuzzleRendererProps } from './renderers';
 const points = (face: BlockPoint[]) => face.map(point => `${point.x},${point.y}`).join(' ');
 
@@ -14,13 +14,16 @@ export function BlocksPuzzle({ puzzle }: PuzzleRendererProps) {
           <polygon className="blocks-right" points={points(cube.right)} />
           <polygon className="blocks-top" points={points(cube.top)} />
         </g>)}
+        {geometry.labels.map((point, index) => <g className="blocks-slot" key={index} aria-label={`바닥 자리 ${index + 1}`}>
+          <circle cx={point.x} cy={point.y} r={7} /><text x={point.x} y={point.y} dy=".35em">{index + 1}</text>
+        </g>)}
       </g>
     </svg>
     <div className="blocks-map">
       <strong>위에서 본 층 수</strong>
-      <p className="small muted">가려진 곳도 알 수 있어요. 층 사이에 빈 곳은 없어요.</p>
+      <p className="small muted">그림과 같은 번호의 자리를 찾아요. 층 사이에 빈 곳은 없어요.</p>
       <div className="blocks-heights" style={{ gridTemplateColumns: `repeat(${heights.length}, 1fr)` }} role="group" aria-label="위에서 본 각 자리의 층 수">
-        {heights.flatMap((row, r) => row.map((height, c) => <span key={`${r}:${c}`} aria-label={`${r + 1}행 ${c + 1}열 ${height}층`}>{height || '없음'}</span>))}
+        {heights.flatMap((row, r) => row.map((height, c) => <span key={`${r}:${c}`} aria-label={`${BLOCK_SLOT_LABELS[r * heights.length + c]} 자리, ${r + 1}행 ${c + 1}열 ${height}층`}><small>{BLOCK_SLOT_LABELS[r * heights.length + c]}</small>{height || '없음'}</span>))}
       </div>
     </div>
   </div>;
