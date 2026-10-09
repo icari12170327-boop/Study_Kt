@@ -212,14 +212,17 @@ export interface BingoRecord {
   hints: number;
 }
 
-export type GameId = 'fishing' | 'duel';
-export interface GameRecord { date: string; game: GameId; score: number; caught?: number; golden?: number; opponent?: ProfileId; won?: boolean }
+export type GameId = 'fishing' | 'duel' | 'obby';
+export interface GameRecord { date: string; game: GameId; score: number; caught?: number; golden?: number; opponent?: ProfileId; won?: boolean; stage?: number }
+export type ObbyColor = 'red' | 'blue' | 'green' | 'yellow' | 'purple';
+export type ObbyHat = 'cap' | 'tophat' | 'helmet';
 
 export interface ProfileData {
   weeklyAi?: Record<string, import('../shared/weeklyReport').WeeklyAi>;
   stories?: Record<string, StoryProgress>;
   puzzles?: PuzzleData;
   games?: GameRecord[];
+  obby?: { best: number; color: ObbyColor; hat?: ObbyHat };
   crownUntil?: string;
   customCards?: CustomCard[];
   bizSituations?: string[];

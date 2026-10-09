@@ -21,12 +21,13 @@ export function nextDay(date: string): string { return addDays(date, 1); }
 export function normalizeGames(raw: unknown): GameRecord[] {
   if (!Array.isArray(raw)) return [];
   return raw.flatMap((row): GameRecord[] => {
-    if (!row || !validGameDate(row.date) || !['fishing', 'duel'].includes(row.game) || !Number.isInteger(row.score) || row.score < 0) return [];
+    if (!row || !validGameDate(row.date) || !['fishing', 'duel', 'obby'].includes(row.game) || !Number.isInteger(row.score) || row.score < 0) return [];
     return [{ date: row.date, game: row.game, score: row.score,
       ...(Number.isInteger(row.caught) && row.caught >= 0 ? { caught: row.caught } : {}),
       ...(Number.isInteger(row.golden) && row.golden >= 0 && row.golden <= row.caught ? { golden: row.golden } : {}),
       ...(['kid1', 'kid2'].includes(row.opponent) ? { opponent: row.opponent } : {}),
-      ...(typeof row.won === 'boolean' ? { won: row.won } : {}) }];
+      ...(typeof row.won === 'boolean' ? { won: row.won } : {}),
+      ...(Number.isSafeInteger(row.stage) && row.stage >= 0 ? { stage: row.stage } : {}) }];
   }).slice(-60);
 }
 /** 기존 학습 평가 값은 유지하고 문제 본문만 오늘의 정상 문제로 제한한다. */
