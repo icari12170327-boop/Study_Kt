@@ -73,7 +73,7 @@ describe('두뇌 퍼즐 입구와 공통 틀', () => {
     } else {
       const edited = renderer.setPad!(input, selected, '12');
       expect(renderer.padValue!(edited, selected)).toBe('12'); expect(renderer.padValue!(input, selected)).toBe('');
-      expect(html).toContain(type === 'balance' ? '저울 그림 식' : '위에서 본 층 수');
+      expect(html).toContain(type === 'balance' ? '저울 그림 식' : '바닥부터 빈틈없이 쌓인 블록 그림');
       if (type === 'balance') expect(html).toContain('role="img" aria-label=');
       if (type === 'blocks') { expect(html).toContain('viewBox='); expect(html).toContain('<polygon'); }
     }

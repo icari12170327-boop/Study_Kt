@@ -4,8 +4,11 @@ export interface BlocksView { heights: number[][] }
 export interface BlockCell { x: number; y: number; z: number }
 export interface BlockPoint { x: number; y: number }
 export const BLOCKS_LEVELS = [
-  { size: 2, maxHeight: 1 }, { size: 2, maxHeight: 2 }, { size: 3, maxHeight: 2 },
-  { size: 3, maxHeight: 3 }, { size: 3, maxHeight: 4 },
+  { size: 2, maxSize: 2, maxHeight: 2, minHidden: 0, maxHidden: 0 },
+  { size: 2, maxSize: 3, maxHeight: 2, minHidden: 1, maxHidden: 2 },
+  { size: 3, maxSize: 3, maxHeight: 3, minHidden: 2, maxHidden: 4 },
+  { size: 3, maxSize: 3, maxHeight: 3, minHidden: 3, maxHidden: Infinity },
+  { size: 3, maxSize: 3, maxHeight: 4, minHidden: 3, maxHidden: Infinity },
 ] as const;
 /** 정해진 높이 아래를 모두 채운다. 받침 없는 블록은 만들지 않는다. */
 export function blockCells(heights: number[][]): BlockCell[] {
@@ -24,122 +27,78 @@ export function blocksGeometry(heights: number[][]) {
   const cells = blockCells(heights).sort((a, b) => blockOrigin(a.x, a.y).y - blockOrigin(b.x, b.y).y || a.z - b.z);
   const origins = heights.flatMap((row, y) => row.map((_, x) => blockOrigin(x, y)));
   const floor = origins.map(floorFace);
-  const labels = origins.map(origin => ({ x: origin.x + 5, y: origin.y + 13 }));
-  const columnLabels = labels.flatMap((point, index) => {
-    const height = heights[Math.floor(index / heights.length)][index % heights.length];
-    return height ? [{ x: point.x, y: point.y - height * 24, index }] : [];
-  });
   const cubes = cells.map(cell => {
     const origin = blockOrigin(cell.x, cell.y);
     const top = floorFace({ x: origin.x, y: origin.y - (cell.z + 1) * 24 });
     const side = (a: BlockPoint, b: BlockPoint) => [a, b, { x: b.x, y: b.y + 24 }, { x: a.x, y: a.y + 24 }];
     return { cell, top, left: side(top[3], top[2]), right: side(top[2], top[1]) };
   });
-  const points = [...floor.flat(), ...cubes.flatMap(cube => [...cube.top, ...cube.left, ...cube.right]),
-    ...labels.flatMap(point => [{ x: point.x - 9, y: point.y - 9 }, { x: point.x + 9, y: point.y + 9 }])];
+  const points = [...floor.flat(), ...cubes.flatMap(cube => [...cube.top, ...cube.left, ...cube.right])];
   const minX = Math.min(...points.map(point => point.x)), maxX = Math.max(...points.map(point => point.x));
   const minY = Math.min(...points.map(point => point.y)), maxY = Math.max(...points.map(point => point.y));
-  return { floor, cubes, labels, columnLabels, offsetX: 16 - minX, offsetY: 16 - minY, width: maxX - minX + 32, height: maxY - minY + 32 };
+  return { floor, cubes, offsetX: 16 - minX, offsetY: 16 - minY, width: maxX - minX + 32, height: maxY - minY + 32 };
 }
 const cross = (a: BlockPoint, b: BlockPoint, p: BlockPoint) => (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
-/** 볼록한 면을 변마다 잘라 접하기만 하는 선과 면적이 있는 겹침을 구별한다. */
-function overlapArea(subject: BlockPoint[], clip: BlockPoint[]): number {
-  let polygon = subject;
-  for (let i = 0; i < clip.length && polygon.length; i++) {
-    const a = clip[i], b = clip[(i + 1) % clip.length], input = polygon;
-    polygon = [];
-    for (let j = 0; j < input.length; j++) {
-      const p = input[j], q = input[(j + 1) % input.length], dp = cross(a, b, p), dq = cross(a, b, q);
-      if (dp >= -1e-8) polygon.push(p);
-      if ((dp >= 0) !== (dq >= 0)) {
-        const t = dp / (dp - dq);
-        polygon.push({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t });
-      }
-    }
-  }
-  return Math.abs(polygon.reduce((area, p, i) => { const q = polygon[(i + 1) % polygon.length]; return area + p.x * q.y - q.x * p.y; }, 0)) / 2;
+/** 볼록한 블록 면에 점이 포함되는지 검사한다. 경계도 덮인 것으로 센다. */
+export function pointInBlockFace(point: BlockPoint, face: BlockPoint[]): boolean {
+  return face.every((a, i) => cross(a, face[(i + 1) % face.length], point) >= -1e-8);
 }
-/** 면적이 있는 기둥 겹침 여부. 완전 가림과 일부 겹침을 비교하는 데 쓴다. */
-export function hasColumnOverlap(heights: number[][]): boolean {
+/** 각 면 안쪽 3×3 점을 표본으로 삼는다. 경계의 선 두께에는 의존하지 않는다. */
+function faceSamples(face: BlockPoint[]): BlockPoint[] {
+  return [1 / 6, 1 / 2, 5 / 6].flatMap(u => [1 / 6, 1 / 2, 5 / 6].map(v => ({
+    x: face[0].x + u * (face[1].x - face[0].x) + v * (face[3].x - face[0].x),
+    y: face[0].y + u * (face[1].y - face[0].y) + v * (face[3].y - face[0].y),
+  })));
+}
+/** 꼭대기 비율과 가려진 아래 블록 수는 같은 가시성 검사에서 계산한다. */
+export function blocksVisibility(heights: number[][]): { top: number[][]; hidden: number } {
   const { cubes } = blocksGeometry(heights);
-  for (let i = 0; i < cubes.length; i++) for (let j = i + 1; j < cubes.length; j++) {
-    const a = cubes[i], b = cubes[j];
-    if (a.cell.x === b.cell.x && a.cell.y === b.cell.y) continue;
-    for (const face of [a.top, a.left, a.right]) for (const other of [b.top, b.left, b.right])
-      if (overlapArea(face, other) > 1e-6) return true;
-  }
-  return false;
+  const faces = cubes.map(cube => [cube.top, cube.left, cube.right].map(face => ({ face,
+    minX: Math.min(...face.map(p => p.x)), maxX: Math.max(...face.map(p => p.x)),
+    minY: Math.min(...face.map(p => p.y)), maxY: Math.max(...face.map(p => p.y)),
+  })));
+  const top = heights.map(row => row.map(() => 0));
+  let hidden = 0;
+  cubes.forEach((cube, index) => {
+    const frontFaces = faces.slice(index + 1).flat();
+    const visible = faces[index].flatMap(({ face }) => faceSamples(face)).filter(point => !frontFaces.some(cover =>
+      point.x >= cover.minX && point.x <= cover.maxX && point.y >= cover.minY && point.y <= cover.maxY && pointInBlockFace(point, cover.face))).length;
+    if (cube.cell.z === heights[cube.cell.y][cube.cell.x] - 1) top[cube.cell.y][cube.cell.x] = visible / 27;
+    else if (!visible) hidden++;
+  });
+  return { top, hidden };
 }
-function polygonArea(polygon: BlockPoint[]): number {
-  return Math.abs(polygon.reduce((area, p, i) => {
-    const q = polygon[(i + 1) % polygon.length]; return area + p.x * q.y - q.x * p.y;
-  }, 0)) / 2;
-}
-function clipSide(polygon: BlockPoint[], a: BlockPoint, b: BlockPoint, inside: boolean): BlockPoint[] {
-  const result: BlockPoint[] = [], sign = inside ? 1 : -1;
-  for (let i = 0; i < polygon.length; i++) {
-    const p = polygon[i], q = polygon[(i + 1) % polygon.length];
-    const dp = sign * cross(a, b, p), dq = sign * cross(a, b, q);
-    if (dp >= 0) result.push(p);
-    if ((dp >= 0) !== (dq >= 0)) {
-      const t = dp / (dp - dq);
-      result.push({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t });
-    }
-  }
-  return result;
-}
-/** 앞쪽 면의 바깥 조각만 남긴다. 여러 기둥이 함께 가리는 경우도 면적 합으로 판정한다. */
-function subtractFace(subject: BlockPoint[], cover: BlockPoint[]): BlockPoint[][] {
-  if (overlapArea(subject, cover) <= 1e-6) return [subject];
-  const pieces: BlockPoint[][] = [];
-  let remaining = subject;
-  for (let i = 0; i < cover.length && remaining.length; i++) {
-    const a = cover[i], b = cover[(i + 1) % cover.length];
-    const outside = clipSide(remaining, a, b, false);
-    if (polygonArea(outside) > 1e-6) pieces.push(outside);
-    remaining = clipSide(remaining, a, b, true);
-  }
-  return pieces;
-}
-/** SVG 그리기 순서에서 한 블록의 세 면이 모두 덮인 경우만 제외한다. 일부 겹침은 허용한다. */
-export function hasHiddenBlock(heights: number[][]): boolean {
-  const { cubes } = blocksGeometry(heights);
-  return cubes.some((cube, index) => [cube.top, cube.left, cube.right].every(face => {
-    let visible = [face];
-    for (let i = index + 1; i < cubes.length && visible.length; i++) {
-      const front = cubes[i];
-      for (const cover of [front.top, front.left, front.right]) {
-        visible = visible.flatMap(piece => subtractFace(piece, cover));
-        if (!visible.length) break;
-      }
-    }
-    return !visible.length;
-  }));
-}
-function needsBlocksRetry(heights: number[][]): boolean {
-  // 명세가 별도로 제외한 최초 재현 배치는 계속 제외한다. 다른 일부 겹침은 허용한다.
-  return hasHiddenBlock(heights) || (heights.length === 2 && heights[0][0] === 2 && heights[0][1] === 0 && heights[1][0] === 0 && heights[1][1] === 1);
-}
-export const BLOCK_SLOT_LABELS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'] as const;
+export function topVisibility(heights: number[][]): number[][] { return blocksVisibility(heights).top; }
+export function hiddenBlockCount(heights: number[][]): number { return blocksVisibility(heights).hidden; }
+
+export const BLOCKS_MAX_ATTEMPTS = 200;
+// 표시 조건을 만족하는 고정 배치. 반환할 때 복제해 호출 간 변경을 막는다.
+export const BLOCKS_FALLBACKS: readonly (readonly (readonly number[])[])[] = [
+  [[0, 2], [1, 0]],
+  [[2, 2], [2, 2]],
+  [[2, 2, 2], [2, 2, 2], [2, 2, 2]],
+  [[3, 3, 3], [3, 3, 3], [3, 3, 3]],
+  [[4, 4, 4], [4, 4, 4], [4, 4, 4]],
+];
 export const blocksGenerator: PuzzleGenerator<BlocksView, number> = {
   type: 'blocks',
   generate(difficulty, rng) {
     const seed = randInt(0, 0xffffffff, rng), config = BLOCKS_LEVELS[difficulty - 1];
-    let heights = Array.from({ length: config.size }, () => Array.from({ length: config.size }, () => randInt(0, config.maxHeight, rng)));
-    // 전부 빈 바닥이어도 재시도하지 않고 한 칸을 채운다. 최대 9기둥, 36블록이다.
-    if (heights.flat().reduce((sum, height) => sum + height, 0) === 0) heights[0][0] = 1;
-    if (difficulty <= 3) {
-      // 최대 16후보로 끝낸다. 높이 상한을 유지하고 실패하면 서로 떨어진 대각선에 놓는다.
-      for (let attempt = 1; attempt < 16 && needsBlocksRetry(heights); attempt++) {
-        heights = Array.from({ length: config.size }, () => Array.from({ length: config.size }, () => randInt(0, config.maxHeight, rng)));
-        if (!heights.flat().some(Boolean)) heights[0][0] = 1;
-      }
-      if (needsBlocksRetry(heights)) {
-        heights = Array.from({ length: config.size }, (_, y) => Array.from({ length: config.size }, (_, x) => x + y === config.size - 1 ? randInt(1, config.maxHeight, rng) : 0));
+    const size = config.size === config.maxSize ? config.size : randInt(config.size, config.maxSize, rng);
+    let heights: number[][] | undefined;
+    for (let attempt = 0; attempt < BLOCKS_MAX_ATTEMPTS; attempt++) {
+      const candidate = Array.from({ length: size }, () => Array.from({ length: size }, () => randInt(0, config.maxHeight, rng)));
+      if (!candidate.flat().some(Boolean)) continue;
+      // 최초 재현 배치는 개정 명세에서도 생성하지 않는다.
+      if (size === 2 && candidate[0][0] === 2 && candidate[0][1] === 0 && candidate[1][0] === 0 && candidate[1][1] === 1) continue;
+      const { top, hidden } = blocksVisibility(candidate);
+      if (candidate.every((row, y) => row.every((height, x) => !height || top[y][x] >= 0.3)) && hidden >= config.minHidden && hidden <= config.maxHidden) {
+        heights = candidate; break;
       }
     }
+    heights ??= BLOCKS_FALLBACKS[difficulty - 1].map(row => [...row]);
     return { type: 'blocks', difficulty, seed, view: { heights }, answer: heights.flat().reduce((sum, height) => sum + height, 0),
-      hint: '위에서 본 층 수를 한 줄씩 더하고, 가려진 블록도 세어 봐요.' };
+      hint: '색칠한 자리에 기둥이 있어요. 보이는 꼭대기 아래의 블록도 세어 봐요.' };
   },
   check(puzzle, input) { return input === puzzle.answer; },
 };
