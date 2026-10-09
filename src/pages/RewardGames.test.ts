@@ -18,17 +18,18 @@ const unlock = (id: 'kid1' | 'kid2') => { const day = emptyDay(today); day.progr
 const card = (profileId: 'kid1' | 'parent' = 'kid1') => renderToStaticMarkup(createElement(RewardGameCard, { profileId, today, go: () => {} }));
 
 describe('오늘의 게임 화면과 기존 홈', () => {
-  it('보호자에게 게임 카드를 표시하지 않고 아이는 수학 전 두 버튼이 잠긴다', () => {
+  it('보호자에게 게임 카드를 표시하지 않고 아이는 수학 전 세 버튼이 잠긴다', () => {
     expect(card('parent')).toBe('');
-    const html = card(); expect(html).toContain('수학 미션을 끝내면 열려요'); expect(html.match(/disabled=""/g)).toHaveLength(2);
+    const html = card(); expect(html).toContain('수학 미션을 끝내면 열려요'); expect(html.match(/disabled=""/g)).toHaveLength(3);
+    expect(html.indexOf('🎣 낚시')).toBeLessThan(html.indexOf('🏃 오비 달리기')); expect(html.indexOf('🏃 오비 달리기')).toBeLessThan(html.indexOf('⚔️ 형제 대결'));
   });
-  it('자신의 수학만 완료하면 낚시만 열리고 둘 다 완료해야 대결이 열린다', () => {
+  it('자신의 수학만 완료하면 낚시·오비가 열리고 둘 다 완료해야 대결이 열린다', () => {
     unlock('kid1'); expect(card().match(/disabled=""/g)).toHaveLength(1);
     unlock('kid2'); expect(card()).not.toContain('disabled=""');
     state.data.kid2.games = Array.from({ length: 3 }, () => ({ date: today, game: 'fishing', score: 0 }));
     expect(card().match(/disabled=""/g)).toHaveLength(1);
   });
-  it('게임 상한은 두 버튼을 잠그지만 왕관 표시와 기존 미션은 보존한다', () => {
+  it('게임 상한은 세 버튼을 잠그지만 왕관 표시와 기존 미션은 보존한다', () => {
     unlock('kid1'); unlock('kid2'); state.data.kid1.crownUntil = today;
     state.data.kid1.games = Array.from({ length: 3 }, () => ({ date: today, game: 'fishing', score: 0 }));
     const html = renderToStaticMarkup(createElement(Home, { profileId: 'kid1', go: () => {} }));

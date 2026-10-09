@@ -280,7 +280,7 @@ function Settings() {
             {Array.from({ length: 10 }, (_, i) => i + 1).map(count => <option key={count} value={count}>{count}판</option>)}
           </select>
         </label>
-        <p className="small muted">낚시와 형제 대결의 하루 상한이에요. 대결 한 번은 각자 한 판이에요.</p>
+        <p className="small muted">낚시·오비 달리기·형제 대결이 함께 쓰는 하루 상한이에요. 대결 한 번은 각자 한 판이에요.</p>
       </div>}
 
       {pid !== 'parent' && profile.level !== 'adult' && <div className="panel">

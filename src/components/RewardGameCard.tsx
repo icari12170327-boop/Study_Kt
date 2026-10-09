@@ -15,6 +15,7 @@ export function RewardGameCard({ profileId, today, go }: { profileId: ProfileId;
     {!gate.ok && <p>{gate.reason === 'math-not-done' ? '🔒 수학 미션을 끝내면 열려요' : '오늘 판 수를 모두 썼어요. 내일 또 만나요!'}</p>}
     <p className="small muted">오늘 {Math.max(0, normalizeGamesPerDay(settings.gamesPerDay) - gamesPlayedToday(data.games ?? [], today))}판 남았어요</p>
     <div className="game-buttons"><button className="btn btn-primary" disabled={!gate.ok} onClick={() => go({ name: 'games', profileId, game: 'fishing' })}>🎣 낚시</button>
+      <button className="btn btn-soft" disabled={!gate.ok} onClick={() => go({ name: 'games', profileId, game: 'obby' })}>🏃 오비 달리기</button>
       <button className="btn btn-soft" disabled={!gate.ok || !both} onClick={() => go({ name: 'games', profileId, game: 'duel' })}>⚔️ 형제 대결</button></div>
     {!both && <p className="small muted">형제 대결은 둘 다 수학을 끝내고 남은 판이 있어야 해요.</p>}
   </section>;

@@ -471,6 +471,41 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 .reward-game .done { display: grid; gap: 14px; }
 @media (prefers-reduced-motion: reduce) { .fish { will-change: auto; } }
 
+/* 오비 코스와 캐릭터는 이미지 없이 DOM과 CSS로 그린다. */
+.obby-game { display: grid; gap: 14px; }
+.obby-game .badge:not(.badge-warn) { color: var(--text); }
+.obby-colors, .obby-hats { display: flex; gap: 10px; flex-wrap: wrap; }
+.obby-colors .btn, .obby-hats .btn { min-height: 48px; }
+.obby-colors [aria-pressed="true"], .obby-hats [aria-pressed="true"] { outline: 3px solid var(--primary); outline-offset: 2px; }
+.obby-red { --obby-body: #e45555; }.obby-blue { --obby-body: #5086e2; }.obby-green { --obby-body: #289865; }.obby-yellow { --obby-body: #e7bd32; }.obby-purple { --obby-body: #9c62d5; }
+.obby-color-swatch { display: inline-block; width: 20px; height: 20px; border: 1px solid var(--text); border-radius: 5px; background: var(--obby-body); margin-right: 8px; vertical-align: middle; }
+.obby-preview { height: 100px; display: grid; place-items: center; }
+.obby-character { position: relative; width: 42px; height: 64px; display: grid; justify-items: center; align-content: end; }
+.obby-hat { position: absolute; top: -16px; left: 2px; z-index: 1; font-size: 32px; line-height: 1; }
+.obby-face { font-size: 27px; line-height: 1; }
+.obby-body { width: 32px; height: 24px; border: 2px solid var(--text); border-radius: 6px; background: var(--obby-body); }
+.obby-legs { width: 24px; height: 11px; border-left: 7px solid var(--text); border-right: 7px solid var(--text); }
+.obby-course { position: relative; height: 180px; overflow: hidden; border: 2px solid var(--primary); border-radius: 18px; background: var(--card); --obby-track: var(--primary); }
+.obby-zone-1 { --obby-track: #b66327; }.obby-zone-2 { --obby-track: #228958; }.obby-zone-3 { --obby-track: #a358c2; }.obby-zone-4 { --obby-track: #417da5; }
+.obby-floor { position: absolute; bottom: 0; width: 100%; height: 30px; background: repeating-linear-gradient(100deg, var(--obby-track) 0 24px, var(--primary-soft) 24px 48px); animation: obby-track 1s linear infinite; }
+.obby-runner { position: absolute; left: 24px; bottom: 30px; z-index: 2; }
+.obby-runner .obby-idle { animation: obby-running .35s linear infinite; }
+.obby-jump { animation: obby-jump .6s ease-in-out; }.obby-fall { animation: obby-fall 3s ease-in-out; }
+.obby-bubble { position: absolute; top: 10px; left: 82px; right: 10px; padding: 10px; border: 2px solid var(--obby-track); border-radius: 12px; background: var(--card); overflow-wrap: anywhere; }
+.obby-bubble .question-text { font-size: clamp(1.1rem, 4vw, 1.5rem); margin: 0; }
+.obby-obstacle { position: absolute; right: 36px; bottom: 30px; font-size: 42px; animation: obby-arrive .6s ease-out; }
+.obby-flag { position: absolute; left: 6px; top: 10px; font-size: 24px; }
+@keyframes obby-track { to { background-position: -48px 0; } }
+@keyframes obby-running { 50% { transform: translateY(-3px) rotate(3deg); } }
+@keyframes obby-jump { 50% { transform: translate(24px, -48px) rotate(8deg); } }
+@keyframes obby-fall { 20%, 75% { transform: translateY(100px) rotate(30deg); opacity: .3; } }
+@keyframes obby-arrive { from { transform: translateX(80px); } to { transform: translateX(0); } }
+@keyframes obby-blink { 50% { opacity: .4; } }
+@media (prefers-reduced-motion: reduce) {
+  .obby-floor, .obby-runner .obby-idle, .obby-obstacle { animation: none; }
+  .obby-jump, .obby-fall { animation: obby-blink .25s ease-in-out; }
+}
+
 /* 두뇌 퍼즐: 작은 화면에서도 숫자 칸은 최소 44px를 유지한다. */
 .puzzle-home { margin-top: 12px; }
 .puzzle-home .mission-icon { background: var(--primary-soft); }
