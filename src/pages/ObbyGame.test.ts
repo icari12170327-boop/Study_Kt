@@ -61,13 +61,13 @@ describe('오비 실제 DOM 입력·종료·학습 분리', () => {
     expect(saved().data.kid2.games).toHaveLength(1); expect(saved().data.kid2.obby).toEqual({ best: 20, color: 'green', hat: 'cap' });
     expect(learningOnly(saved())).toEqual(learningOnly(before));
   });
-  it('정답 점프·오답 3초 잠금·90초 종료 동안 키와 터치를 막고 학습·보상은 유지한다', async () => {
+  it('정답 점프·오답 3초 잠금·90초 종료에서 오답 입력만 막고 학습·보상은 유지한다', async () => {
     await mount(); const before = saved(); await click(button('🏃 달리기 시작'));
     expect(container.querySelector('.obby-bubble')?.textContent).toBe('2 + 3 = ?');
     expect(container.textContent).toContain('🔥 용암 · 30점');
     await key('5'); await key('Enter');
     expect(container.textContent).toContain('Stage 2'); expect(container.textContent).toContain('점프! +30점');
-    expect(button('확인').disabled).toBe(true); await key('Enter'); expect(container.textContent).toContain('Stage 2');
+    expect(button('확인').disabled).toBe(false); await key('Enter'); expect(container.textContent).toContain('Stage 2');
     await frame(600); expect(button('확인').disabled).toBe(false);
     await click(button('0')); await click(button('확인')); expect(container.textContent).toContain('으악, 떨어졌다!');
     const question = container.querySelector('.obby-bubble')?.textContent;
@@ -83,6 +83,33 @@ describe('오비 실제 DOM 입력·종료·학습 분리', () => {
     expect(saved().data.kid2.games).toEqual([{ date: toDateKey(), game: 'obby', score: 40, stage: 3, caught: 2, golden: 1 }]);
     expect(saved().data.kid2.obby?.best).toBe(20); expect(learningOnly(saved())).toEqual(learningOnly(before));
     expect(frames.size).toBe(0);
+  });
+  it.each(['키보드', '키패드'])('점프 시작 150ms 뒤 %s로 두 자리 답을 입력하고 바로 제출할 수 있다', async method => {
+    await mount(); const before = saved(); await click(button('🏃 달리기 시작')); await key('5'); await key('Enter');
+    await frame(150); expect(container.querySelector('.obby-jump')).not.toBeNull();
+    expect(button('확인').disabled).toBe(false);
+    for (const digit of '11') {
+      if (method === '키보드') await key(digit); else await click(button(digit));
+    }
+    expect(container.querySelector<HTMLInputElement>('[aria-label=답]')?.value).toBe('11');
+    if (method === '키보드') await key('Enter'); else await click(button('확인'));
+    expect(container.textContent).toContain('Stage 3'); expect(container.querySelector('.obby-fall')).toBeNull();
+    await frame(90000);
+    expect(saved().data.kid2.games![0]).toMatchObject({ stage: 3, score: 40, caught: 2 });
+    expect(learningOnly(saved())).toEqual(learningOnly(before));
+  });
+  it('두 자리 답의 첫 글자를 점프 중에 입력해도 애니메이션 종료 뒤 이어서 제출한다', async () => {
+    await mount(); await click(button('🏃 달리기 시작')); await key('5'); await key('Enter');
+    await frame(150); await key('1'); await frame(650);
+    expect(container.querySelector<HTMLInputElement>('[aria-label=답]')?.value).toBe('1');
+    await key('1'); await key('Enter'); expect(container.textContent).toContain('Stage 3');
+  });
+  it('확인 연타는 이전 답으로 다음 문제까지 채점하지 않는다', async () => {
+    await mount(); await click(button('🏃 달리기 시작')); await key('5');
+    const submit = button('확인'); await act(async () => { submit.click(); submit.click(); });
+    expect(container.textContent).toContain('Stage 2'); expect(container.querySelector('.obby-fall')).toBeNull();
+    expect(container.querySelector<HTMLInputElement>('[aria-label=답]')?.value).toBe('');
+    await key('1'); await key('1'); await key('Enter'); expect(container.textContent).toContain('Stage 3');
   });
   it('오답 잠금 뒤 다른 문제 세 개를 넘으면 틀린 장애물이 다시 나온다', async () => {
     await mount(); await click(button('🏃 달리기 시작')); await key('0'); await key('Enter'); await frame(3000);

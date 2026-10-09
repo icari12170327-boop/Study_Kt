@@ -87,7 +87,7 @@ export function ObbyGame({ profileId, go }: { profileId: ProfileId; go: Go }) {
     // 중간에 화면을 나가도 예약한 한 판과 도달 기록을 남긴다.
     return () => { stopped = true; cancelAnimationFrame(frame); persist(); };
   }, [mode, end, persist]);
-  const blocked = () => done.current || !plan.current || phaseRef.current !== 'idle' || performance.now() < runRef.current.lockedUntil;
+  const blocked = () => done.current || !plan.current || performance.now() < runRef.current.lockedUntil;
   const changeInput = (value: AnswerInput) => {
     if (blocked()) return;
     if (!roundRemaining(plan.current!.startedAt, performance.now())) { end(); return; }
@@ -97,7 +97,9 @@ export function ObbyGame({ profileId, go }: { profileId: ProfileId; go: Go }) {
     if (blocked()) return;
     const now = performance.now(), current = plan.current!;
     if (!roundRemaining(current.startedAt, now)) { end(); return; }
-    const fish = runRef.current.queue[0]; if (!fish) return;
+    const fish = runRef.current.queue[0];
+    // 이전 문제의 확인 연타가 새 문제에 이전 답을 적용하지 않게 한다.
+    if (!fish || fish.id !== run.queue[0]?.id) return;
     const result = gradeAnswer(fish.problem.answer, input);
     if (result.reason) { setMessage(result.reason); return; }
     let next = answerObstacle(runRef.current, result.correct, now);
@@ -140,7 +142,7 @@ export function ObbyGame({ profileId, go }: { profileId: ProfileId; go: Go }) {
       <ObbyCourse run={run} color={color} hat={hat} phase={phase} />
       {fish && <section className="question-card"><span className={`badge ${fish.golden ? 'badge-warn' : ''}`}>{fish.golden ? '🔥 용암 · 30점' : '장애물 · 10점'}</span>
         {fish.problem.answer.kind === 'fraction' && <p className="small muted">기약분수로 답해요. 대분수는 자연수 칸도 채워요.</p>}
-        <NumberPad key={`${run.stage}-${run.falls}`} kind={fish.problem.answer.kind} value={input} onChange={changeInput} onSubmit={submit} onNext={() => {}} nextButtonRef={nextButton} onActivity={() => {}} disabled={phase !== 'idle'} />
+        <NumberPad key={`${run.stage}-${run.falls}`} kind={fish.problem.answer.kind} value={input} onChange={changeInput} onSubmit={submit} onNext={() => {}} nextButtonRef={nextButton} onActivity={() => {}} disabled={phase === 'fall'} />
       </section>}
       {message && <p className={`feedback ${phase === 'fall' ? 'bad' : 'ok'}`} role="status">{message}{phase === 'fall' && ` (${Math.max(0, Math.ceil((run.lockedUntil - performance.now()) / 1000))}초)`}</p>}
     </>}
