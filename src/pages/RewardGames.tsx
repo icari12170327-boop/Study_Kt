@@ -11,11 +11,13 @@ import { canPlay, gamesPlayedToday, normalizeGamesPerDay, reserveDuel, reserveGa
 import { TopBar } from '../components/common';
 import { FishingGame, type FishingPlan } from './FishingGame';
 import { DuelGame, type DuelPlan } from './DuelGame';
+import { ObbyGame } from './ObbyGame';
 
-export const REWARD_GAMES: { id: GameId; title: string }[] = [{ id: 'fishing', title: '🎣 낚시' }, { id: 'duel', title: '⚔️ 형제 대결' }];
+export const REWARD_GAMES: { id: GameId; title: string }[] = [{ id: 'fishing', title: '🎣 낚시' }, { id: 'obby', title: '🏃 오비 달리기' }, { id: 'duel', title: '⚔️ 형제 대결' }];
 export function RewardGames({ profileId, go, initial }: { profileId: ProfileId; go: Go; initial?: GameId }) {
   const { state, update } = useStore();
   const [fishing, setFishing] = useState<FishingPlan>(), [duel, setDuel] = useState<DuelPlan>();
+  const [obby, setObby] = useState(false);
   const starting = useRef(false), today = toDateKey();
   const profile = state.profiles.find(p => p.id === profileId)!, settings = state.settings[profileId], data = state.data[profileId];
   const allowed = profileId !== 'parent' && profile.level !== 'adult';
@@ -24,6 +26,7 @@ export function RewardGames({ profileId, go, initial }: { profileId: ProfileId; 
   const dataLevel = (id: ProfileId) => state.data[id].math.level;
   const start = (game: GameId) => {
     if (starting.current || !allowed || !gate.ok || (game === 'duel' && !both)) return;
+    if (game === 'obby') { setObby(true); return; }
     const seed = Math.floor(Math.random() * 0x100000000), snapshot = structuredClone(state);
     if (game === 'fishing') {
       const index = reserveGame(settings, snapshot.data[profileId], today, game);
@@ -42,12 +45,13 @@ export function RewardGames({ profileId, go, initial }: { profileId: ProfileId; 
   };
   if (fishing) return <FishingGame profileId={profileId} go={go} plan={fishing} />;
   if (duel) return <DuelGame profileId={profileId} go={go} plan={duel} />;
+  if (obby || initial === 'obby') return <ObbyGame profileId={profileId} go={go} />;
   const message = !allowed || (!gate.ok && gate.reason === 'math-not-done') ? '🔒 수학 미션을 끝내면 열려요'
     : !gate.ok ? '오늘 판 수를 모두 썼어요. 내일 또 만나요!'
     : `오늘 ${Math.max(0, normalizeGamesPerDay(settings.gamesPerDay) - gamesPlayedToday(data.games ?? [], today))}판 남았어요`;
   return <div className="page"><TopBar title="🎮 오늘의 게임" onBack={() => go({ name: 'home', profileId })} /><section className="panel form">
     <h2>오늘의 수학으로 놀아요!</h2><p>{message}</p>
     {REWARD_GAMES.filter(game => !initial || game.id === initial).map(game => <button key={game.id} className="btn btn-primary" disabled={!allowed || !gate.ok || game.id === 'duel' && !both} onClick={() => start(game.id)}>{game.title} 시작</button>)}
-    <p className="small muted">형제 대결은 두 아이 모두 수학을 끝내고 한 판 이상 남아 있어야 해요.</p><p className="small muted">낚시 90초 · 대결은 각자 90초. 시작하면 오늘 판 수에 포함돼요. 게임 점수는 별과 쿠폰에 더하지 않아요.</p>
+    <p className="small muted">형제 대결은 두 아이 모두 수학을 끝내고 한 판 이상 남아 있어야 해요.</p><p className="small muted">낚시·오비 90초 · 대결은 각자 90초. 시작하면 오늘 판 수에 포함돼요. 게임 점수는 별과 쿠폰에 더하지 않아요.</p>
   </section></div>;
 }

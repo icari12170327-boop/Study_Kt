@@ -59,6 +59,25 @@ describe('주간 범위와 안내 날짜', () => {
   });
 });
 describe('고정 기록 집계', () => {
+  it('오비 판 수와 이번 주 최고 Stage는 해당 주 기록만 읽고 누적 최고와 구분한다', () => {
+    const state = fixture(), data = state.data.kid2; data.obby = { best: 99, color: 'blue' };
+    data.games!.push({ date: '2026-10-04', game: 'obby', score: 200, stage: 60 },
+      { date: '2026-10-05', game: 'obby', score: 20, stage: 3 }, { date: '2026-10-11', game: 'obby', score: 120, stage: 14 },
+      { date: '2026-10-11', game: 'obby', score: 0 }, { date: '2026-10-12', game: 'obby', score: 200, stage: 50 });
+    const before = structuredClone(state), stats = buildWeeklyStats(state, 'kid2', weekRange('2026-10-09'));
+    expect(stats.play).toMatchObject({ obby: 3, obbyBest: 14, fishing: 1, duels: 2 });
+    expect(reportText(stats)).toContain('오비 달리기 3판(이번 주 최고 Stage 14)');
+    expect(weeklyReportRequest(stats, 'g3').input.stats.play).not.toHaveProperty('obby');
+    expect(weeklyReportRequest(stats, 'g3').input.stats.play).not.toHaveProperty('obbyBest');
+    expect(state).toEqual(before);
+  });
+  it('오비 Stage 없는 옛 기록과 예약된 판은 수만 세고 최고 Stage는 추정하지 않는다', () => {
+    const state = defaultState(); state.data.kid1.games = [{ date: '2026-10-09', game: 'obby', score: 0 }];
+    const stats = buildWeeklyStats(state, 'kid1', weekRange('2026-10-09'));
+    expect(stats.play.obby).toBe(1); expect(stats.play.obbyBest).toBeUndefined();
+    expect(reportText(stats)).toContain('이번 주 최고 Stage 기록 없음');
+    expect(buildWeeklyStats(state, 'kid1', weekRange('2026-10-09', -1)).play).toMatchObject({ obby: 0 });
+  });
   it('출석·쿠폰·수학의 분모·단원·레벨·문장제·찍기가 원기록과 일치한다', () => {
     const stats = buildWeeklyStats(fixture(), 'kid2', weekRange('2026-10-08'));
     expect(stats.attendance).toEqual({ completedDays: 3, streak: 3, stars: null, coupons: 2 });
@@ -87,7 +106,7 @@ describe('고정 기록 집계', () => {
   it('대화 시간을 일별 합계와 중복하지 않고 자유 놀이의 날짜 범위를 지킨다', () => {
     const stats = buildWeeklyStats(fixture(), 'kid2', weekRange('2026-10-08'));
     expect(stats.talk).toEqual({ minutes: 5.5, sessions: 3, highlights: ['한 줄 3', '한 줄 2', '한 줄 1'] });
-    expect(stats.play).toEqual({ bingoGames: 2, bingoBest: 10, puzzlesSolved: 13, puzzleLevelUps: null, fishing: 1, duels: 2, crowns: 1, storyEpisodes: null });
+    expect(stats.play).toEqual({ bingoGames: 2, bingoBest: 10, puzzlesSolved: 13, puzzleLevelUps: null, fishing: 1, duels: 2, obby: 0, crowns: 1, storyEpisodes: null });
   });
   it('날짜 없는 누적 값은 주간 값으로 쓰지 않고 기록 없는 주도 모든 항목을 유지한다', () => {
     const stats = buildWeeklyStats(fixture(), 'kid2', weekRange('2026-09-21'));

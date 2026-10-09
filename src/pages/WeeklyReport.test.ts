@@ -13,6 +13,12 @@ beforeEach(() => { state = defaultState(); update.mockClear(); vi.useFakeTimers(
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 const render = () => renderToStaticMarkup(createElement(WeeklyReport));
 describe('보호자 주간 리포트 화면', () => {
+  it('자유 놀이에 오비 판 수와 이번 주 최고 Stage를 표시한다', () => {
+    state.data.kid1.obby = { best: 99, color: 'blue' };
+    state.data.kid1.games = [{ date: '2026-10-04', game: 'obby', score: 100, stage: 50 }, { date: '2026-10-11', game: 'obby', score: 20, stage: 8 }];
+    const html = render();
+    expect(html).toMatch(/오비 달리기<\/span><strong>1판/); expect(html).toMatch(/이번 주 최고 Stage<\/span><strong>8 /);
+  });
   it('AI 연결 없이 모든 숫자 항목과 아이·주 선택이 나오고 요청과 상태 변경은 없다', () => {
     const fetch = vi.fn(); vi.stubGlobal('fetch', fetch); const before = structuredClone(state);
     const html = render();

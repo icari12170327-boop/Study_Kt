@@ -4,6 +4,7 @@ import { normalizeStories, normalizeStorySettings } from '../content/stories/pro
 import { normalizeWeeklyAi } from '../lib/weeklyAi';
 import { normalizePuzzleData, normalizePuzzleSettings } from '../content/puzzles/state';
 import { normalizeGameAttempts, normalizeGames, normalizeGamesPerDay, validGameDate } from '../content/games/limits';
+import { normalizeObby } from '../content/games/obby';
 import { toDateKey } from '../lib/date';
 import { enableBusinessTalkOnce, normalizeBizSituations, normalizeCustomCards } from '../lib/business';
 import { normalizeCoachSettings } from '../lib/coach';
@@ -57,6 +58,7 @@ export function normalizeState(raw: unknown, today = toDateKey()): AppState {
     data[p.id].wrongNotes = Array.isArray(data[p.id].wrongNotes) ? data[p.id].wrongNotes.filter(note => note && note.problem).map(note => ({ ...note, problem: withoutStory(note.problem) })) : [];
     data[p.id].puzzles = normalizePuzzleData(s.data?.[p.id]?.puzzles, p.level);
     data[p.id].games = normalizeGames(s.data?.[p.id]?.games);
+    data[p.id].obby = normalizeObby(s.data?.[p.id]?.obby);
     if (validGameDate(s.data?.[p.id]?.crownUntil)) data[p.id].crownUntil = s.data![p.id].crownUntil;
     else delete data[p.id].crownUntil;
     data[p.id].customCards = normalizeCustomCards(s.data?.[p.id]?.customCards);

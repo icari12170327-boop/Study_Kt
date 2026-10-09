@@ -6,7 +6,10 @@ import { badgeLabel } from '../content/science/units';
 import { addDays, lastNDays, parseDateKey, toDateKey } from './date';
 export type { WeekRange, WeeklyAi } from '../../shared/weeklyReport';
 /** 비교용 기록 존재 여부는 로컬에서만 사용하며 Worker에 보내지 않는다. */
-export interface WeeklyStats extends NumericWeeklyStats { hasRecords: boolean }
+export interface WeeklyStats extends NumericWeeklyStats {
+  hasRecords: boolean;
+  play: NumericWeeklyStats['play'] & { obby: number; obbyBest?: number };
+}
 
 export function validReportDate(value: unknown): value is string {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && toDateKey(parseDateKey(value)) === value;
@@ -79,6 +82,7 @@ export function buildWeeklyStats(state: AppState, profileId: ProfileId, range: W
   const dailyDates = new Set(dailyPuzzles.map(row => row.date));
   const recentPuzzles = data.puzzles?.recent.filter(row => within(row.date) && !dailyDates.has(row.date)) ?? [];
   const games = data.games?.filter(row => within(row.date)) ?? [];
+  const obby = games.filter(row => row.game === 'obby'), stages = obby.flatMap(row => row.stage !== undefined ? [row.stage] : []);
   const story = attempts.filter(attempt => attempt.story === true);
   return {
     profileId, range: { ...range },
@@ -110,6 +114,7 @@ export function buildWeeklyStats(state: AppState, profileId: ProfileId, range: W
       puzzlesSolved: dailyPuzzles.reduce((n, row) => n + row.solved, 0) + recentPuzzles.filter(row => row.correct).length,
       puzzleLevelUps: null, fishing: games.filter(row => row.game === 'fishing').length,
       duels: games.filter(row => row.game === 'duel').length,
+      obby: obby.length, ...(stages.length ? { obbyBest: Math.max(...stages) } : {}),
       crowns: games.filter(row => row.game === 'duel' && row.won === true).length, storyEpisodes: null,
     },
   };
@@ -122,7 +127,7 @@ export function compareStats(cur: WeeklyStats, prev: WeeklyStats): Record<string
     mathSolved: stats.math.solved, mathAccuracy: stats.math.accuracy, mathLevel: stats.math.levelEnd, guesses: stats.math.guesses, storyAccuracy: stats.math.storyAccuracy,
     scienceSolved: stats.science.solved, scienceAccuracy: stats.science.accuracy, newCards: stats.science.newCards, newBadges: stats.science.newBadges.length,
     talkMinutes: stats.talk.minutes, talkSessions: stats.talk.sessions, bingoGames: stats.play.bingoGames, bingoBest: stats.play.bingoBest ?? null,
-    puzzlesSolved: stats.play.puzzlesSolved, puzzleLevelUps: stats.play.puzzleLevelUps, fishing: stats.play.fishing, duels: stats.play.duels, crowns: stats.play.crowns, storyEpisodes: stats.play.storyEpisodes,
+    puzzlesSolved: stats.play.puzzlesSolved, puzzleLevelUps: stats.play.puzzleLevelUps, fishing: stats.play.fishing, duels: stats.play.duels, obby: stats.play.obby, obbyBest: stats.play.obbyBest ?? null, crowns: stats.play.crowns, storyEpisodes: stats.play.storyEpisodes,
   });
   const before = metrics(prev);
   return Object.fromEntries(Object.entries(metrics(cur)).map(([key, value]) => {
@@ -143,7 +148,7 @@ export function reportText(stats: WeeklyStats, ai?: WeeklyAi, profileName = stat
     `과학 ${s.solved}문제 · 정답률 ${reportValue(s.accuracy, '%')} · 새 도감 ${s.newCards}장 · 새 배지 ${s.newBadges.length ? s.newBadges.map(badgeLabel).join(', ') : '기록 없음'}`,
     `영어 대화 ${t.minutes}분 · ${t.sessions}회`, ...t.highlights.map(line => `오늘의 한 줄: ${line}`),
     `자유 놀이: 빙고 ${p.bingoGames}판(최고 ${reportValue(p.bingoBest)}) · 맞힌 퍼즐 ${p.puzzlesSolved}개 · 난이도 변경 ${reportValue(p.puzzleLevelUps)}`,
-    `낚시 ${p.fishing}판 · 형제 대결 ${p.duels}판 · 👑 ${p.crowns}회 · 읽은 이야기 ${reportValue(p.storyEpisodes)}`,
+    `낚시 ${p.fishing}판 · 오비 달리기 ${p.obby}판(이번 주 최고 Stage ${reportValue(p.obbyBest)}) · 형제 대결 ${p.duels}판 · 👑 ${p.crowns}회 · 읽은 이야기 ${reportValue(p.storyEpisodes)}`,
     '보관된 기록 기준입니다. 날짜가 없는 별·이야기·퍼즐 난이도 변경은 주간 값으로 추정하지 않습니다.',
     ...(ai ? [`잘한 점: ${ai.goodKo}`, `살펴볼 점: ${ai.watchKo}`, `다음 주 제안: ${ai.nextKo}`] : []),
   ].join('\n');
