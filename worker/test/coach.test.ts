@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SessionRequest } from '../../shared/ai';
 import { buildCallBody } from '../src/openai';
-import { instructions } from '../src/personas';
+import { generationInstructions, instructions } from '../src/personas';
 import { generateSchema, inputSchemas, outputSchemas, sessionSchema } from '../src/validation';
 
 const child: SessionRequest = { profileId: 'kid1', level: 'g5', mode: 'kid-friend', offerSdp: 'v=0\r\nm=audio', persona: { friendName: 'Max', personaId: 'funny', voice: 'marin' } };
@@ -50,8 +50,9 @@ describe('코치 검증·지시문·음성 설정', () => {
     expect(inputSchemas['coach-check'].safeParse({ text: 'a'.repeat(301), level: 'words' }).success).toBe(false);
     expect(inputSchemas['coach-wrapup'].safeParse({ lines: [] }).success).toBe(false);
     expect(inputSchemas['coach-wrapup'].safeParse({ lines: [{ role: 'user', text: 'Hi', at: 1 }] }).success).toBe(true);
-    expect(outputSchemas['coach-gloss'].safeParse({ ko: 'a'.repeat(200) }).success).toBe(true);
-    expect(outputSchemas['coach-gloss'].safeParse({ ko: 'a'.repeat(201) }).success).toBe(false);
+    expect(outputSchemas['coach-gloss'].safeParse({ ko: 'a'.repeat(400) }).success).toBe(true);
+    expect(outputSchemas['coach-gloss'].safeParse({ ko: 'a'.repeat(401) }).success).toBe(false);
+    expect(generationInstructions['coach-gloss']).toContain('keep it short; never exceed 400 characters');
     const sentence = { en: 'a'.repeat(120), ko: '가'.repeat(120) };
     expect(outputSchemas['coach-wrapup'].safeParse({ sentences: Array(3).fill(sentence) }).success).toBe(true);
     expect(outputSchemas['coach-wrapup'].safeParse({ sentences: Array(4).fill(sentence) }).success).toBe(false);

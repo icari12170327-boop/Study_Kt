@@ -35,7 +35,7 @@ export function normalizeCustomCards(raw: unknown): CustomCard[] {
   const ids = new Set<string>(), expressions = new Set<string>(), result: CustomCard[] = [];
   for (const item of raw) {
     const row = object(item);
-    if (!text(row.id, 100) || !/^mp-\d+-[a-z0-9]{4}$/.test(row.id) || !text(row.en, 300) || typeof row.ko !== 'string' || row.ko.length > 300 || !text(row.source, 300) ||
+    if (!text(row.id, 100) || !/^mp-\d+-[a-z0-9]{4}$/.test(row.id) || !text(row.en, 300) || typeof row.ko !== 'string' || row.ko.length > 400 || !text(row.source, 300) ||
       typeof row.createdAt !== 'string' || row.createdAt.length > 40 || !Number.isFinite(Date.parse(row.createdAt)) || ids.has(row.id) || expressions.has(englishKey(row.en))) continue;
     ids.add(row.id); expressions.add(englishKey(row.en));
     result.push({ id: row.id, en: row.en.trim(), ko: row.ko.trim(), source: row.source.trim(), createdAt: row.createdAt });
@@ -49,7 +49,7 @@ export function rememberSituation(data: ProfileData, situation: string): void {
   if (text(situation, 300)) data.bizSituations = normalizeBizSituations([situation.trim(), ...(data.bizSituations ?? [])]);
 }
 export function savePhrase(data: ProfileData, en: string, ko: string, source: string, now: number, rng: Rng): 'saved' | 'updated' | 'duplicate' | 'invalid' {
-  if (!text(en, 300) || typeof ko !== 'string' || ko.length > 300 || !text(source, 300) || !Number.isSafeInteger(now) || now < 0 || !Number.isFinite(new Date(now).getTime())) return 'invalid';
+  if (!text(en, 300) || typeof ko !== 'string' || ko.length > 400 || !text(source, 300) || !Number.isSafeInteger(now) || now < 0 || !Number.isFinite(new Date(now).getTime())) return 'invalid';
   const cards = data.customCards ?? [];
   const existing = cards.find(card => englishKey(card.en) === englishKey(en));
   if (existing) {

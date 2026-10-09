@@ -911,3 +911,93 @@ describe('일반 종료의 hangup 장애 복구', () => {
     expect((storage.get('ledger') as Ledger).sessions[opened.sessionId].needsHangup).toBe(false);
   });
 });
+
+describe('T20c 코치 뜻 길이·시간 초과 회귀', () => {
+  it.each([240, 300])('%s자 영어 입력의 250자 뜻도 정상 반환한다', async length => {
+    output = { ko: '가'.repeat(250) };
+    const response = await req('/api/generate', { profileId: 'parent', level: 'adult', kind: 'coach-gloss', input: { text: 'a'.repeat(length) } });
+    expect(response.status).toBe(200);
+    expect((await response.json() as { data: { ko: string } }).data.ko).toHaveLength(250);
+  });
+  it('8초 시간 초과 뒤 한 번 재시도하고 사용량은 한 번 센다', async () => {
+    output = { ko: '뜻' }; const entered = deferred<void>();
+    outgoing.mockImplementationOnce(async (_url, init: RequestInit) => {
+      entered.resolve();
+      return new Promise((_resolve, reject) => init.signal!.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true }));
+    });
+    const pending = req('/api/generate', { profileId: 'parent', level: 'adult', kind: 'coach-gloss', input: { text: 'a'.repeat(280) } });
+    await entered.promise; await vi.advanceTimersByTimeAsync(8000);
+    expect((await pending).status).toBe(200);
+    expect(outgoing).toHaveBeenCalledTimes(2);
+    expect((await readUsage(await req('/api/usage'))).today.parent.generates).toBe(1);
+  });
+});
+
+describe('T20c 코치 생성 재시도 범위·상한', () => {
+  const cases = [
+    { kind: 'coach-gloss', input: { text: 'a'.repeat(280) }, result: { ko: '뜻' } },
+    { kind: 'coach-check', input: { text: 'a'.repeat(280), level: 'zero' }, result: { corrected: 'Hello.', noteKo: '잘했어요.' } },
+    { kind: 'coach-wrapup', input: { lines: [{ role: 'friend', text: 'a'.repeat(280), at: 1 }] }, result: { sentences: [{ en: 'Hello.', ko: '안녕.' }] } },
+  ];
+  const generated = (text: string) => Response.json({ id: 'response', object: 'response', status: 'completed', output: [{ type: 'message', id: 'message', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text, annotations: [] }] }] });
+  it.each(cases)('$kind는 스키마 실패를 한 번 재시도하고 한도 1에서도 성공한다', async ({ kind, input, result }) => {
+    env.GENERATE_LIMIT_DAY_TOTAL = '1'; output = result;
+    outgoing.mockResolvedValueOnce(generated(JSON.stringify({ invalid: true })));
+    const body = { profileId: 'parent', level: 'adult', kind, input };
+    expect(await (await req('/api/generate', body)).json()).toEqual({ ok: true, data: result });
+    expect(outgoing).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(outgoing.mock.calls[0][1].body)).toEqual(JSON.parse(outgoing.mock.calls[1][1].body));
+    expect((await readUsage(await req('/api/usage'))).today.parent.generates).toBe(1);
+    expect((await req('/api/generate', body)).status).toBe(429); expect(outgoing).toHaveBeenCalledTimes(2);
+  });
+  it.each(cases)('$kind는 JSON 파싱 실패도 한 번만 재시도한다', async ({ kind, input, result }) => {
+    output = result; outgoing.mockResolvedValueOnce(generated('{broken'));
+    expect((await req('/api/generate', { profileId: 'parent', level: 'adult', kind, input })).status).toBe(200);
+    expect(outgoing).toHaveBeenCalledTimes(2); expect((await readUsage(await req('/api/usage'))).today.parent.generates).toBe(1);
+  });
+  it.each(cases)('$kind는 두 번의 스키마 실패 뒤 멈추고 사용량은 한 번 센다', async ({ kind, input }) => {
+    output = { invalid: true };
+    const response = await req('/api/generate', { profileId: 'parent', level: 'adult', kind, input });
+    expect(response.status).toBe(502); expect(outgoing).toHaveBeenCalledTimes(2);
+    expect((await readUsage(await req('/api/usage'))).today.parent.generates).toBe(1);
+  });
+  it.each(cases)('$kind는 8초 시간 초과를 한 번 재시도한다', async ({ kind, input, result }) => {
+    output = result; const entered = deferred<void>();
+    outgoing.mockImplementationOnce(async (_url, init: RequestInit) => {
+      entered.resolve(); return new Promise((_resolve, reject) => init.signal!.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true }));
+    });
+    const pending = req('/api/generate', { profileId: 'parent', level: 'adult', kind, input });
+    await entered.promise; await vi.advanceTimersByTimeAsync(8000);
+    expect((await pending).status).toBe(200); expect(outgoing).toHaveBeenCalledTimes(2);
+    expect((await readUsage(await req('/api/usage'))).today.parent.generates).toBe(1);
+  });
+  it('시간 초과가 계속돼도 요청 두 번·16초에서 끝나고 원문·비밀값을 로그에 남기지 않는다', async () => {
+    const entered = deferred<void>(), errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const warnLog = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      outgoing.mockImplementation(async (_url, init: RequestInit) => {
+        entered.resolve(); return new Promise((_resolve, reject) => init.signal!.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true }));
+      });
+      const pending = req('/api/generate', { profileId: 'parent', level: 'adult', kind: 'coach-gloss', input: { text: 'private-subtitle-marker' } });
+      await entered.promise; await vi.advanceTimersByTimeAsync(16000);
+      expect((await pending).status).toBe(502); expect(outgoing).toHaveBeenCalledTimes(2);
+      expect((await readUsage(await req('/api/usage'))).today.parent.generates).toBe(1);
+      const logs = JSON.stringify([...errorLog.mock.calls, ...warnLog.mock.calls]);
+      for (const value of ['private-subtitle-marker', token, env.OPENAI_API_KEY]) expect(logs).not.toContain(value);
+    } finally { errorLog.mockRestore(); warnLog.mockRestore(); }
+  });
+  it.each([401, 429, 500])('스키마·시간 초과가 아닌 HTTP %s는 재시도하지 않는다', async status => {
+    outgoing.mockResolvedValueOnce(Response.json({ error: { message: 'upstream failed', type: 'api_error' } }, { status }));
+    expect((await req('/api/generate', { profileId: 'parent', level: 'adult', kind: 'coach-gloss', input: { text: 'Hello.' } })).status).toBe(502);
+    expect(outgoing).toHaveBeenCalledOnce();
+  });
+  it('다른 생성 종류는 시간 초과에도 재시도하지 않는다', async () => {
+    const entered = deferred<void>(); outgoing.mockImplementationOnce(async (_url, init: RequestInit) => {
+      entered.resolve(); return new Promise((_resolve, reject) => init.signal!.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true }));
+    });
+    const pending = req('/api/generate', { profileId: 'parent', level: 'adult', kind: 'reading-quiz', input: { title: '책', author: '', summary: '가'.repeat(40), level: 'adult' } });
+    await entered.promise; await vi.advanceTimersByTimeAsync(8000);
+    expect((await pending).status).toBe(502); expect(outgoing).toHaveBeenCalledOnce();
+    expect((await readUsage(await req('/api/usage'))).today.parent.generates).toBe(1);
+  });
+});

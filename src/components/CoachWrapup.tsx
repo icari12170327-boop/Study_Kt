@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from '../store/StoreContext';
 import { AiError, generate } from '../lib/ai';
 import { aiReady, summaryLines } from '../lib/talk';
-import { coachTitle, fillCoachMeanings, isCoachCheck, isCoachWrapup, normalizeCoachSettings } from '../lib/coach';
+import { coachErrorMessage, coachTitle, fillCoachMeanings, isCoachCheck, isCoachWrapup, normalizeCoachSettings } from '../lib/coach';
 import type { CoachSettings, TalkLog } from '../types';
 import { CoachSaveButton } from './CoachPhrase';
 import { CoachMeaning } from './CoachMeaning';
@@ -24,7 +24,7 @@ export function CoachWrapup({ log, auto = false, settings, onSkip }: { log: Talk
       const result = await generate(cfg, { profileId: 'parent', level: 'adult', kind: 'coach-wrapup', input: { lines } });
       if (!isCoachWrapup(result)) throw new AiError('server');
       update(draft => { const row = draft.data.parent.talks.find(row => row.id === log.id); if (row) { row.coachWrapup = result; fillCoachMeanings(draft.data.parent, result.sentences); } });
-    } catch (e) { if (alive.current) setError(`${e instanceof AiError ? e.message : '문장을 받지 못했어요.'} 대화 기록은 저장되어 있어요.`); }
+    } catch (e) { if (alive.current) setError(`${coachErrorMessage(e, 'wrapup')} 대화 기록은 저장되어 있어요.`); }
     finally { busy.current = false; if (alive.current) setPending(false); }
   }, [cfg, log, update, wrapup]);
   useEffect(() => { if (auto && !wrapup && !requested.current) { requested.current = true; void receive(); } }, [auto, receive, wrapup]);
@@ -37,7 +37,7 @@ export function CoachWrapup({ log, auto = false, settings, onSkip }: { log: Talk
       if (!isCoachCheck(result)) throw new AiError('server');
       update(draft => { const row = draft.data.parent.talks.find(row => row.id === log.id); if (row) row.coachCheck = { text, ...result }; });
       if (alive.current) setMeaning(old => result.corrected === checked?.corrected ? old : '');
-    } catch (e) { if (alive.current) setCheckError(e instanceof AiError ? e.message : '문장을 확인하지 못했어요.'); }
+    } catch (e) { if (alive.current) setCheckError(coachErrorMessage(e, 'check')); }
     finally { checkBusy.current = false; if (alive.current) setChecking(false); }
   };
   const source = coachTitle(log.coachTopic);
