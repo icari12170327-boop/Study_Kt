@@ -101,6 +101,7 @@ function ReportBody({ stats, previous, profileName, level, today }: { stats: Wee
         {metric('퍼즐 난이도 변경', p.puzzleLevelUps, 'puzzleLevelUps', '회')}
         <p className="small muted">현재 난이도: {PUZZLE_TYPES.map(type => `${PUZZLE_LABELS[type]} ${data.puzzles?.levels[type]?.level ?? (level === 'g5' ? 2 : 1)}`).join(' · ')}</p>
         {metric('낚시', p.fishing, 'fishing', '판')}{metric('형제 대결', p.duels, 'duels', '판')}{metric('받은 왕관 👑', p.crowns, 'crowns', '회')}
+        {metric('오비 달리기', p.obby, 'obby', '판')}{metric('이번 주 최고 Stage', p.obbyBest, 'obbyBest')}
         {metric('이번 주 읽은 이야기', p.storyEpisodes, 'storyEpisodes', '화')}
         <p className="small muted">누적 완주: {Object.values(data.stories ?? {}).reduce((sum, story) => sum + story.finished, 0)}화 · 완주 날짜는 저장되지 않아요.</p>
       </section>
