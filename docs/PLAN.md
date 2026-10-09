@@ -225,7 +225,7 @@
 
 ### 5단계 — 확장
 - [x] [T10](tasks/T10-ai-word-problems.md) AI 수학 문장제 (관심사 맞춤)
-- [ ] **[T11](tasks/T11-ai-reading-quiz.md) 독서노트·독서록 AI 복습 질문**
+- [x] [T11](tasks/T11-ai-reading-quiz.md) 독서노트·독서록 AI 복습 질문
 - [ ] T12 자막 가림 비율 자동 조절 (대화 기록으로 이해도 판단)
 - [x] [T13](tasks/T13-weekly-report.md) 주간 학습 리포트 (숫자 요약 + 선택 AI 한마디)
 - [ ] T14 기기 간 동기화 (아이마다 기기가 따로 생기면 필요)
