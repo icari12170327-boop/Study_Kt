@@ -106,7 +106,7 @@ export const inputSchemas = {
 };
 export const outputSchemas = {
   'weekly-report': weeklyReportOutputSchema,
-  'coach-gloss': z.strictObject({ ko: text(200) }),
+  'coach-gloss': z.strictObject({ ko: text(400) }),
   'coach-wrapup': z.strictObject({ sentences: z.array(z.strictObject({ en: text(120), ko: text(120) })).max(3) }),
   'coach-check': z.strictObject({ corrected: text(200), noteKo: text(200) }),
   'talk-summary': summarySchema,
