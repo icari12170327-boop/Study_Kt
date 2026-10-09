@@ -35,6 +35,11 @@ export function mergeCandidates(cards: readonly QaCard[], candidates: readonly Q
   // 추가할 후보가 없으면 빈 수동 입력칸도 그대로 남긴다.
   return chosen.length ? [...base, ...chosen] : [...cards];
 }
+export function hasCandidateAdditions(cards: readonly QaCard[], candidates: readonly QuizCandidate[]): boolean {
+  const existingIds = new Set(cards.map(card => card.id));
+  // 빈 수동 입력칸을 후보 한 개로 바꾸면 길이는 같으므로 새 카드 id로 확인한다.
+  return mergeCandidates(cards, candidates).some(card => !existingIds.has(card.id));
+}
 export function isQuizResponse(raw: unknown): raw is QuizResponse {
   if (!raw || typeof raw !== 'object' || !('cards' in raw) || !Array.isArray(raw.cards) || raw.cards.length < 1 || raw.cards.length > 10) return false;
   return raw.cards.every(card => card && typeof card === 'object' &&

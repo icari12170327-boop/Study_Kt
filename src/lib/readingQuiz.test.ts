@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isQuizResponse, mergeCandidates, normalizeReadingQuiz, quizCount, quizReadiness, sameQuestion, toCandidates, type QuizCandidate } from './readingQuiz';
+import { hasCandidateAdditions, isQuizResponse, mergeCandidates, normalizeReadingQuiz, quizCount, quizReadiness, sameQuestion, toCandidates, type QuizCandidate } from './readingQuiz';
 import { defaultState } from '../store/defaults';
 import { exportState, importState, normalizeState } from '../store/storage';
 const empty = { id: 'empty', q: '', a: '' };
@@ -32,6 +32,20 @@ describe('독서 질문 순수 함수', () => {
   it('빈 수동 첫 줄 하나를 대체하고 후보 종류·체크 표시를 저장 카드에서 제거한다', () => {
     const chosen = candidate(' 질문 ', ' 답 ');
     expect(mergeCandidates([empty], [chosen])).toEqual([{ id: chosen.id, q: '질문', a: '답' }]);
+    expect(hasCandidateAdditions([empty], [chosen])).toBe(true);
+  });
+  it('고른 후보가 모두 기존 질문과 같으면 새 카드가 없고 입력도 바꾸지 않는다', () => {
+    const candidates = [candidate(' WHAT happened？ '), candidate('what   happened.')];
+    const before = structuredClone({ existing, candidates });
+    expect(hasCandidateAdditions(existing, candidates)).toBe(false);
+    expect(mergeCandidates(existing, candidates)).toEqual(existing);
+    expect({ existing, candidates }).toEqual(before);
+  });
+  it('중복과 새 질문을 함께 고르면 새 질문이 있을 때만 추가할 수 있다', () => {
+    const duplicate = candidate('WHAT happened.'), fresh = candidate('새 질문');
+    expect(hasCandidateAdditions(existing, [duplicate, fresh])).toBe(true);
+    expect(hasCandidateAdditions(existing, [duplicate, { ...fresh, checked: false }])).toBe(false);
+    expect(hasCandidateAdditions(existing, [candidate(' ', '답'), candidate('질문', ' ')])).toBe(false);
   });
   it('선택 해제·편집으로 빈칸이 된 후보·편집 뒤 중복을 제외하고 기존 id와 입력은 유지한다', () => {
     const candidates = [candidate('다음 질문'), { ...candidate('제외'), checked: false }, candidate(' ', '답'), candidate('질문', ' '), candidate('WHAT HAPPENED.'), candidate('다음  질문？')];

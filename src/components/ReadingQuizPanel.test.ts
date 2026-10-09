@@ -67,6 +67,32 @@ describe('가짜 generate로 실제 후보 화면 동작', () => {
     expect(container.querySelector<HTMLInputElement>('.reading-quiz-candidate input:not([type=checkbox])')?.value).toBe('새 후보');
     expect(saved()).toEqual(before);
   });
+  it('편집한 후보가 모두 기존 질문과 같으면 안내와 후보를 유지하고 고치면 다시 추가한다', async () => {
+    const add = vi.fn(); generated.mockResolvedValue(response);
+    await mount(panel('kid2', add, [{ id: 'old', q: '기존 질문?', a: '기존 답' }])); const before = saved();
+    await click(button('🤖 질문 만들기'));
+    await fill('후보 질문 1', ' 기존   질문？ '); await fill('후보 질문 2', '기존 질문.');
+    const addButton = button('고른 질문 추가');
+    expect(addButton.disabled).toBe(true);
+    expect(container.querySelector('[role=status]')?.textContent).toContain('이미 있는 질문이에요.');
+    expect(addButton.getAttribute('aria-describedby')).toBe('reading-quiz-duplicate');
+    await click(addButton);
+    expect(add).not.toHaveBeenCalled(); expect(container.querySelectorAll('input[type=checkbox]')).toHaveLength(2);
+    expect(button('다시 만들기')).toBeTruthy(); expect(saved()).toEqual(before);
+    await fill('후보 질문 2', '새 질문');
+    expect(button('고른 질문 추가').disabled).toBe(false); expect(container.querySelector('[role=status]')).toBeNull();
+    await click(button('고른 질문 추가'));
+    expect(add).toHaveBeenCalledTimes(1); expect(container.querySelectorAll('input[type=checkbox]')).toHaveLength(0);
+    expect(saved()).toEqual(before);
+  });
+  it('후보 생성 뒤 기존 질문이 바뀌어 모두 중복되어도 추가를 막는다', async () => {
+    const add = vi.fn(); generated.mockResolvedValue(response); await mount(panel('kid2', add));
+    await click(button('🤖 질문 만들기'));
+    await act(async () => root.render(createElement(StoreProvider, null, panel('kid2', add, response.cards.map((card, index) => ({ id: `old-${index}`, q: card.q, a: card.a }))))));
+    expect(button('고른 질문 추가').disabled).toBe(true);
+    expect(container.querySelector('[role=status]')?.textContent).toContain('이미 있는 질문이에요.');
+    expect(container.querySelectorAll('input[type=checkbox]')).toHaveLength(2); expect(add).not.toHaveBeenCalled();
+  });
   it('요청 중 빠른 연타는 한 번만 호출하고 완료 후 버튼을 다시 사용할 수 있다', async () => {
     const result = deferred(); generated.mockReturnValue(result.promise); await mount(panel());
     const make = button('🤖 질문 만들기');
