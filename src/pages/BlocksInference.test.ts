@@ -53,7 +53,7 @@ function unrelatedState(state: AppState) {
 }
 it('풀 때는 그림과 안내만 있고 정답 숫자는 텍스트·aria-label·title에 새지 않는다', async () => {
   await mount();
-  expect(host.querySelector('.puzzle-instruction')!.textContent).toBe('빈 곳 없이 바닥부터 쌓았어요. 블록은 모두 몇 개일까요?');
+  expect(host.querySelector('.puzzle-instruction')!.textContent).toBe('빈 곳 없이 바닥부터 쌓았고, 숨어 있는 기둥은 없어요. 블록은 모두 몇 개일까요?');
   noHeightText(host.querySelector('.blocks-puzzle')!);
   expect(host.querySelector('.blocks-map')).toBeNull(); expect(button('정답 보기')).toBeUndefined();
 });
