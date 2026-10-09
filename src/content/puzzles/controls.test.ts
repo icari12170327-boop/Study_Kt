@@ -54,7 +54,7 @@ describe('방향키 빈칸 도달 회귀', () => {
 });
 
 describe('숫자 칸 입력 범위', () => {
-  for (const size of [4, 6]) it(`스도쿠 ${size}칸은 1~${size} 한 자리로 교체·삭제한다`, () => {
+  for (const size of [4, 5, 6]) it(`스도쿠 ${size}칸은 1~${size} 한 자리로 교체·삭제한다`, () => {
     let input = '';
     for (let n = 1; n <= size; n++) {
       input = puzzleCellInput(input, applyNumberKey(input, String(n)), 'sudoku', size);

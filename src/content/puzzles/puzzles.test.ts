@@ -33,7 +33,7 @@ describe('스도쿠 유일 해', () => {
     for (let seed = 0; seed < 200; seed++) {
       const puzzle = sudokuGenerator.generate(level, seededRng(seed));
       const { size, rows, boxRows, boxCols } = puzzle.view;
-      expect(size).toBe(level <= 3 ? 4 : 6);
+      expect(size).toBe(level <= 3 ? 4 : 5);
       const solved = solveSudoku(rows, boxRows, boxCols);
       expect(solved.exhausted).toBe(false);
       expect(solved.count).toBe(1);
@@ -46,7 +46,7 @@ describe('스도쿠 유일 해', () => {
       for (let r = 0; r < size; r += boxRows) for (let c = 0; c < size; c += boxCols) {
         expect(puzzle.answer.slice(r, r + boxRows).flatMap(row => row.slice(c, c + boxCols)).sort()).toEqual(symbols);
       }
-      expect(rows.flat().filter(n => !n).length).toBeGreaterThan(0);
+      expect(rows.flat().filter(n => !n).length).toBe([4, 6, 8, 9, 12][level - 1]);
     }
   });
   it('여러 해, 모순, 탐색 상한을 구별한다', () => {
@@ -59,7 +59,7 @@ describe('스도쿠 유일 해', () => {
   it('상수 난수로도 유한하게 끝나고 유일 해를 유지한다', () => {
     for (const level of levels) {
       const puzzle = sudokuGenerator.generate(level, () => 0);
-      expect(solveSudoku(puzzle.view.rows, 2, puzzle.view.boxCols).count).toBe(1);
+      expect(solveSudoku(puzzle.view.rows, puzzle.view.boxRows, puzzle.view.boxCols).count).toBe(1);
     }
   });
 });

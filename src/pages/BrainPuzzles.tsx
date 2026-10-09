@@ -7,7 +7,7 @@ import { generatePuzzle, GENERATORS, PUZZLE_LABELS, registeredPuzzleTypes } from
 import { adjustPuzzleLevel, defaultPuzzleLevel, normalizePuzzleSettings, puzzleSummary, recordPuzzle, recordPuzzleExit } from '../content/puzzles/state';
 import { pausePuzzleClock, puzzleActivity, puzzleActiveMs, puzzlePaused, PUZZLE_HINT_MS, startPuzzleClock } from '../content/puzzles/activity';
 import type { Puzzle, PuzzleResult, PuzzleType } from '../content/puzzles/types';
-import { PUZZLE_RENDERERS } from '../components/puzzles/renderers';
+import { puzzleInstruction, PUZZLE_RENDERERS } from '../components/puzzles/renderers';
 import { NumberPad } from '../components/NumberPad';
 import { TopBar } from '../components/common';
 import { toDateKey } from '../lib/date';
@@ -178,7 +178,7 @@ function PuzzlePlay({ profileId, go }: { profileId: ProfileId; go: Go }) {
   return <div className="page brain-puzzles" onPointerDownCapture={activity}>
     <TopBar title={`${renderer.icon} ${PUZZLE_LABELS[play.puzzle.type]}`} onBack={stop} right={<button className="btn btn-ghost" onClick={stop}>그만하기</button>} />
     <div className="puzzle-status"><span>{'★'.repeat(play.puzzle.difficulty)}{'☆'.repeat(5 - play.puzzle.difficulty)}</span><span>활동 {formatTime(Math.floor((summary.activeSec * 1000 + activeMs) / 1000))}</span></div>
-    <p className="puzzle-instruction">{renderer.instruction}</p>
+    <p className="puzzle-instruction">{puzzleInstruction(play.puzzle)}</p>
     {paused && <button className="btn btn-soft puzzle-resume" onClick={activity}>계속하려면 화면을 눌러요</button>}
     <Component puzzle={play.puzzle} input={play.revealed ? renderer.answerInput(play.puzzle) : play.input} selected={play.selected} select={select} change={change} disabled={play.finished} onSubmit={submit} onNext={next} />
     {play.hinted && <p className="panel puzzle-hint">💡 {play.puzzle.hint}</p>}

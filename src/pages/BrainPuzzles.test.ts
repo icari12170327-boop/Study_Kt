@@ -55,7 +55,7 @@ describe('두뇌 퍼즐 입구와 공통 틀', () => {
     expect(renderer.padValue!(input, selected)).toBe('');
     const html = renderToStaticMarkup(createElement(renderer.Component, { puzzle, input: answerInput, selected,
       select: () => {}, change: () => {}, disabled: true }));
-    expect(html).toContain(type === 'train' ? '숫자 기차' : type === 'sudoku' ? '6 곱하기 6 스도쿠' : '수 피라미드');
+    expect(html).toContain(type === 'train' ? '숫자 기차' : type === 'sudoku' ? '5 곱하기 5 스도쿠' : '수 피라미드');
   });
   for (const type of ['balance', 'pattern', 'blocks'] as const) it(`${type} 새 렌더러의 입력과 그림·보기를 검증한다`, () => {
     const puzzle = generatePuzzle(type, 5, 13), renderer = PUZZLE_RENDERERS[type]!;

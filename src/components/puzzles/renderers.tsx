@@ -41,7 +41,7 @@ function PuzzleGrid({ puzzle, input, selected, select, disabled }: PuzzleRendere
   const values = input as string[][];
   const cell = (r: number, c: number) => <button key={`${r}-${c}`} type="button"
     className={`puzzle-cell ${rows[r][c] ? 'given' : ''} ${selected.r === r && selected.c === c ? 'selected' : ''}`}
-    style={sudoku ? { borderRightWidth: (c + 1) % sudoku.boxCols === 0 && c < sudoku.size - 1 ? 3 : 1,
+    style={sudoku && sudoku.boxRows !== 1 ? { borderRightWidth: (c + 1) % sudoku.boxCols === 0 && c < sudoku.size - 1 ? 3 : 1,
       borderBottomWidth: (r + 1) % sudoku.boxRows === 0 && r < sudoku.size - 1 ? 3 : 1 } : undefined}
     aria-label={`${r + 1}행 ${c + 1}열 ${rows[r][c] ? `주어진 수 ${rows[r][c]}` : '빈칸'}`}
     aria-pressed={!rows[r][c] && selected.r === r && selected.c === c}
@@ -99,3 +99,9 @@ export const PUZZLE_RENDERERS: Partial<Record<PuzzleType, PuzzleRenderer>> = {
     initialInput: () => '', answerInput: puzzle => String(puzzle.answer), complete: input => /^\d+$/.test(String(input)),
     toAnswer: input => Number(input), padValue: input => String(input), setPad: (_input, _selected, value) => value },
 };
+
+/** 5×5는 상자가 없는 라틴 방진이므로 안내도 가로·세로 규칙만 보여 준다. */
+export function puzzleInstruction(puzzle: Puzzle): string {
+  return puzzle.type === 'sudoku' && (puzzle.view as SudokuView).size === 5
+    ? '가로줄과 세로줄에 1~5가 한 번씩' : PUZZLE_RENDERERS[puzzle.type]!.instruction;
+}
