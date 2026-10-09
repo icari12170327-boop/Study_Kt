@@ -3,7 +3,7 @@ import { BusinessFeedback } from '../components/BusinessFeedback';
 import { CoachSubtitle } from '../components/CoachSubtitle';
 import { CoachPhrase } from '../components/CoachPhrase';
 import { CoachWrapup } from '../components/CoachWrapup';
-import { COACH_TOPICS, coachRequest, coachTitle, extractRepeatSentence, normalizeCoachSettings, subtitleVisible } from '../lib/coach';
+import { COACH_TOPICS, coachErrorMessage, coachRequest, coachTitle, extractRepeatSentence, normalizeCoachSettings, subtitleVisible } from '../lib/coach';
 import { BUSINESS_SCENARIOS, businessRequest, isShortFeedback, rememberSituation, scenarioTitle } from '../lib/business';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
@@ -116,10 +116,10 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
     if (aiReady(cfg)) void fetchUsage(cfg).then((usage) => {
       if (active) setRemaining(usage.remainingSeconds?.[profileId] ?? Math.max(0, settings.dailyMinutes * 60 - usage.today[profileId].talkSeconds));
     }).catch((e: unknown) => {
-      if (active) setError(business && e instanceof AiError ? e.message : childErrors[e instanceof AiError ? e.kind : 'server']);
+      if (active) setError(coach ? coachErrorMessage(e, 'connection') : business && e instanceof AiError ? e.message : childErrors[e instanceof AiError ? e.kind : 'server']);
     });
     return () => { active = false; };
-  }, [endpoint, token, profileId, settings.dailyMinutes, business]);
+  }, [endpoint, token, profileId, settings.dailyMinutes, business, coach]);
   useEffect(() => { if (transcript.current) transcript.current.scrollTop = transcript.current.scrollHeight; }, [lines]);
 
   const elapsed = (run: Run) => run.start === undefined ? 0 : Math.min(run.cap, Math.max(0, Math.floor((performance.now() - run.start) / 1000)));
@@ -256,14 +256,14 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
           if (alive.current) setDoneLog((old) => old?.id === run.id ? { ...old, seconds: Math.max(old.seconds, seconds) } : old);
         },
         onError: (e) => {
-          if (alive.current && runRef.current === run) setError(business ? e.message : childErrors[e.kind]);
+          if (alive.current && runRef.current === run) setError(run.coach ? coachErrorMessage(e, 'connection') : business ? e.message : childErrors[e.kind]);
           if (run.start !== undefined) finish(run);
         },
       }, run.abort.signal);
       run.handle = handle;
       if (run.finished || !alive.current) await handle.stop();
     } catch (e) {
-      if (alive.current && !run.finished) { setError(business && e instanceof AiError ? e.message : childErrors[e instanceof AiError ? e.kind : 'server']); setPhase('error'); }
+      if (alive.current && !run.finished) { setError(run.coach ? coachErrorMessage(e, 'connection') : business && e instanceof AiError ? e.message : childErrors[e instanceof AiError ? e.kind : 'server']); setPhase('error'); }
       finish(run);
     }
   };
@@ -308,7 +308,7 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
       <h2>{business ? '어떤 상황을 연습할까요?' : `${settings.friendName}와 무슨 이야기 할까요?`}</h2>
       <p>{remaining === undefined ? '오늘 남은 시간을 확인하고 있어요.' : `오늘 남은 시간 ${duration(remaining)}`}</p>
       {business ? <>
-        <button className={`business-scenario coach-choice ${coach ? 'on' : ''}`} aria-pressed={coach} onClick={() => setParentMode('coach')}><strong>🌱 코치 모드</strong><span>한국어로 대답하고 쉬운 영어를 따라 해요.</span></button>
+        <button className={`business-scenario coach-choice ${coach ? 'on' : ''}`} aria-pressed={coach} onClick={() => { setError(''); setParentMode('coach'); }}><strong>🌱 코치 모드</strong><span>한국어로 대답하고 쉬운 영어를 따라 해요.</span></button>
         {coach ? <><div className="business-scenarios" role="group" aria-label="코치 주제">{COACH_TOPICS.map(row => <button key={row.id} className={`business-scenario ${coachTopic === row.id ? 'on' : ''}`} aria-pressed={coachTopic === row.id} onClick={() => setCoachTopic(row.id)}>{row.title}</button>)}</div><button className="btn btn-ghost" onClick={() => setParentMode('biz')}>비즈니스 상황극 고르기</button></> : <>
         <div className="business-scenarios" role="group" aria-label="비즈니스 상황">
           {BUSINESS_SCENARIOS.map(row => <button key={row.id} className={`business-scenario ${scenarioId === row.id ? 'on' : ''}`} aria-pressed={scenarioId === row.id} onClick={() => setScenarioId(row.id)}><strong>{row.title}</strong><span className="small muted">상대: {row.role}</span></button>)}

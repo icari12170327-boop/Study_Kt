@@ -72,3 +72,19 @@ it('아이 목소리 카드는 저장되고 고급 설정에 열 가지 목소�
   expect(host.querySelector('details select')!.querySelectorAll('option')).toHaveLength(10);
   expect(host.textContent).toContain('다음 대화부터 바뀌어요');
 });
+it.each(['server', 'network', 'unauthorized'] as const)('코치 연결의 %s 오류도 인증 실패일 때만 Worker 설정 안내를 보여 준다', async kind => {
+  vi.mocked(startTalk).mockRejectedValueOnce(new AiError(kind));
+  await act(async () => root.render(createElement(StoreProvider, null, createElement(TalkSession, { profileId: 'parent', go: vi.fn() }))));
+  await click('🌱 코치 모드한국어로 대답하고 쉬운 영어를 따라 해요.');
+  await act(async () => [...host.querySelectorAll('button')].find(b => b.textContent?.includes('시작') && !b.disabled)!.click());
+  const error = host.querySelector('[role=alert]')!.textContent!;
+  expect(error.includes('Worker')).toBe(kind === 'unauthorized');
+  if (kind !== 'unauthorized') expect(error).toBe('대화를 연결하지 못했어요. 한 번 더 눌러 주세요.');
+});
+it('코치 모드로 바꾸면 이전 사용량 조회 오류를 남기지 않고 코치 오류 문구로 바꾼다', async () => {
+  vi.mocked(fetchUsage).mockRejectedValue(new AiError('server'));
+  await act(async () => root.render(createElement(StoreProvider, null, createElement(TalkSession, { profileId: 'parent', go: vi.fn() }))));
+  expect(host.querySelector('[role=alert]')!.textContent).toContain('Worker 설정');
+  await click('🌱 코치 모드한국어로 대답하고 쉬운 영어를 따라 해요.');
+  expect(host.querySelector('[role=alert]')!.textContent).toBe('대화를 연결하지 못했어요. 한 번 더 눌러 주세요.');
+});

@@ -1,4 +1,5 @@
 import { parentPersona } from './voices';
+import { AiError } from './ai';
 import type { CoachCheck, CoachSettings, CoachWrapup, ProfileData } from '../types';
 import type { CoachTopic, SessionRequest } from '../../shared/ai';
 
@@ -8,6 +9,39 @@ export const COACH_TOPICS = [
   { id: 'money', title: '📈 투자 이야기' },
 ] as const;
 export function coachTitle(topic?: CoachTopic): string { return `🌱 코치 · ${COACH_TOPICS.find(row => row.id === topic)?.title ?? '영어 대화'}`; }
+
+/** 문장 경계를 우선하고, 한 문장이 상한보다 길 때만 공백 또는 글자 경계에서 나눈다. 초과하면 빈 배열을 반환한다. */
+export function splitForGloss(text: string, max = 300): string[] {
+  if (!Number.isInteger(max) || max < 1) throw new RangeError('묶음 길이가 올바르지 않아요.');
+  const chunks: string[] = [];
+  let current = '';
+  for (const sentence of text.trim().split(/(?<=[.!?])\s+|(?<=[.!?]["”’'])\s+/u)) {
+    let rest = sentence.trim();
+    if (!rest) continue;
+    if (current && current.length + 1 + rest.length > max) { chunks.push(current); current = ''; }
+    while (rest.length > max) {
+      let end = rest.lastIndexOf(' ', max);
+      if (end <= 0) end = max;
+      // 이모지 등 서로게이트 쌍을 중간에서 잘라 요청하지 않는다.
+      if (/[\uD800-\uDBFF]/.test(rest[end - 1]) && /[\uDC00-\uDFFF]/.test(rest[end] ?? '')) end--;
+      if (!end) return [];
+      chunks.push(rest.slice(0, end)); rest = rest.slice(end).trim();
+      if (chunks.length > 3) return [];
+    }
+    current = current ? `${current} ${rest}` : rest;
+    if (chunks.length >= 3 && current) return [];
+  }
+  if (current) chunks.push(current);
+  return chunks.length <= 3 ? chunks : [];
+}
+export function coachErrorMessage(error: unknown, action: 'gloss' | 'wrapup' | 'check' | 'connection' = 'gloss'): string {
+  if (error instanceof AiError) {
+    if (error.kind === 'unauthorized') return 'AI 연결 권한이 없어요. Worker 설정을 확인하고 다시 시도해 주세요.';
+    if (!['server', 'network'].includes(error.kind)) return error.message;
+  }
+  const message = { gloss: '뜻을 받지 못했어요.', wrapup: '마무리를 받지 못했어요.', check: '문장을 확인하지 못했어요.', connection: '대화를 연결하지 못했어요.' };
+  return `${message[action]} 한 번 더 눌러 주세요.`;
+}
 
 /** 첫 번째 따옴표 안의 짧은 영어 한 문장만 따라 말하기로 사용한다. */
 export function extractRepeatSentence(text: string): string | null {
