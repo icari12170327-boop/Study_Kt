@@ -44,8 +44,8 @@ export function findLines(board: BingoBoard, goal: BingoGoal): Cell[][] {
 function signatures(board: BingoBoard, goal: BingoGoal): string[] {
   return findLines(board, goal).map(line => valuesFor(board, line).sort((a, b) => a - b).join(','));
 }
-function candidates(board: BingoBoard, op: BingoOp): BingoGoal[] {
-  const low = op === 'product' ? 12 : board.size === 5 ? 6 : 10, high = op === 'product' ? 400 : board.size === 5 ? 24 : 50;
+function candidates(board: BingoBoard, op: BingoOp, level: 'g3' | 'g5'): BingoGoal[] {
+  const low = op === 'product' ? 12 : level === 'g3' ? 6 : 10, high = op === 'product' ? 400 : level === 'g3' ? 24 : 50;
   const targets = new Map<number, number[][]>();
   for (const line of allLines(board)) {
     const values = valuesFor(board, line), target = calculate(values, op);
@@ -55,27 +55,27 @@ function candidates(board: BingoBoard, op: BingoOp): BingoGoal[] {
   return [...targets].filter(([target, lines]) => target >= low && target <= high && lines.length <= 4 && (op === 'sum' || lines.every(values => !values.includes(1))))
     .map(([target]) => ({ op, target }));
 }
-function goalsFor(board: BingoBoard, products: number, rng: Rng): BingoGoal[] | undefined {
-  const chosen = shuffle(candidates(board, 'product'), rng).slice(0, products);
+function goalsFor(board: BingoBoard, level: 'g3' | 'g5', products: number, rng: Rng): BingoGoal[] | undefined {
+  const chosen = shuffle(candidates(board, 'product', level), rng).slice(0, products);
   if (chosen.length !== products) return;
   const used = new Set(chosen.flatMap(goal => signatures(board, goal)));
-  const sums = shuffle(candidates(board, 'sum'), rng).filter(goal => !chosen.some(row => row.target === goal.target) && !signatures(board, goal).some(key => used.has(key))).slice(0, 5 - products);
+  const sums = shuffle(candidates(board, 'sum', level), rng).filter(goal => !chosen.some(row => row.target === goal.target) && !signatures(board, goal).some(key => used.has(key))).slice(0, 5 - products);
   return sums.length + products === 5 ? shuffle([...chosen, ...sums], rng) : undefined;
 }
 const FALLBACK_G3 = [[9, 3, 9, 2, 9], [3, 4, 6, 8, 3], [6, 3, 8, 5, 6], [5, 4, 8, 4, 6], [5, 6, 9, 3, 7]];
-const FALLBACK_G5 = [[15, 11, 12, 9, 12, 12], [16, 17, 5, 6, 20, 8], [12, 18, 5, 2, 1, 4], [13, 1, 11, 12, 10, 7], [5, 7, 6, 16, 9, 10], [13, 12, 4, 17, 12, 6]];
+const FALLBACK_G5 = [[20, 17, 11, 7, 8], [7, 9, 5, 10, 3], [6, 14, 5, 8, 1], [4, 4, 8, 1, 12], [7, 1, 12, 20, 14]];
 /** 재시도 상한에 닿으면 목표·정답 줄 개수를 검증한 예비 판을 쓴다. */
 export function generateBingoBoard(level: 'g3' | 'g5', rng: Rng, opts?: { productMix?: ProductMix }): BingoBoard {
   const mix = opts?.productMix ?? 'normal', products = level === 'g3' || mix === 'off' ? 0 : mix === 'few' ? 1 : mix === 'many' ? 4 : randInt(2, 3, rng);
-  const size = level === 'g3' ? 5 : 6;
+  const size = 5;
   for (let attempt = 0; attempt < MAX_BOARD_ATTEMPTS; attempt++) {
-    const values = shuffle(Array.from({ length: size * size }, (_, i) => randInt(1, level === 'g3' ? 9 : products && i < 18 ? 12 : 20, rng)), rng);
+    const values = shuffle(Array.from({ length: size * size }, (_, i) => randInt(1, level === 'g3' ? 9 : products && i < Math.floor(size * size / 2) ? 12 : 20, rng)), rng);
     const board: BingoBoard = { size, grid: Array.from({ length: size }, (_, r) => values.slice(r * size, (r + 1) * size)), goals: [] };
-    const goals = goalsFor(board, products, rng);
+    const goals = goalsFor(board, level, products, rng);
     if (goals) return { ...board, goals };
   }
-  const sums = level === 'g3' ? [21, 10, 20, 23, 15] : [38, 43, 37, 32, 46];
-  const goals: BingoGoal[] = [...[110, 300, 108, 360].slice(0, products).map(target => ({ op: 'product' as const, target })),
+  const sums = level === 'g3' ? [21, 10, 20, 23, 15] : [48, 33, 34, 35, 40];
+  const goals: BingoGoal[] = [...[275, 400, 315, 150].slice(0, products).map(target => ({ op: 'product' as const, target })),
     ...sums.slice(0, 5 - products).map(target => ({ op: 'sum' as const, target }))];
   return { size, grid: (level === 'g3' ? FALLBACK_G3 : FALLBACK_G5).map(row => [...row]), goals: shuffle(goals, rng) };
 }
@@ -97,11 +97,14 @@ export function adjustClock(clock: BingoClock, now: number, deltaMs: number): Bi
   return { ...clock, remainingMs: Math.max(0, Math.min(clock.limitMs, remaining(clock, now) + deltaMs)),
     ...(clock.runningSince !== undefined ? { runningSince: now } : {}) };
 }
-export function updateBest(best: Record<string, BingoRecord>, rec: BingoRecord): { best: Record<string, BingoRecord>; isNew: boolean } {
-  const old = best[String(rec.limitSec)];
+export function bingoBestKey(size: number, limitSec: number): string {
+  return `${size}x${size}-${limitSec}`;
+}
+export function updateBest(best: Record<string, BingoRecord>, rec: BingoRecord, size = 5): { best: Record<string, BingoRecord>; isNew: boolean } {
+  const key = bingoBestKey(size, rec.limitSec), old = best[key];
   // 0개인 판은 최근 기록에만 남기고 최고 기록으로 축하하지 않는다.
   const isNew = rec.found > 0 && (!old || rec.found > old.found || (rec.found === old.found && rec.hints < old.hints));
-  return { best: isNew ? { ...best, [String(rec.limitSec)]: { ...rec } } : { ...best }, isNew };
+  return { best: isNew ? { ...best, [key]: { ...rec } } : { ...best }, isNew };
 }
 export function defaultBingoSettings(level: Level): NonNullable<ProfileSettings['bingo']> {
   return { enabled: level !== 'adult', productMix: level === 'g5' ? 'normal' : 'off', limitSec: level === 'g3' ? 180 : 120 };
@@ -123,15 +126,24 @@ export function normalizeBingoData(raw: unknown): NonNullable<ProfileData['bingo
   const row = object(raw);
   const recent = (Array.isArray(row.recent) ? row.recent.map(validRecord).filter((rec): rec is BingoRecord => !!rec) : []).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 20);
   const best: Record<string, BingoRecord> = {};
+  const legacyG3: BingoRecord[] = [];
   for (const [key, value] of Object.entries(object(row.best))) {
     const rec = validRecord(value);
-    if (rec && key === String(rec.limitSec)) best[key] = rec;
+    if (!rec) continue;
+    // 둘째의 예전 숫자 키는 이미 5×5 기록이다. 첫째의 6×6 숫자 키만 따로 보존한다.
+    if (key === String(rec.limitSec) && rec.level === 'g3') legacyG3.push(rec);
+    else if ([String(rec.limitSec), bingoBestKey(5, rec.limitSec), bingoBestKey(6, rec.limitSec)].includes(key)) best[key] = rec;
+  }
+  for (const rec of legacyG3) {
+    const key = bingoBestKey(5, rec.limitSec);
+    // 새 키를 먼저 읽어 동점이면 새 키를 유지하고, 더 좋은 예전 기록은 이어 받는다.
+    best[key] = best[key] ? updateBest(best, rec).best[key] : rec;
   }
   return { recent, best };
 }
 /** 자유 놀이 기록만 갱신하고 학습 진행·보상을 건드리지 않는다. */
-export function recordBingo(data: ProfileData, rec: BingoRecord): boolean {
-  const saved = data.bingo ?? { recent: [], best: {} }, result = updateBest(saved.best, rec);
+export function recordBingo(data: ProfileData, rec: BingoRecord, size = 5): boolean {
+  const saved = data.bingo ?? { recent: [], best: {} }, result = updateBest(saved.best, rec, size);
   data.bingo = { recent: [{ ...rec }, ...saved.recent].slice(0, 20), best: result.best };
   return result.isNew;
 }
