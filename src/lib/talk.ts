@@ -1,3 +1,4 @@
+import { normalizeCorrections, normalizeReviewResult } from './talkCorrections';
 import { BUSINESS_SCENARIOS, isBizFeedback } from './business';
 import { COACH_TOPICS, isCoachCheck, isCoachWrapup } from './coach';
 import type { AppState, Level, ProfileData, ProfileId, ProfileSettings, TalkLine, TalkLog, TalkSettings, TalkSummary } from '../types';
@@ -120,11 +121,13 @@ export function isTalkSummary(value: unknown): value is TalkSummary & { flagged?
   return typeof s.highlightKo === 'string' && s.highlightKo.length <= 300 && strings(s.topicsKo, 8, 100) && strings(s.nextTopics, 3, 40) &&
     Array.isArray(s.newExpressions) && s.newExpressions.length <= 5 && s.newExpressions.every((e) => e && typeof e.en === 'string' && e.en.length <= 200 && typeof e.ko === 'string' && e.ko.length <= 200) && (s.flagged === undefined || typeof s.flagged === 'boolean');
 }
-export function normalizeTalkLogs(raw: unknown): TalkLog[] {
+export function normalizeTalkLogs(raw: unknown, parent = false): TalkLog[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter((s: TalkLog) => s && typeof s.id === 'string' && typeof s.date === 'string' && Number.isFinite(s.seconds) && s.seconds >= 0 && Array.isArray(s.lines)).slice(-60).map((log: TalkLog) => {
     const lines = log.lines.filter((l) => l && ['kid', 'friend'].includes(l.role) && typeof l.text === 'string' && Number.isFinite(l.at) && l.at >= 0).map((l) => ({ role: l.role, text: l.text, at: l.at, ...(l.peeked ? { peeked: true } : {}) }));
     return {
+    ...(parent && normalizeCorrections(log.corrections, lines.filter(line => line.role === 'kid').map(line => line.text)) ? { corrections: normalizeCorrections(log.corrections, lines.filter(line => line.role === 'kid').map(line => line.text)) } : {}),
+    ...(parent && normalizeReviewResult(log.reviewResult) ? { reviewResult: normalizeReviewResult(log.reviewResult) } : {}),
     id: log.id, date: log.date, seconds: Math.floor(log.seconds),
     lines,
     englishRatio: Math.max(0, Math.min(1, Number.isFinite(log.englishRatio) ? log.englishRatio : englishRatio(lines))),
@@ -145,7 +148,7 @@ export function migrateV1toV2(state: LegacyState): AppState {
   const next: AppState = {
     ...structuredClone(state), version: 2,
     data: Object.fromEntries(Object.entries(state.data).map(([id, data]) => [id, {
-      ...structuredClone(data), talks: normalizeTalkLogs(data.talks), friendMemory: typeof data.friendMemory === 'string' ? data.friendMemory.slice(0, 1500) : '',
+      ...structuredClone(data), talks: normalizeTalkLogs(data.talks, id === 'parent'), friendMemory: typeof data.friendMemory === 'string' ? data.friendMemory.slice(0, 1500) : '',
     }])) as Record<ProfileId, ProfileData>,
   };
   for (const profile of next.profiles) {
