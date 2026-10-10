@@ -1,3 +1,5 @@
+import { DeviceCheck, StorageNotices } from '../components/DeviceCheck';
+import { requestStorageProtection } from '../lib/deviceStorage';
 import { normalizeReadingQuiz } from '../lib/readingQuiz';
 import { WeeklyReport } from './WeeklyReport';
 import { WordProblemSettings } from '../components/WordProblemSettings';
@@ -9,7 +11,7 @@ import { normalizeGamesPerDay } from '../content/games/limits';
 import { MyPhrases } from '../components/MyPhrases';
 import { CoachSettings } from '../components/CoachSettings';
 import { normalizeBingoSettings, type ProductMix } from '../content/math/bingo';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store/StoreContext';
 import type { Level, MissionType, ProfileId } from '../types';
 import { MISSION_META, type Go } from '../route';
@@ -35,10 +37,12 @@ type Tab = 'overview' | 'settings' | 'coupons' | 'backup' | 'ai' | 'talks' | 'we
 const LEVEL_LABEL: Record<Level, string> = { g3: '초등 3학년', g5: '초등 5학년', adult: '성인' };
 
 export function Parent({ go, initialTab }: { go: Go; initialTab?: 'weekly' }) {
+  useEffect(() => { void requestStorageProtection(); }, []);
   const [tab, setTab] = useState<Tab>(initialTab ?? 'overview');
   return (
     <div className="page">
       <TopBar title="🔒 보호자 모드" onBack={() => go({ name: 'profiles' })} />
+      <StorageNotices />
       <div className="tabs">
         {(
           [
@@ -60,7 +64,7 @@ export function Parent({ go, initialTab }: { go: Go; initialTab?: 'weekly' }) {
       {tab === 'overview' && <Overview />}
       {tab === 'settings' && <Settings />}
       {tab === 'coupons' && <Coupons />}
-      {tab === 'backup' && <Backup />}
+      {tab === 'backup' && <><Backup /><DeviceCheck /></>}
       {tab === 'ai' && <AiConnection />}
       {tab === 'talks' && <TalkRecords />}
     </div>
@@ -389,18 +393,22 @@ function Backup() {
   const [message, setMessage] = useState('');
 
   const download = () => {
-    const blob = new Blob([exportState(state)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `study-kt-backup-${toDateKey()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    let url: string | undefined;
+    try {
+      const date = toDateKey(), backup = structuredClone(state);
+      backup.settings.parent.lastBackupAt = date;
+      const blob = new Blob([exportState(backup)], { type: 'application/json' });
+      url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `study-kt-backup-${date}.json`; a.click();
+      update(draft => { draft.settings.parent.lastBackupAt = date; });
+      setMessage('백업 파일을 받았어요. 안전한 곳에 보관해 주세요.');
+    } catch { setMessage('백업 파일을 만들지 못했어요. 한 번 더 눌러 주세요.'); }
+    finally { if (url) URL.revokeObjectURL(url); }
   };
 
   const restore = async (file: File) => {
     try {
-      const next = importState(await file.text(), state.ai);
+      const next = importState(await file.text(), state.ai, state.settings.parent);
       if (!confirm('지금 기록을 백업 파일 내용으로 바꿀까요?')) return;
       replace(next);
       setMessage('복원했어요.');

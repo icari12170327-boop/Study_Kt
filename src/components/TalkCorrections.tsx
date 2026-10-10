@@ -1,3 +1,4 @@
+import { RecognitionInput, useRecognition } from './RecognitionInput';
 import { buildTalkGrowth } from '../lib/talkGrowth';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CoachSettings, TalkLog } from '../types';
@@ -7,7 +8,7 @@ import { aiReady, summaryLines } from '../lib/talk';
 import { normalizeCoachSettings } from '../lib/coach';
 import { filterCorrections, focusParts, isCorrections, saveCorrection, selfFixed } from '../lib/talkCorrections';
 import { toDateKey } from '../lib/date';
-import { canRecognize, canSpeak, listenOnce, speak, type ListenHandle } from '../lib/speech';
+import { canSpeak, speak } from '../lib/speech';
 import { scoreSpeech } from '../lib/similarity';
 
 function Better({ better, focus }: { better: string; focus: string }) {
@@ -22,12 +23,12 @@ export function TalkCorrections({ log, auto = false, history = false, settings, 
   const cfg = state.ai, coach = settings ?? normalizeCoachSettings(state.settings.parent.coach);
   const [pending, setPending] = useState(false), [error, setError] = useState('');
   const [index, setIndex] = useState(0), [step, setStep] = useState<'try' | 'answer' | 'practice' | 'save' | 'done'>('try');
-  const [answer, setAnswer] = useState(''), [save, setSave] = useState(true), [message, setMessage] = useState(''), [listening, setListening] = useState(false), [playing, setPlaying] = useState(false);
+  const [answer, setAnswer] = useState(''), [save, setSave] = useState(true), [message, setMessage] = useState(''), [playing, setPlaying] = useState(false);
   const alive = useRef(true), busy = useRef(false), requested = useRef(false), advancing = useRef(false);
-  const abort = useRef<AbortController | undefined>(undefined), listeningHandle = useRef<ListenHandle | undefined>(undefined), speechEpoch = useRef(0), input = useRef<HTMLTextAreaElement>(null), title = useRef<HTMLHeadingElement>(null);
+  const abort = useRef<AbortController | undefined>(undefined), input = useRef<HTMLTextAreaElement>(null), title = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     alive.current = true;
-    return () => { alive.current = false; abort.current?.abort(); listeningHandle.current?.stop(); if (canSpeak()) window.speechSynthesis.cancel(); };
+    return () => { alive.current = false; abort.current?.abort(); if (canSpeak()) window.speechSynthesis.cancel(); };
   }, []);
   useEffect(() => { advancing.current = false; title.current?.focus(); }, [index, step]);
   const receive = useCallback(async () => {
@@ -56,19 +57,18 @@ export function TalkCorrections({ log, auto = false, history = false, settings, 
     return () => { cancelled = true; };
   }, [auto, corrections, receive]);
   useEffect(() => { if (!history && (step === 'done' || corrections?.items.length === 0)) onComplete?.(); }, [history, step, corrections, onComplete]);
+  const recognition = useRecognition();
+  const [practiceText, setPracticeText] = useState(''), [keyboardPractice, setKeyboardPractice] = useState(false);
+  const practiceInput = useRef<HTMLTextAreaElement>(null);
   const item = corrections?.items[index];
-  const stopListening = () => { speechEpoch.current++; listeningHandle.current?.stop(); listeningHandle.current = undefined; setListening(false); };
+  const stopListening = recognition.stop;
+  const practice = (values: string[]) => setMessage(values.some(value => scoreSpeech(item!.better, value).score >= 0.8) ? '잘 따라 말했어요! 👏' : '괜찮아요. 다시 해도 되고 넘어가도 돼요.');
   const record = async (repeat: boolean) => {
-    if (listeningHandle.current || !canRecognize() || !item) return;
-    const epoch = ++speechEpoch.current; setListening(true); setMessage('');
-    try {
-      const handle = listenOnce('en-US'); listeningHandle.current = handle;
-      const values = await handle.promise;
-      if (!alive.current || epoch !== speechEpoch.current) return;
-      if (repeat) setMessage(values.some(value => scoreSpeech(item.better, value).score >= 0.8) ? '잘 따라 말했어요! 👏' : '괜찮아요. 다시 해도 되고 넘어가도 돼요.');
-      else setAnswer(values[0] ?? '');
-    } catch { if (alive.current && epoch === speechEpoch.current) setMessage('말을 듣지 못했어요. 입력하거나 넘어가도 돼요.'); }
-    finally { if (alive.current && epoch === speechEpoch.current) { listeningHandle.current = undefined; setListening(false); } }
+    if (!item) return;
+    setMessage('');
+    const values = await recognition.listen();
+    if (!values) return;
+    if (repeat) practice(values); else setAnswer(values[0] ?? '');
   };
   const reveal = (unknown = false) => {
     if (!item) return;
@@ -81,7 +81,7 @@ export function TalkCorrections({ log, auto = false, history = false, settings, 
     if (!item || advancing.current) return;
     advancing.current = true; stopListening();
     if (save) { const now = Date.now(), random = Math.random(); update(draft => { saveCorrection(draft.data.parent, item, log.mode === 'coach' ? 'coach' : 'biz', toDateKey(new Date(now)), now, () => random); }); }
-    setMessage(''); setAnswer(''); setSave(true);
+    setMessage(''); setAnswer(''); setPracticeText(''); setKeyboardPractice(false); setSave(true);
     if (index + 1 >= (corrections?.items.length ?? 0)) setStep('done'); else { setIndex(index + 1); setStep('try'); }
   };
   return <section className="panel form talk-corrections" aria-label="오늘의 교정">
@@ -97,13 +97,13 @@ export function TalkCorrections({ log, auto = false, history = false, settings, 
         <h3 ref={title} tabIndex={-1}>{step === 'try' ? '먼저 고쳐 보기' : step === 'answer' ? '정답' : step === 'practice' ? '듣고 따라 말하기' : '내 표현에 저장'}</h3>
         {step === 'try' ? <><p lang="en">내 말: {item.said}</p><p>{item.hintKo}</p><p>어떻게 고치면 좋을까요?</p>
           <label>내가 고친 문장<textarea ref={input} value={answer} maxLength={300} rows={3} onChange={event => setAnswer(event.target.value)} /></label>
-          <div className="row-center">{canRecognize() && <button className="btn btn-soft" disabled={listening} onClick={() => { void record(false); }}>🎤 말하기</button>}<button className="btn btn-soft" onClick={() => input.current?.focus()}>⌨️ 입력</button><button className="btn btn-primary" disabled={!answer.trim()} onClick={() => reveal()}>고친 문장 확인</button><button className="btn btn-ghost" onClick={() => reveal(true)}>모르겠어요</button></div>
+          <div className="row-center"><RecognitionInput recognition={recognition} onListen={() => { void record(false); }} onKeyboard={() => input.current?.focus()} /><button className="btn btn-primary" disabled={!answer.trim()} onClick={() => reveal()}>고친 문장 확인</button><button className="btn btn-ghost" onClick={() => reveal(true)}>모르겠어요</button></div>
         </> : <><Better better={item.better} focus={item.focus} /><p>{item.whyKo}</p>{item.selfFixed && <p className="good-text">직접 고쳤어요! 👏</p>}
           {step === 'answer' && <button className="btn btn-primary" onClick={() => setStep('practice')}>듣고 따라 말하기</button>}
-          {step === 'practice' && <><div className="row-center">{canSpeak() && <button className="btn btn-soft" disabled={playing} onClick={() => { setPlaying(true); void speak(item.better, { lang: 'en-US', rate: coach.speed }).finally(() => { if (alive.current) setPlaying(false); }); }}>🔊 듣기</button>}{canRecognize() && <button className="btn btn-soft" disabled={listening} onClick={() => { void record(true); }}>🎤 따라 말하기</button>}</div><p className="small muted">말하기가 어려우면 건너뛰어도 괜찮아요.</p><button className="btn btn-primary" onClick={() => { stopListening(); setStep('save'); }}>저장으로</button></>}
+          {step === 'practice' && <><div className="row-center">{canSpeak() && <button className="btn btn-soft" disabled={playing} onClick={() => { setPlaying(true); void speak(item.better, { lang: 'en-US', rate: coach.speed }).finally(() => { if (alive.current) setPlaying(false); }); }}>🔊 듣기</button>}<RecognitionInput recognition={recognition} label="🎤 따라 말하기" onListen={() => { void record(true); }} onKeyboard={() => { setKeyboardPractice(true); requestAnimationFrame(() => practiceInput.current?.focus()); }} /></div>{(keyboardPractice || !recognition.available) && <label>따라 쓴 문장<textarea ref={practiceInput} value={practiceText} maxLength={300} onChange={event => setPracticeText(event.target.value)} /><button className="btn btn-soft" disabled={!practiceText.trim()} onClick={() => practice([practiceText])}>따라 쓴 문장 확인</button></label>}<p className="small muted">말하기가 어려우면 건너뛰어도 괜찮아요.</p><button className="btn btn-primary" onClick={() => { stopListening(); setStep('save'); }}>저장으로</button></>}
           {step === 'save' && <><label className="check"><input type="checkbox" checked={save} onChange={event => setSave(event.target.checked)} />내 표현에 저장</label><button className="btn btn-primary" onClick={next}>{save ? '저장하고 다음' : '저장 없이 다음'}</button></>}
         </>}
-        {listening && <p role="status">듣고 있어요…</p>}{message && <p role="status">{message}</p>}
+        {recognition.listening && <p role="status">듣고 있어요…</p>}{message && <p role="status">{message}</p>}
       </article>}
       {!history && step === 'done' && <p role="status">오늘의 교정을 모두 확인했어요. 저장한 표현은 다음 대화에서 다시 써 봐요.</p>}
     </>}
