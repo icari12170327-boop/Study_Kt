@@ -692,8 +692,7 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 @media (min-width: 600px) {
   :root { --device-font: 17px; --page-max: 960px; --touch-size: 48px; }
   .page { padding-bottom: max(16px, var(--safe-bottom)); }
-  .page button, .page input, .page select, .page [role="button"], .modal button { min-width: var(--touch-size); min-height: var(--touch-size); }
-  .page input[type="checkbox"], .page input[type="radio"] { width: var(--touch-size); height: var(--touch-size); }
+  .page button, .page input:not([type="checkbox"]):not([type="radio"]), .page select, .page [role="button"], .modal button { min-width: var(--touch-size); min-height: var(--touch-size); }
   .topbar { grid-template-columns: var(--touch-size) minmax(0, 1fr) auto; }
   .topbar h1 { overflow-wrap: anywhere; }
   .icon-btn { width: var(--touch-size); height: var(--touch-size); }
@@ -725,7 +724,7 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
   .puzzle-play-area:has(.pattern-puzzle) .puzzle-controls > * { width: var(--pad-width); }
   .brain-puzzles { gap: .6rem; }
   .math-session .question-card { max-width: 42rem; width: 100%; align-self: center; }
-  .bingo-board { width: min(calc(100vw - 48px), calc(100dvh - 300px), calc(var(--page-max) - 32px)); }
+  .bingo-board { width: min(calc(100vw - 48px), 62dvh, calc(100dvh - 420px), calc(var(--page-max) - 32px)); }
   .bingo-cell { font-size: clamp(1.2rem, 3vw, 2rem); }
   .fish-pond { width: min(100%, calc((100dvh - 220px) * 1.5)); height: min(60dvh, calc(100dvh - 220px)); align-self: center; }
   .fish { min-height: 72px; height: calc((100% - 40px) / 4); padding: 4px; }
@@ -738,6 +737,9 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
   .obby-game:has(.obby-course) > .question-card { grid-column: 2; grid-row: 3 / span 2; padding: .6rem; }
   .obby-game:has(.obby-course) > .feedback { grid-column: 1; }
   .talk-page .talk-lines, .talk-page .talk-controls, .talk-page .coach-line { width: 100%; max-width: 720px; align-self: center; }
+}
+@media (min-width: 600px) and (pointer: coarse) {
+  .page input[type="checkbox"], .page input[type="radio"] { width: var(--touch-size); height: var(--touch-size); }
 }
 @media (min-width: 1200px) {
   :root { --device-font: 18px; --page-max: 1080px; }

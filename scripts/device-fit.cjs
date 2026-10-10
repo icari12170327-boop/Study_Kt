@@ -9,11 +9,11 @@ const sizes = [[390,844],[844,390],[1333,800],[800,1333],[2560,1440],[2048,1152]
 const screens = ['home','math','sudoku5','sudoku6','blocks','pattern','bingo','obby','fishing','kid-talk','coach','corrections'];
 // 테스트 데이터·API 응답은 모두 가짜다. 실제 가족 기록과 키는 읽거나 출력하지 않는다.
 const fixture = `
-import React from '/node_modules/.vite/deps/react.js?DEVICE_FIT_HASH';
-import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js?DEVICE_FIT_HASH';
+import React from '/node_modules/.vite/deps/react.js?DEVICE_FIT_REACT_HASH';
+import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js?DEVICE_FIT_DOM_HASH';
 const {createElement:h}=React, {createRoot}=ReactDOM;
 import '/src/styles.css';
-import {StoreProvider} from '/src/store/StoreContext.tsx';
+import {StoreProvider} from 'DEVICE_FIT_STORE_MODULE';
 import {defaultState} from '/src/store/defaults.ts';
 import {toDateKey} from '/src/lib/date.ts';
 import {emptyDay} from '/src/lib/progress.ts';
@@ -30,6 +30,7 @@ import {FishingGame} from '/src/pages/FishingGame.tsx';
 import {TalkSession} from '/src/pages/TalkSession.tsx';
 import {TalkCorrections} from '/src/components/TalkCorrections.tsx';
 import {TopBar} from '/src/components/common.tsx';
+import {Parent} from '/src/pages/Parent.tsx';
 const screen = new URL(location.href).searchParams.get('device-fit');
 const state=defaultState(),today=toDateKey();
 state.ai={endpoint:'https://device-fit.invalid',token:'fixture-token-'.repeat(3)};
@@ -53,6 +54,7 @@ if(screen==='sudoku6'){
 localStorage.setItem('study-kt:v1',JSON.stringify(state));
 let component,props={profileId:'kid2',go:()=>{}};
 if(screen==='home')component=Home;
+else if(screen==='parent-settings')component=Parent;
 else if(screen==='math')component=MathSession;
 else if(['sudoku5','sudoku6','blocks','pattern'].includes(screen))component=BrainPuzzles;
 else if(screen==='bingo')component=MathBingo;
@@ -65,16 +67,20 @@ props.go=route=>{if(route.name==='home')root.render(h(StoreProvider,null,h(Home,
 root.render(h(StoreProvider,null,h(component,props)));
 `;
 const realtime = `export const stopLocalTalks=()=>{};export async function startTalk(cfg,req,cb){cb.onConnected(180);cb.onUserText('u','I go yesterday.');cb.onAssistantText('a','Oh, you went yesterday! What did you do?',true);cb.onFriendFinished();return{stop:async()=>{cb.onEndStatus('confirmed');cb.onState('ended');},setMicEnabled(){},sendSystemNote(){},beginPushToTalk(){},endPushToTalk(){}};}`;
-async function prepare(page, screen) {
+async function prepare(page, screen, bingoMode = 'practice') {
   const source = await (await page.request.get(`${url}/src/main.tsx`)).text();
-  const hash = source.match(/react\.js\?([^"]+)/)?.[1];
-  if (!hash) throw new Error('Vite의 React 모듈 주소를 확인할 수 없어요. 개발 서버로 검사해 주세요.');
-  await page.route('**/src/main.tsx*', route => route.fulfill({contentType:'application/javascript',body:fixture.replaceAll('DEVICE_FIT_HASH', hash)}));
+  const reactHash = source.match(/react\.js\?([^"]+)/)?.[1];
+  const domHash = source.match(/react-dom_client\.js\?([^"]+)/)?.[1];
+  // HMR 중에는 Context 주소에도 별도 쿼리가 붙는다. 앱과 같은 모듈을 사용한다.
+  const storeModule = source.match(/from "([^"]*\/store\/StoreContext\.tsx[^"]*)"/)?.[1];
+  if (!reactHash || !domHash || !storeModule) throw new Error('Vite의 모듈 주소를 확인할 수 없어요. 개발 서버로 검사해 주세요.');
+  await page.route('**/src/main.tsx*', route => route.fulfill({contentType:'application/javascript',body:fixture.replaceAll('DEVICE_FIT_REACT_HASH', reactHash).replaceAll('DEVICE_FIT_DOM_HASH', domHash).replaceAll('DEVICE_FIT_STORE_MODULE', storeModule)}));
   await page.route('**/src/lib/realtime.ts*',route=>route.fulfill({contentType:'application/javascript',body:realtime}));
   await page.route('https://device-fit.invalid/**',route=>route.fulfill({json:{today:{kid1:{talkSeconds:0,generates:0},kid2:{talkSeconds:0,generates:0},parent:{talkSeconds:0,generates:0}},month:{talkSeconds:0,estimatedKrw:0}}}));
   await page.goto(`${url}/?device-fit=${screen}`); await page.locator('.page').waitFor();
   if(['sudoku5','sudoku6','blocks','pattern'].includes(screen))await page.locator('.puzzle-choice').filter({hasText:screen.startsWith('sudoku')?'스도쿠':screen==='blocks'?'블록 세기':'도형 규칙'}).click();
-  if(screen==='bingo'){await page.getByRole('button',{name:'🐢 연습',exact:true}).click();await page.getByRole('button',{name:'시작하기',exact:true}).click();await page.locator('.bingo-board').waitFor();}
+  if(screen==='bingo'){if(bingoMode==='practice')await page.getByRole('button',{name:'🐢 연습',exact:true}).click();await page.getByRole('button',{name:'시작하기',exact:true}).click();await page.locator('.bingo-board').waitFor();}
+  if(screen==='parent-settings')await page.getByRole('button',{name:'미션 설정',exact:true}).click();
   if(screen==='obby')await page.getByRole('button',{name:'🏃 달리기 시작',exact:true}).click();
   if(screen==='coach')await page.getByRole('button',{name:/🌱 코치 모드/}).click();
   if(screen==='coach'||screen==='kid-talk')await page.getByRole('button',{name:'대화 시작',exact:true}).click();
@@ -89,11 +95,13 @@ async function audit(page, screen, width, height, theme) {
     const boards=[...document.querySelectorAll(selector)].map(el=>{const r=el.getBoundingClientRect();return{type:el.className.baseVal??el.className,width:Math.round(r.width),height:Math.round(r.height),bottom:Math.round(r.bottom),fits:r.top>=0&&r.bottom<=height+.5&&r.left>=0&&r.right<=width+.5}});
     const confirm=document.querySelector('.number-confirm,.pattern-confirm');const r=confirm?.getBoundingClientRect();
     const card=document.querySelector('.completion-card')?.getBoundingClientRect();
-    return{screen,width,height,theme,overflow:document.documentElement.scrollWidth>width,small,boards,confirmFits:!r||r.bottom<=height+.5,cardFits:!card||card.bottom<=height+.5,font:parseFloat(getComputedStyle(document.body).fontSize),missionColumns:document.querySelector('.mission-list')?getComputedStyle(document.querySelector('.mission-list')).gridTemplateColumns:null,qhdBoard:width!==2560||!['sudoku5','sudoku6','blocks','pattern','bingo'].includes(screen)||boards.every(board=>board.height>=height*.6-.5)};
+    // 비활성 버튼도 포함해 취소·힌트·패스가 실제로 화면 안에 있는지 확인한다.
+    const bingoControls=[...document.querySelectorAll('.bingo-page > .row-center button')].map(el=>{const r=el.getBoundingClientRect();return{text:el.textContent.trim(),bottom:r.bottom,fits:r.top>=0&&r.bottom<=height+.5}});
+    return{screen,width,height,theme,overflow:document.documentElement.scrollWidth>width,small,boards,bingoControls,confirmFits:!r||r.bottom<=height+.5,cardFits:!card||card.bottom<=height+.5,font:parseFloat(getComputedStyle(document.body).fontSize),missionColumns:document.querySelector('.mission-list')?getComputedStyle(document.querySelector('.mission-list')).gridTemplateColumns:null,qhdBoard:width!==2560||!['sudoku5','sudoku6','blocks','pattern','bingo'].includes(screen)||boards.every(board=>board.height>=height*.6-.5)};
   },{screen,width,height,theme});
 }
 async function main(){
-  fs.mkdirSync(out,{recursive:true});const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});const rows=[],errors=[],safeArea=[];
+  fs.mkdirSync(out,{recursive:true});const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});const rows=[],errors=[],safeArea=[],reviewChecks=[];
   try{
     for(const [width,height]of sizes)for(const theme of ['light','dark'])for(const screen of screens){
       const page=await browser.newPage({viewport:{width,height},hasTouch:width<1800,colorScheme:theme,timezoneId:'Asia/Seoul'});page.on('pageerror',e=>{errors.push(`${screen} ${width}: ${e.message}`);console.error(e.message);});
@@ -105,9 +113,25 @@ async function main(){
       const page=await browser.newPage({viewport:{width,height},hasTouch:true});
       await page.addInitScript(values=>{document.addEventListener('DOMContentLoaded',()=>{for(const [side,value]of Object.entries(values))document.documentElement.style.setProperty(`--safe-${side}`,`${value}px`);});},insets);
       await prepare(page,screen);
-      const fits=await page.evaluate(({height,width,insets})=>[...document.querySelectorAll('.puzzle-grid,.blocks-picture,.pattern-grid,.bingo-board,.obby-course,.fish-pond,.number-confirm,.pattern-confirm')].every(el=>{const r=el.getBoundingClientRect();return r.top>=insets.top&&r.bottom<=height-insets.bottom+.5&&r.left>=insets.left&&r.right<=width-insets.right+.5}),{height,width,insets});
+      const fits=await page.evaluate(({height,width,insets})=>[...document.querySelectorAll('.puzzle-grid,.blocks-picture,.pattern-grid,.bingo-board,.obby-course,.fish-pond,.number-confirm,.pattern-confirm,.bingo-page > .row-center button')].every(el=>{const r=el.getBoundingClientRect();return r.top>=insets.top&&r.bottom<=height-insets.bottom+.5&&r.left>=insets.left&&r.right<=width-insets.right+.5}),{height,width,insets});
       safeArea.push({width,height,screen,fits});await page.screenshot({path:path.join(out,`safe-${screen}-${width}x${height}.png`),fullPage:true});await page.close();
     }
+    // 리뷰 회귀 검사: 타임어택에서 힌트까지 나타난 뒤에도 조작 버튼을 확인한다.
+    for(const [width,height] of [[1333,800],[2560,1440],[2048,1152]]){
+      const page=await browser.newPage({viewport:{width,height},hasTouch:width<1800});await page.clock.install();await prepare(page,'bingo','time');await page.clock.runFor(4000);await page.clock.fastForward(25000);await page.getByRole('button',{name:/💡 힌트/}).waitFor();
+      const row=await audit(page,'bingo',width,height,'light');reviewChecks.push({kind:'bingo-time',width,height,controls:row.bingoControls,fits:!row.overflow&&row.boards.every(x=>x.fits)&&row.bingoControls.every(x=>x.fits)});
+      await page.screenshot({path:path.join(out,`bingo-time-${width}x${height}.png`),fullPage:true});await page.close();
+    }
+    // 터치 설정에서는 큰 체크박스, 마우스 설정에서는 원래 크기를 보존한다.
+    for(const width of [1333,2560])for(const hasTouch of [false,true]){
+      const page=await browser.newPage({viewport:{width,height:800},hasTouch});await prepare(page,'parent-settings');
+      const boxes=await page.locator('.page input[type="checkbox"]').evaluateAll(elements=>elements.map(el=>{const r=el.getBoundingClientRect();return{width:r.width,height:r.height};}));
+      reviewChecks.push({kind:'parent-checkbox',width,hasTouch,boxes,fits:boxes.length>0&&boxes.every(r=>hasTouch?r.width>=48&&r.height>=48:r.width<48&&r.height<48)});
+      await page.screenshot({path:path.join(out,`parent-settings-${width}-${hasTouch?'touch':'mouse'}.png`),fullPage:true});await page.close();
+    }
+    const iconPage=await browser.newPage();const icon=fs.readFileSync(path.join(__dirname,'../public/apple-touch-icon.png')).toString('base64');
+    const opaque=await iconPage.evaluate(async source=>{const image=new Image();image.src=`data:image/png;base64,${source}`;await image.decode();const canvas=document.createElement('canvas');canvas.width=canvas.height=180;const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);const data=ctx.getImageData(0,0,180,180).data;for(let i=3;i<data.length;i+=4)if(data[i]!==255)return false;return image.width===180&&image.height===180;},icon);
+    reviewChecks.push({kind:'apple-icon-opaque',fits:opaque});await iconPage.close();
     // 가상 키보드·물리 키 없이 실제 화면 키패드로 수학 20문제를 모두 푼다.
     const page=await browser.newPage({viewport:{width:1333,height:800},hasTouch:true,timezoneId:'Asia/Seoul'});await prepare(page,'math');
     for(let i=0;i<20;i++){
@@ -119,11 +143,12 @@ async function main(){
     const touchRound=await page.evaluate(()=>{const s=JSON.parse(localStorage.getItem('study-kt:v1')),day=Object.values(s.data.kid2.days).at(-1);return{attempts:day.mathAttempts.length,correct:day.correct,completedAt:day.completedAt}});
     await page.getByRole('button',{name:'미션 목록으로',exact:true}).tap();await page.locator('.completion-card').waitFor();await page.screenshot({path:path.join(out,'touch-round-completion-1333x800.png')});
     if(touchRound.attempts!==20||touchRound.correct!==20||!touchRound.completedAt)throw new Error('수학 20문제 터치 완료 기록 불일치');await page.close();
-    const failures=rows.filter(row=>row.overflow||row.small.length||row.boards.some(b=>!b.fits)||!row.confirmFits||!row.cardFits||!row.qhdBoard||row.width===2560&&row.font!==20);
-    fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({rows,errors,safeArea,touchRound,failures},null,2));
+    const failures=rows.filter(row=>row.overflow||row.small.length||row.boards.some(b=>!b.fits)||row.bingoControls.some(b=>!b.fits)||!row.confirmFits||!row.cardFits||!row.qhdBoard||row.width===2560&&row.font!==20);
+    fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({rows,errors,safeArea,reviewChecks,touchRound,failures},null,2));
     const safeFailures=safeArea.filter(row=>!row.fits);
-    console.log(JSON.stringify({cases:rows.length,errors,failures:failures.map(({screen,width,height,theme,overflow,small,boards,confirmFits,qhdBoard})=>({screen,width,height,theme,overflow,small,boards,confirmFits,qhdBoard})),safeFailures,touchRound},null,2));
-    if(failures.length||errors.length||safeFailures.length)process.exitCode=1;
+    const reviewFailures=reviewChecks.filter(row=>!row.fits);
+    console.log(JSON.stringify({cases:rows.length,errors,failures:failures.map(({screen,width,height,theme,overflow,small,boards,bingoControls,confirmFits,qhdBoard})=>({screen,width,height,theme,overflow,small,boards,bingoControls,confirmFits,qhdBoard})),safeFailures,reviewFailures,touchRound},null,2));
+    if(failures.length||errors.length||safeFailures.length||reviewFailures.length)process.exitCode=1;
   }finally{await browser.close();}
 }
 main().catch(error=>{console.error(error.stack);process.exitCode=1});
