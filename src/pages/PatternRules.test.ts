@@ -45,7 +45,11 @@ it.each([1, 2, 3, 4, 5] as Difficulty[])('★%s: 라벨은 aria에만 있고 정
   expect(host.querySelectorAll('.pattern-sequence li')).toHaveLength(puzzle.view.cells.length);
   expect(host.querySelectorAll('.pattern-options button')).toHaveLength(4);
   expect(host.querySelector('.number-answer')).toBeNull();
-  if (level >= 4) expect(host.querySelector('.pattern-grid')).not.toBeNull();
+  if (level >= 4) {
+    expect(host.querySelector('.pattern-grid')).not.toBeNull();
+    expect(!!host.querySelector('.pattern-latin-rule')).toBe(puzzle.view.rules.shape?.kind === 'cycle');
+  }
+  expect(host.querySelector('.pattern-scroll-hint')).toBeNull();
   await key(String(puzzle.answer)); await key('Enter');
   expect(host.querySelector('.pattern-explanation')!.textContent).toBe(explainRules(puzzle.view));
   const after = saved(); expect(unrelated(after)).toEqual(unrelated(before));
@@ -77,7 +81,7 @@ it('네모든 화살표든 SVG로 그리고 6개도 세 칸씩 두 줄로 배치
   puzzle.view.cells.filter(Boolean).forEach((tile, i) => expect(arrows[i].querySelector('g')!.getAttribute('transform')).toBe(`rotate(${tile!.dir} 20 20)`));
   await act(async () => root.render(null)); await mount(3, 42);
   for (const shapes of host.querySelectorAll<HTMLElement>('.pattern-shapes')) {
-    expect(shapes.children.length).toBeLessThanOrEqual(6); expect(shapes.style.gridTemplateColumns).toBe(`repeat(${Math.min(3, shapes.children.length)}, 24px)`);
+    expect(shapes.children.length).toBeLessThanOrEqual(6); expect(shapes.style.gridTemplateColumns).toBe(`repeat(${Math.min(3, shapes.children.length)}, var(--pattern-icon, 24px))`);
   }
 });
 it('Tab으로 보기 포커스 후 Enter 제출, PIN·입력 칸 예외와 리스너 하나·정리를 유지한다', async () => {
