@@ -7,7 +7,7 @@ import type { BingoRecord } from '../../types';
 const grid: BingoBoard = { size: 3, grid: [[2, 3, 4], [5, 6, 7], [8, 9, 10]], goals: [] };
 const rec: BingoRecord = { date: '2026-10-07', level: 'g5', limitSec: 120, found: 8, bingos: 1, hints: 2 };
 function verify(board: BingoBoard, level: 'g3' | 'g5', count: number | readonly number[]) {
-  expect(board.size).toBe(level === 'g3' ? 5 : 6);
+  expect(board.size).toBe(5);
   expect(board.grid).toHaveLength(board.size);
   for (const row of board.grid) {
     expect(row).toHaveLength(board.size);
@@ -17,7 +17,7 @@ function verify(board: BingoBoard, level: 'g3' | 'g5', count: number | readonly 
   expect(new Set(board.goals.map(g => g.target)).size).toBe(5);
   const products = board.goals.filter(g => g.op === 'product');
   if (typeof count === 'number') expect(products).toHaveLength(count); else expect(count).toContain(products.length);
-  if (products.length) expect(board.grid.flat().filter(n => n <= 12).length).toBeGreaterThanOrEqual(18);
+  if (products.length) expect(board.grid.flat().filter(n => n <= 12).length).toBeGreaterThanOrEqual(12);
   const sums = new Set<string>(), prods = new Set<string>();
   for (const goal of board.goals) {
     expect(goal.target).toBeGreaterThanOrEqual(goal.op === 'product' ? 12 : level === 'g3' ? 6 : 10);
@@ -73,11 +73,27 @@ describe('빙고 줄과 채점', () => {
 });
 
 describe('유한한 빙고 생성기', () => {
+  it('둘째 시드 16의 기존 판과 목표를 그대로 유지한다', () => {
+    expect(generateBingoBoard('g3', seededRng(16))).toEqual({ size: 5,
+      grid: [[7, 7, 6, 9, 5], [2, 3, 1, 4, 8], [4, 9, 2, 6, 5], [1, 5, 4, 7, 4], [6, 4, 8, 2, 3]],
+      goals: [16, 6, 20, 14, 10].map(target => ({ op: 'sum', target })) });
+  });
+  it('같은 5×5라도 첫째는 둘째의 합 상한 24보다 큰 목표를 받는다', () => {
+    expect(generateBingoBoard('g5', seededRng(16)).goals.some(goal => goal.op === 'sum' && goal.target > 24)).toBe(true);
+  });
   it('둘째 100개 시드: 범위·목표 고유성·1~4개 정답·덧셈만', () => {
     for (let seed = 0; seed < 100; seed++) verify(generateBingoBoard('g3', seededRng(seed), { productMix: 'many' }), 'g3', 0);
   });
-  for (const mix of ['off', 'few', 'normal', 'many'] as ProductMix[]) it(`첫째 ${mix} 100개 시드: 곱 개수·숫자·목표 범위·혼동 없는 묶음`, () => {
-    for (let seed = 0; seed < 100; seed++) verify(generateBingoBoard('g5', seededRng(seed), { productMix: mix }), 'g5', mix === 'off' ? 0 : mix === 'few' ? 1 : mix === 'many' ? 4 : [2, 3]);
+  for (const mix of ['off', 'few', 'normal', 'many'] as ProductMix[]) it(`첫째 ${mix} 500개 시드: 목표 검증과 예비 판 비율 5% 이하`, () => {
+    const fallback = generateBingoBoard('g5', () => 0, { productMix: mix });
+    let fallbacks = 0;
+    for (let seed = 0; seed < 500; seed++) {
+      const board = generateBingoBoard('g5', seededRng(seed), { productMix: mix });
+      verify(board, 'g5', mix === 'off' ? 0 : mix === 'few' ? 1 : mix === 'many' ? 4 : [2, 3]);
+      if (JSON.stringify(board.grid) === JSON.stringify(fallback.grid)) fallbacks++;
+    }
+    console.info(`예비 판 ${mix}: ${fallbacks}/500 (${fallbacks / 5}%)`);
+    expect(fallbacks).toBeLessThanOrEqual(25);
   });
   it('같은 시드에 결정적이고 기본은 곱 2~3개다', () => {
     expect(generateBingoBoard('g5', seededRng(16))).toEqual(generateBingoBoard('g5', seededRng(16)));
@@ -122,34 +138,45 @@ describe('실제 시각 기반 빙고 시계', () => {
 });
 
 describe('기록·설정 순수 로직', () => {
+  it('예전 숫자 키·6×6 최고는 보존하고 새 5×5 기록과 비교하지 않는다', () => {
+    const legacy = { ...rec, found: 100 }, large = { ...rec, found: 90 };
+    const best = { '120': legacy, '6x6-120': large }, before = structuredClone(best);
+    const first = updateBest(best, rec);
+    expect(first).toEqual({ isNew: true, best: { ...best, '5x5-120': rec } });
+    expect(updateBest(first.best, { ...rec, found: 7 }).isNew).toBe(false);
+    expect(updateBest(first.best, { ...rec, found: 9 }).isNew).toBe(true);
+    expect(updateBest(first.best, { ...rec, found: 10 }, 6).isNew).toBe(false);
+    expect(best).toEqual(before);
+  });
   it('첫 기록이 0개면 새 기록으로 치지 않고 이후 양수 기록부터 갱신한다', () => {
     const zero = { ...rec, found: 0, bingos: 0, hints: 0 };
     const result = updateBest({}, zero);
     expect(result).toEqual({ best: {}, isNew: false });
     const first = updateBest(result.best, { ...zero, found: 1 });
-    expect(first.isNew).toBe(true); expect(first.best['120'].found).toBe(1);
+    expect(first.isNew).toBe(true); expect(first.best['5x5-120'].found).toBe(1);
   });
   it('0개 기록은 기존 최고나 다른 제한 시간의 최고를 갱신하지 않는다', () => {
-    const best = { '120': rec }, before = structuredClone(best);
+    const best = { '5x5-120': rec }, before = structuredClone(best);
     expect(updateBest(best, { ...rec, found: 0, hints: 0 })).toEqual({ best, isNew: false });
     expect(updateBest(best, { ...rec, limitSec: 180, found: 0, hints: 0 })).toEqual({ best, isNew: false });
-    expect(updateBest({ '120': { ...rec, found: 0 } }, { ...rec, found: 0, hints: 0 }).isNew).toBe(false);
+    expect(updateBest({ '5x5-120': { ...rec, found: 0 } }, { ...rec, found: 0, hints: 0 }).isNew).toBe(false);
     expect(best).toEqual(before);
   });
   it('더 많이 찾거나 동점에서 힌트가 적으면 갱신하고 제한 시간은 분리한다', () => {
-    const best = { '120': rec }, before = structuredClone(best);
+    const best = { '5x5-120': rec }, before = structuredClone(best);
     expect(updateBest(best, { ...rec, found: 9 }).isNew).toBe(true);
     expect(updateBest(best, { ...rec, hints: 1 }).isNew).toBe(true);
     expect(updateBest(best, { ...rec, hints: 3 }).isNew).toBe(false);
     expect(updateBest(best, rec).isNew).toBe(false);
-    expect(Object.keys(updateBest(best, { ...rec, limitSec: 180 }).best)).toEqual(['120', '180']);
+    expect(Object.keys(updateBest(best, { ...rec, limitSec: 180 }).best)).toEqual(['5x5-120', '5x5-180']);
     expect(best).toEqual(before);
   });
   it('날짜·정수·학년이 손상된 기록을 제외하며 최근 20개와 유효한 시간별 최고를 보존', () => {
     const recent = Array.from({ length: 25 }, (_, i) => ({ ...rec, found: i }));
     expect(normalizeBingoData({ recent }).recent).toHaveLength(20);
     for (const patch of [{ found: NaN }, { hints: -1 }, { bingos: 0.5 }, { limitSec: Infinity }, { date: '2026-02-30' }, { level: 'bad' }]) expect(normalizeBingoData({ recent: [{ ...rec, ...patch }] }).recent).toEqual([]);
-    expect(normalizeBingoData({ best: { '120': rec, '180': rec, invalid: rec }, recent: null })).toEqual({ recent: [], best: { '120': rec } });
+    expect(normalizeBingoData({ best: { '120': rec, '5x5-120': rec, '6x6-120': rec, '180': rec, '5x5-180': rec, '5x6-120': rec, '7x7-120': rec, invalid: rec }, recent: null }))
+      .toEqual({ recent: [], best: { '120': rec, '5x5-120': rec, '6x6-120': rec } });
     expect(normalizeBingoData(null)).toEqual({ recent: [], best: {} });
     expect(normalizeBingoData({ recent: [], best: [] })).toEqual({ recent: [], best: {} });
   });
@@ -166,7 +193,7 @@ describe('기록·설정 순수 로직', () => {
     const { bingo, ...rest } = data;
     const { bingo: ignored, ...old } = before;
     void ignored;
-    expect(rest).toEqual(old); expect(bingo?.best['120']).toEqual(rec);
+    expect(rest).toEqual(old); expect(bingo?.best['5x5-120']).toEqual(rec);
     for (let n = 0; n < 25; n++) recordBingo(data, { ...rec, found: n });
     expect(data.bingo?.recent).toHaveLength(20);
   });
