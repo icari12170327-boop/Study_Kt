@@ -21,7 +21,7 @@ SQLite Durable Object `FamilyUsage`는 첫 배포의 migration으로 만들어�
 - `ALLOWED_ORIGINS`: **origin만** 쉼표로 구분합니다. 기본 `https://icari12170327-boop.github.io`이며 `/Study_Kt/` 경로와 끝 `/`는 넣지 않습니다. 로컬 개발은 `http://localhost:5173`을 추가합니다. 미등록·무출처 요청은 403이며 응답에 CORS 허용 헤더를 넣지 않습니다.
 - `REALTIME_MODEL`: 명세 기본값 `gpt-realtime-2.1-mini`. 실제 프로젝트에서 이 모델을 사용할 수 있는지는 보호자 확인이 필요합니다. 사용할 수 없다면 보호자가 공식 모델 목록을 확인하고 이 값을 수정합니다.
 - `TEXT_MODEL`: 공식 가격표에서 nano/mini 중 표준 텍스트 입출력 가격이 가장 낮은 `gpt-5-nano`를 선택했습니다(2026-10-07 확인: 100만 토큰당 입력 $0.05, 출력 $0.40). `reasoning.effort=minimal`, 최대 출력 4000토큰, Responses `store:false`를 사용합니다.
-- `TALK_MINUTES_kid1=20`, `_kid2=15`, `_parent=30`, `TALK_MINUTES_MONTH_TOTAL=1500`, `GENERATE_LIMIT_DAY_TOTAL=200`.
+- `TALK_MINUTES_kid1=10`, `_kid2=15`, `_parent=60`, `TALK_MINUTES_MONTH_TOTAL=3000`, `GENERATE_LIMIT_DAY_TOTAL=200`.
 - `KRW_PER_TALK_MINUTE=15`: 음성 비용 추정 단가입니다. 텍스트 생성·입력 전사 비용은 포함하지 않으므로 실제 청구와 다릅니다.
 
 ### OpenAI 프로젝트 월 예산

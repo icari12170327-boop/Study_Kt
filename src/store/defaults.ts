@@ -59,7 +59,7 @@ export function defaultSettings(level: Level, id?: ProfileId): ProfileSettings {
           { type: 'math', enabled: true, target: 20 },
           { type: 'vocab', enabled: false, target: 10 },
           { type: 'speaking', enabled: false, target: 5 },
-          { type: 'talk', enabled: true, target: 20 },
+          { type: 'talk', enabled: true, target: 10 },
           { type: 'reading', enabled: false, target: 1 },
         ],
         mathSkills,

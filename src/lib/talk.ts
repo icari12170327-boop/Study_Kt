@@ -22,7 +22,7 @@ export function defaultTalkSettings(level: Level, id?: ProfileId): TalkSettings 
     personaId: first ? 'funny' : 'cheerful',
     voice: level === 'adult' ? PARENT_VOICES[0].voice : CHILD_VOICES[first ? 0 : 1].voice,
     voiceStyle: level === 'adult' ? PARENT_VOICES[0].voiceStyle : CHILD_VOICES[first ? 0 : 1].voiceStyle,
-    dailyMinutes: level === 'adult' ? 15 : level === 'g5' ? 20 : 15,
+    dailyMinutes: level === 'adult' ? 15 : level === 'g5' ? 10 : 15,
     interests: level === 'adult' ? [] : first ? ['Roblox', 'building games', 'science experiments'] : ['Animal Crossing', 'animals', 'fishing and bug catching', 'decorating my island'],
     friendHobbies: first ? 'loves Roblox obbies and building tycoon games, always trying to beat a hard level' : 'loves Animal Crossing, decorating an island, catching bugs and fish, and taking care of animals',
     subtitleHidePercent: 0,
