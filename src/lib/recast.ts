@@ -21,6 +21,14 @@ export function detectRecast(user: string, ai: string): Recast | null {
   const a = tokens(user), all = tokens(first);
   const b = all.filter((token, i) => !(i === 0 && ['oh', 'yes', 'right', 'okay'].includes(token.word)));
   if (a.length < 3 || b.length < 3 || a.length > 20 || b.length > 22) return null;
+  // 맞는 문장을 1인칭↔2인칭으로 되받을 때 자연스러운 주어 일치 변화는 교정이 아니다.
+  if (a[0].key === 'subject' && b[0].key === 'subject' && a[0].word !== b[0].word) {
+    for (const line of [a, b]) {
+      const subject = line[0].word, verb = line[1];
+      if (verb.word === (subject === 'i' ? 'am' : 'are')) verb.key = 'be-present';
+      else if (verb.word === (subject === 'i' ? 'was' : 'were')) verb.key = 'be-past';
+    }
+  }
   let left = 0;
   while (left < Math.min(a.length, b.length) && a[left].key === b[left].key) left++;
   let right = 0;

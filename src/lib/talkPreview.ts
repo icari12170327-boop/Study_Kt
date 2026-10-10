@@ -1,20 +1,34 @@
 import { CHUNK_MAP, TALK_CHUNKS, type TalkChunk } from '../content/talk/chunks';
 import type { RetrievalItem } from '../types';
 import { addDays } from './date';
-import { normalizeWords } from './similarity';
+import { normalizeRetrievalWords } from './retrievalWords';
 import { shuffle, type Rng } from './random';
 import { normalizeRetrieval, updateRetrieval, validRetrievalDate } from './retrieval';
-export const expressionKey = (text: string) => normalizeWords(text).join(' ');
+export const expressionKey = (text: string) => normalizeRetrievalWords(text).join(' ');
 export function normalizePreviewHistory(raw: unknown, today: string): Record<string, string> {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
-  return Object.fromEntries(Object.entries(raw).filter(([id, date]) => CHUNK_MAP.has(id) && validRetrievalDate(date) && date <= today && date > addDays(today, -14)));
+  return Object.fromEntries(Object.entries(raw).filter(([id, date]) => CHUNK_MAP.has(id) && validRetrievalDate(date) && date <= today));
 }
-/** 2주 안에 다시 보여 주지 않고 복습 목록에 없는 표현을 우선한다. */
+/** 같은 날은 같은 세 표현을 쓰고, 최근 5일을 제외한 뒤 오래된 표현부터 고른다. */
 export function pickPreviewChunks(group: string, items: readonly RetrievalItem[], history: Readonly<Record<string, string>>, today: string, rng: Rng): TalkChunk[] {
-  const recent = new Set(Object.entries(normalizePreviewHistory(history, today)).map(([id]) => expressionKey(CHUNK_MAP.get(id)!.en)));
+  const dates = normalizePreviewHistory(history, today);
+  const candidates = shuffle(TALK_CHUNKS.filter(chunk => chunk.group === group), rng);
+  const sameDay = candidates.filter(chunk => dates[chunk.id] === today);
+  if (sameDay.length === 3) return sameDay.map(chunk => ({ ...chunk }));
+  const lastShown = new Map<string, string>();
+  for (const [id, date] of Object.entries(dates)) {
+    const key = expressionKey(CHUNK_MAP.get(id)!.en);
+    if (!lastShown.has(key) || lastShown.get(key)! < date) lastShown.set(key, date);
+  }
+  const lastDate = (chunk: TalkChunk) => lastShown.get(expressionKey(chunk.en)) ?? '';
   const existing = new Set(items.map(item => expressionKey(item.text)));
-  const candidates = shuffle(TALK_CHUNKS.filter(chunk => chunk.group === group && !recent.has(expressionKey(chunk.en))), rng);
-  return [...candidates.filter(chunk => !existing.has(expressionKey(chunk.en))), ...candidates.filter(chunk => existing.has(expressionKey(chunk.en)))].slice(0, 3).map(chunk => ({ ...chunk }));
+  const oldest = (a: TalkChunk, b: TalkChunk) => lastDate(a).localeCompare(lastDate(b));
+  const eligible = candidates.filter(chunk => !lastDate(chunk) || lastDate(chunk) <= addDays(today, -5))
+    .sort((a, b) => Number(existing.has(expressionKey(a.en))) - Number(existing.has(expressionKey(b.en))) || oldest(a, b));
+  const picked = eligible.slice(0, 3);
+  // 목록이 부족해도 중복 없이 세 개를 제공한다. 최근 표현은 가장 오래된 것부터 채운다.
+  picked.push(...candidates.filter(chunk => !picked.includes(chunk)).sort(oldest).slice(0, 3 - picked.length));
+  return picked.map(chunk => ({ ...chunk }));
 }
 export function previewRetrieval(items: readonly RetrievalItem[], chunks: readonly TalkChunk[], lines: readonly string[], mode: 'coach' | 'biz', today: string, already: readonly string[] = []): { items: RetrievalItem[]; applied: string[] } {
   let result = normalizeRetrieval(items, today);

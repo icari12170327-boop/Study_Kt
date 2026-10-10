@@ -18,7 +18,7 @@ export function buildTalkGrowth(log: TalkLog): TalkGrowth {
   const retells = log.retells ?? [], seconds = retells.reduce((n, attempt) => n + attempt.seconds, 0);
   const targets = practiceTargets(log);
   const reused = updateRetrieval([], targets, [...user, ...retells.map(attempt => attempt.text)], log.date, false).result.reused.length;
-  return { averageEnglishWords: ratio(english.reduce((n, text) => n + englishWordCount(text), 0), english.length), retellWordsPerMinute: ratio(retells.reduce((n, attempt) => n + englishWordCount(attempt.text), 0) * 60, seconds), correctionRate: corrections ? ratio(corrections.length, sentences) : null, selfFixedRate: ratio(tried.filter(item => item.selfFixed).length, tried.length), englishRatio: log.englishRatio, reuseRate: ratio(reused, targets.length) };
+  return { averageEnglishWords: ratio(english.reduce((n, text) => n + englishWordCount(text), 0), english.length), retellWordsPerMinute: ratio(retells.reduce((n, attempt) => n + englishWordCount(attempt.text), 0) * 60, seconds), correctionRate: corrections ? ratio(corrections.length, sentences) : null, selfFixedRate: ratio(tried.filter(item => item.selfFixed).length, tried.length), englishRatio: user.some(text => /[A-Za-z가-힣]/.test(text)) ? log.englishRatio : null, reuseRate: ratio(reused, targets.length) };
 }
 export const GROWTH_METRICS = [
   { key: 'averageEnglishWords', label: '발화당 평균 영어 단어', unit: '단어', scale: 20 },
