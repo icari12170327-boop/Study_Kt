@@ -218,7 +218,7 @@ export interface ReadingNote {
 export interface BingoRecord {
   date: string;
   level: Level;
-  /** 같은 제한 시간끼리만 최고 기록을 비교한다. */
+  /** 같은 판 크기·제한 시간끼리만 최고 기록을 비교한다. */
   limitSec: number;
   found: number;
   bingos: number;
@@ -241,6 +241,7 @@ export interface ProfileData {
   crownUntil?: string;
   customCards?: CustomCard[];
   bizSituations?: string[];
+  /** 최고 기록 키: 판 크기-제한 시간(예: 5x5-120). 숫자만 있는 예전 키는 보존한다. */
   bingo?: { recent: BingoRecord[]; best: Record<string, BingoRecord> };
   science: ScienceData;
   talks: TalkLog[];

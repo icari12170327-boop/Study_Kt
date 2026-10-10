@@ -396,13 +396,11 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
   touch-action: none; user-select: none; -webkit-user-select: none;
 }
 .bingo-size-5 { min-width: 300px; }
-.bingo-size-6 { min-width: 313px; }
 .bingo-cell {
   border: 2px solid var(--line); border-radius: 12px; background: var(--card); aspect-ratio: 1;
   font-size: clamp(1.15rem, 3.5vw, 2rem); font-weight: 800; padding: 0; cursor: pointer;
 }
 .bingo-size-5 .bingo-cell { min-height: 56px; }
-.bingo-size-6 .bingo-cell { min-height: 48px; }
 .bingo-cell.cursor { border-color: var(--primary); }
 .bingo-cell:focus-visible { outline: 3px solid var(--warn); outline-offset: -5px; }
 .bingo-cell.selected { background: var(--primary-soft); box-shadow: inset 0 0 0 3px var(--primary); }
@@ -778,8 +776,8 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
   .bingo-page:has(.bingo-board) { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 6px 16px; }
   .bingo-page:has(.bingo-board) > .topbar { grid-column: 1 / -1; }
   .bingo-board-wrap { grid-column: 1; grid-row: 2 / span 4; justify-self: center; }
-  .bingo-size-5, .bingo-size-6 { min-width: 0; }
-  .bingo-size-5 .bingo-cell, .bingo-size-6 .bingo-cell { min-height: 44px; }
+  .bingo-size-5 { min-width: 0; }
+  .bingo-size-5 .bingo-cell { min-height: 44px; }
   .bingo-timer, .bingo-goal, .bingo-feedback, .bingo-page:has(.bingo-board) > .row-center { grid-column: 2; margin: 0; }
   .bingo-page:has(.bingo-board) > p:last-child { grid-column: 2; margin: 0; }
   .obby-course { height: 200px; }

@@ -4,7 +4,7 @@ import type { ProfileId } from '../types';
 import type { Go } from '../route';
 import { ProgressBar, TopBar } from '../components/common';
 import { toDateKey } from '../lib/date';
-import { actBingo, bingoElapsed, canBingoHint, canBingoPass, lineFromEnds, normalizeBingoSettings, recordBingo, remaining, startBingoGame, updateBest,
+import { actBingo, bingoBestKey, bingoElapsed, canBingoHint, canBingoPass, lineFromEnds, normalizeBingoSettings, recordBingo, remaining, startBingoGame, updateBest,
   type BingoAction, type BingoGame, type BingoMode, type Cell } from '../content/math/bingo';
 
 const sameCell = (a: Cell, b?: Cell) => !!b && a.r === b.r && a.c === b.c;
@@ -76,8 +76,8 @@ export function MathBingo({ profileId, go }: { profileId: ProfileId; go: Go }) {
     if (!game || game.phase !== 'ended' || game.mode === 'practice' || saved.current) return;
     saved.current = true;
     const rec = { date: toDateKey(new Date(now)), level: game.level, limitSec: game.limitSec, found: game.found, bingos: game.bingos, hints: game.hints };
-    setIsNew(updateBest(state.data[profileId].bingo?.best ?? {}, rec).isNew);
-    update(draft => { recordBingo(draft.data[profileId], rec); });
+    setIsNew(updateBest(state.data[profileId].bingo?.best ?? {}, rec, game.board.size).isNew);
+    update(draft => { recordBingo(draft.data[profileId], rec, game.board.size); });
   }, [game, now, profileId, state.data, update]);
   const pointedCell = (event: PointerEvent): Cell | undefined => {
     const element = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-bingo-cell]');
@@ -117,7 +117,7 @@ export function MathBingo({ profileId, go }: { profileId: ProfileId; go: Go }) {
   const goal = game?.board.goals[game.goalIndex];
   const feedback = game?.feedback;
   const freshFeedback = !!game && !!feedback && bingoElapsed(game, now) - feedback.atMs < 1600;
-  const savedBest = state.data[profileId].bingo?.best[String(game?.limitSec ?? settings.limitSec)];
+  const savedBest = state.data[profileId].bingo?.best[bingoBestKey(game?.board.size ?? 5, game?.limitSec ?? settings.limitSec)];
   const best = savedBest && savedBest.found > 0 ? savedBest : undefined;
   return <div className="page bingo-page">
     <TopBar title="🎯 수학 빙고" onBack={() => go({ name: 'home', profileId })} />
