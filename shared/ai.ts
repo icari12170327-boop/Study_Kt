@@ -25,6 +25,7 @@ export interface SessionRequest {
   coach?: { level: CoachLevel; repeat: CoachRepeat };
   speed?: ParentSpeed;
   reviewTargets?: string[];
+  previewChunks?: string[];
 }
 export interface SessionResponse {
   sessionId: string;

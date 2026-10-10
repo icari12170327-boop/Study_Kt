@@ -1,3 +1,4 @@
+import { ParentEnglishReport } from '../components/ParentEnglishReport';
 import { useEffect, useRef, useState } from 'react';
 import type { Level, ProfileId } from '../types';
 import { useStore } from '../store/StoreContext';
@@ -12,25 +13,27 @@ import { PUZZLE_LABELS, PUZZLE_TYPES } from '../content/puzzles/registry';
 export function WeeklyReport() {
   const { state } = useStore();
   const today = useStoryDate();
-  const [pid, setPid] = useState<'kid1' | 'kid2'>('kid1');
+  const [pid, setPid] = useState<'kid1' | 'kid2' | 'parent'>('kid1');
   const [offset, setOffset] = useState(0);
   const range = weekRange(today, offset);
   const profile = state.profiles.find(p => p.id === pid)!;
-  const stats = buildWeeklyStats(state, pid, range);
-  const previous = buildWeeklyStats(state, pid, weekRange(today, offset - 1));
+  const stats = pid === 'parent' ? undefined : buildWeeklyStats(state, pid, range);
+  const previous = pid === 'parent' ? undefined : buildWeeklyStats(state, pid, weekRange(today, offset - 1));
   return <div className="weekly-report">
     <div className="form-grid panel">
-      <label>아이 선택<select value={pid} onChange={event => setPid(event.target.value as 'kid1' | 'kid2')}>
-        {state.profiles.filter(p => p.id !== 'parent').map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+      <label>아이 선택<select value={pid} onChange={event => setPid(event.target.value as 'kid1' | 'kid2' | 'parent')}>
+        {state.profiles.filter(p => p.id !== 'parent').map(p => <option key={p.id} value={p.id}>{p.name}</option>)}<option value="parent">보호자 영어</option>
       </select></label>
       <label>주 선택<select value={offset} onChange={event => setOffset(Number(event.target.value))}>
         <option value={0}>이번 주</option><option value={-1}>지난주</option><option value={-2}>그 전 주</option>
       </select></label>
     </div>
+    {pid === 'parent' ? <ParentEnglishReport logs={state.data.parent.talks} today={today} offset={offset} /> : <>
     <h2>{profile.name} · 주간 학습 리포트</h2>
     <p className="muted">{range.start} ~ {range.end} · 월요일부터 일요일</p>
     <p className="small muted">보관된 기록 기준이에요. 이번 주는 현재까지의 기록이며, 화살표는 선택한 주의 전주와 비교해요.</p>
-    <ReportBody key={`${pid}-${range.start}`} stats={stats} previous={previous} profileName={profile.name} level={profile.level} today={today} />
+    <ReportBody key={`${pid}-${range.start}`} stats={stats!} previous={previous!} profileName={profile.name} level={profile.level} today={today} />
+    </>}
   </div>;
 }
 

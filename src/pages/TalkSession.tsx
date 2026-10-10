@@ -1,3 +1,9 @@
+import { TalkPreview } from '../components/TalkPreview';
+import { TalkRetell } from '../components/TalkRetell';
+import { RecastText } from '../components/RecastText';
+import { pickPreviewChunks, previewRetrieval, normalizePreviewHistory } from '../lib/talkPreview';
+import { buildTalkGrowth } from '../lib/talkGrowth';
+import type { TalkChunk } from '../content/talk/chunks';
 import { parentPersona } from '../lib/voices';
 import { TalkCorrections } from '../components/TalkCorrections';
 import { pickReviewTargets, reviewOpportunity, updateRetrieval } from '../lib/retrieval';
@@ -20,7 +26,7 @@ import { startTalk, type TalkHandle, type TalkState, type TalkEndStatus } from '
 import { aiReady, defaultTalkSettings, englishRatio, isTalkSummary, maskSubtitle, recordTalkSeconds, summaryLines, talkRequest, talkSignals, talkTopics } from '../lib/talk';
 import { toDateKey } from '../lib/date';
 import { scienceTalkTopics } from '../content/science/session';
-import { uid } from '../lib/random';
+import { uid, seededRng } from '../lib/random';
 
 type StreamLine = TalkLine & { itemId: string; done: boolean; audioDone?: boolean; responseId?: string };
 interface Run {
@@ -32,6 +38,7 @@ interface Run {
   business?: { scenarioId: string; situation?: string };
   coach?: { topic: CoachTopic; settings: CoachSettings };
   reviewTargets?: RetrievalItem[];
+  previewChunks?: TalkChunk[];
   coachAudioEnded?: boolean;
   coachFinishedResponses?: Set<string>;
   replaying?: boolean;
@@ -88,6 +95,18 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
   const [parentMode, setParentMode] = useState<'biz' | 'coach'>('biz'), [coachTopic, setCoachTopic] = useState<CoachTopic>('daily');
   const coach = business && parentMode === 'coach';
   const coachSettings = normalizeCoachSettings(state.settings.parent.coach);
+  const previewGroup = coach ? coachTopic : scenarioId, today = toDateKey();
+  const previewHistory = state.data.parent.previewHistory, retrieval = state.data.parent.retrieval;
+  const previewKey = `${today}:${previewGroup}`;
+  const [previewSelection, setPreviewSelection] = useState<{ key: string; chunks: TalkChunk[] }>();
+  const preview = previewSelection?.key === previewKey ? previewSelection.chunks : [];
+  useEffect(() => {
+    if (!business || phase !== 'ready' || previewSelection?.key === previewKey) return;
+    const chunks = pickPreviewChunks(previewGroup, retrieval ?? [], previewHistory ?? {}, today, seededRng([...previewKey].reduce((n, char) => n * 31 + char.charCodeAt(0), 0)));
+    setPreviewSelection({ key: previewKey, chunks });
+  }, [business, phase, previewSelection, previewKey, previewGroup, retrieval, previewHistory, today, update]);
+  const [correctionsDone, setCorrectionsDone] = useState(false);
+  const correctionsComplete = useCallback(() => setCorrectionsDone(true), []);
   const [alternatives, setAlternatives] = useState<{ said: string; values: string[] }>();
   const [shortPending, setShortPending] = useState(false), [shortError, setShortError] = useState('');
   const shortBusy = useRef(false);
@@ -177,6 +196,11 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
         if (run.business || run.coach) {
           const userLines = log.lines.filter(line => line.role === 'kid').map(line => line.text);
           data.retrieval = updateRetrieval(data.retrieval ?? [], run.reviewTargets ?? [], userLines, toDateKey(), reviewOpportunity(seconds, userLines)).items;
+          const previewResult = previewRetrieval(data.retrieval, run.previewChunks ?? [], userLines, run.coach ? 'coach' : 'biz', toDateKey(), reviewResult?.reused ?? []);
+          data.retrieval = previewResult.items;
+          log.previewChunks = (run.previewChunks ?? []).map(chunk => chunk.id);
+          log.retrievalApplied = previewResult.applied;
+          log.growth = buildTalkGrowth(log);
         }
         data.talks = [...data.talks, log].slice(-60);
       });
@@ -189,17 +213,17 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
     run.stuckSent = true;
     run.handle?.sendSystemNote('[STUCK]');
   };
-  const start = async () => {
+  const start = async (includePreview = true) => {
     if (runRef.current && !runRef.current.finished) return;
     if (!aiReady(state.ai) || (profile.level === 'adult' && !business) || (business && !coach && scenarioId === 'biz-custom' && !situation.trim())) return;
     const run: Run = { id: uid(), date: toDateKey(), cfg: { ...state.ai }, settings: { ...settings, ...(business ? { pushToTalk: false, subtitleHidePercent: 0 } : {}) }, memory: state.data[profileId].friendMemory,
       cap: 0, credited: 0, savedSeconds: 0, carry: (state.data[profileId].days[toDateKey()]?.talkSeconds ?? 0) % 60,
       ...(coach ? { coach: { topic: coachTopic, settings: { ...coachSettings } }, coachFinishedResponses: new Set<string>() } : business ? { business: { scenarioId, ...(scenarioId === 'biz-custom' ? { situation: situation.trim() } : {}) } } : {}),
-      ...(business ? { reviewTargets: pickReviewTargets(state.data.parent.retrieval ?? [], toDateKey(), coach ? 'coach' : 'biz') } : {}),
+      ...(business ? { reviewTargets: pickReviewTargets(state.data.parent.retrieval ?? [], toDateKey(), coach ? 'coach' : 'biz'), previewChunks: includePreview ? preview : [] } : {}),
       lines: [], finished: false, paused: false, stuckSent: false, wrapSent: false, abort: new AbortController() };
     runRef.current = run;
     leave.current = () => finish(run);
-    setEndStatus(undefined);
+    setEndStatus(undefined); setCorrectionsDone(false);
     setPhase('connecting'); setError(''); setAlternatives(undefined); setShortError(''); setLines([]); setPaused(false); setPressing(false);
     const append = (itemId: string, role: TalkLine['role'], text: string, done: boolean, responseId?: string) => {
       if (run.finished) return;
@@ -215,6 +239,7 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
     try {
       const request = run.coach ? coachRequest(run.coach.topic, run.coach.settings, run.memory, settings.interests, run.settings) : business ? businessRequest(scenarioId, situation, run.memory, coachSettings.speed, run.settings) : talkRequest(profileId, profile.level, settings, run.memory, topic);
       if (business && run.reviewTargets?.length) request.reviewTargets = run.reviewTargets.map(row => row.text);
+      if (business && run.previewChunks?.length) request.previewChunks = run.previewChunks.map(row => row.en);
       const handle = await startTalk(run.cfg, request, {
         onState: (value) => {
           if (run.coach && (value === 'thinking' || value === 'speaking')) run.coachAudioEnded = false;
@@ -224,6 +249,7 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
         onConnected: (seconds) => {
           if (run.finished) return;
           run.start = performance.now(); run.cap = seconds;
+          if (run.previewChunks?.length) update(draft => { draft.data.parent.previewHistory = { ...normalizePreviewHistory(draft.data.parent.previewHistory, run.date), ...Object.fromEntries(run.previewChunks!.map(chunk => [chunk.id, run.date])) }; });
           if (run.business?.situation) update(draft => { rememberSituation(draft.data.parent, run.business!.situation!); });
           if (alive.current) { setPhase('talking'); setRemaining(seconds); }
           run.timer = setInterval(() => {
@@ -334,6 +360,7 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
       </> : <>
       <div className="chip-wrap">{[...new Set([...scienceTalkTopics(state.data[profileId], toDateKey()), ...talkTopics(settings, state.data[profileId].talks)])].map((value) => <button key={value} className={`chip ${topic === value ? 'on' : ''}`} lang={value.startsWith('오늘 과학:') ? 'ko' : 'en'} onClick={() => setTopic(value)}>{value}</button>)}<button className={`chip ${!topic ? 'on' : ''}`} onClick={() => setTopic('')}>아무 얘기나</button></div>
       </>}
+      {business && <TalkPreview key={previewGroup} chunks={preview} speed={coachSettings.speed} disabled={!aiReady(state.ai) || remaining === undefined || remaining === 0 || (!coach && scenarioId === 'biz-custom' && !situation.trim())} onSkip={() => { void start(false); }} />}
       <p>처음에는 마이크 사용을 허용해 주세요. 헤드셋을 쓰면 더 잘 들려요.</p>
       {!aiReady(state.ai) && <p>{business ? '보호자 모드에서 AI 연결을 설정해 주세요.' : '보호자에게 AI 연결을 부탁하세요.'}</p>}
       {remaining === 0 && <p>{business ? '오늘 대화 시간을 다 썼어요. 내일 다시 연습해 주세요.' : '오늘 대화 시간을 다 썼어요. 내일 다시 친구를 만나요!'}</p>}
@@ -349,7 +376,7 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
         {completed && <p className="good-text">오늘 미션 완료! 더 이야기해도 돼</p>}
       </div>
       <p className="small muted">{run.coach ? `${coachTitle(run.coach.topic)} · ${run.coach.settings.subtitle === 'now' ? '자막을 바로 보여요.' : run.coach.settings.subtitle === 'after' ? 'AI의 말이 끝나면 자막을 보여요.' : '자막 보기 버튼으로 글자를 확인해요.'}` : business ? `${scenarioTitle(run.business?.scenarioId)} · 전체 자막을 보여요. 최근 60줄을 보여 주고 있어요.` : '자막을 꾹 누르면 그 문장이 보여요. 최근 60줄을 보여 주고 있어요.'}</p>
-      <div className="talk-lines" ref={transcript} role="log" aria-label="대화 자막">{lines.map((line) => run.coach && line.role === 'friend' ? <CoachSubtitle key={`${line.role}:${line.itemId}`} line={line} friendName={friendName} mode={run.coach!.settings.subtitle} cfg={run.cfg} onReveal={() => peek(line.itemId)} /> : business ? <p className={line.role === 'kid' ? 'talk-kid' : 'talk-subtitle'} key={`${line.role}:${line.itemId}`} lang="en"><span>{line.role === 'kid' ? '나:' : `${friendName}:`}</span> {line.text}</p> : <Subtitle key={`${line.role}:${line.itemId}`} line={line} percent={run.settings.subtitleHidePercent} onPeek={() => peek(line.itemId)} />)}</div>
+      <div className="talk-lines" ref={transcript} role="log" aria-label="대화 자막">{lines.map((line, index) => run.coach && line.role === 'friend' ? <CoachSubtitle key={`${line.role}:${line.itemId}`} line={line} friendName={friendName} mode={run.coach!.settings.subtitle} cfg={run.cfg} previousUser={index > 0 && lines[index - 1].role === 'kid' ? lines[index - 1].text : undefined} onReveal={() => peek(line.itemId)} /> : business ? <p className={line.role === 'kid' ? 'talk-kid' : 'talk-subtitle'} key={`${line.role}:${line.itemId}`} lang="en"><span>{line.role === 'kid' ? '나:' : `${friendName}:`}</span> <RecastText text={line.text} user={line.role === 'friend' && line.done && index > 0 && lines[index - 1].role === 'kid' ? lines[index - 1].text : undefined} /></p> : <Subtitle key={`${line.role}:${line.itemId}`} line={line} percent={run.settings.subtitleHidePercent} onPeek={() => peek(line.itemId)} />)}</div>
       {run.coach && repeatSentence && <CoachPhrase key={repeatLine!.itemId} sentence={repeatSentence} source={coachTitle(run.coach.topic)} speed={run.coach.settings.speed} onReplay={replay} />}
       {!business && run.settings.pushToTalk && <button className={`btn btn-primary talk-ptt ${pressing ? 'on' : ''}`} disabled={paused} aria-pressed={pressing}
         onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); run.handle?.beginPushToTalk(); setPressing(true); }}
@@ -375,7 +402,7 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
     </>}
     {phase === 'done' && endStatus === 'pending' && <p className="panel" role="status">대화를 정리하고 있어요…</p>}
     {phase === 'done' && endStatus === 'failed' && <div className="panel" role="alert"><p>연결 정리가 안 됐어요. 보호자 모드 → AI 연결에서 끝내 주세요</p>{business && <button className="btn" onClick={() => go({ name: 'parent' })}>보호자 모드로 가기</button>}</div>}
-    {phase === 'done' && doneLog && business && <><div className="panel"><h2>{doneLog.mode === 'coach' ? coachTitle(doneLog.coachTopic) : scenarioTitle(doneLog.scenarioId)} · {duration(doneLog.seconds)} 연습했어요</h2><p>대화 기록과 미션 진행을 저장했어요.</p></div><TalkCorrections key={`corrections-${doneLog.id}`} log={doneLog} settings={run?.coach?.settings} auto />{doneLog.mode === 'coach' ? <CoachWrapup key={doneLog.id} log={doneLog} settings={run?.coach?.settings} auto onSkip={back} /> : <BusinessFeedback key={doneLog.id} log={doneLog} auto />}<button className="btn btn-primary" onClick={back}>홈으로</button></>}
+    {phase === 'done' && doneLog && business && <><div className="panel"><h2>{doneLog.mode === 'coach' ? coachTitle(doneLog.coachTopic) : scenarioTitle(doneLog.scenarioId)} · {duration(doneLog.seconds)} 연습했어요</h2><p>대화 기록과 미션 진행을 저장했어요.</p></div><TalkCorrections key={`corrections-${doneLog.id}`} log={doneLog} settings={run?.coach?.settings} auto onComplete={correctionsComplete} />{correctionsDone && <TalkRetell key={`retell-${doneLog.id}`} log={doneLog} />}{doneLog.mode === 'coach' ? <CoachWrapup key={doneLog.id} log={doneLog} settings={run?.coach?.settings} auto onSkip={back} /> : <BusinessFeedback key={doneLog.id} log={doneLog} auto />}<button className="btn btn-primary" onClick={back}>홈으로</button></>}
     {phase === 'done' && doneLog && !business && <div className="panel form">
       <div className="talk-avatar" aria-hidden="true">👋</div><h2>{friendName}와 {duration(doneLog.seconds)} 이야기했어요!</h2>
       <p>완성한 1분마다 별을 받았어요. 하루 별은 미션 목표까지만 모을 수 있어요.</p>

@@ -1,3 +1,4 @@
+import { buildTalkGrowth } from '../lib/talkGrowth';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CoachSettings, TalkLog } from '../types';
 import { useStore } from '../store/StoreContext';
@@ -14,7 +15,7 @@ function Better({ better, focus }: { better: string; focus: string }) {
   return <p lang="en" className="coach-sentence">{before}<strong>{core}</strong>{after}</p>;
 }
 /** 보호자 완료 화면과 기록 화면이 같은 검증·저장 경로를 사용한다. */
-export function TalkCorrections({ log, auto = false, history = false, settings }: { log: TalkLog; auto?: boolean; history?: boolean; settings?: CoachSettings }) {
+export function TalkCorrections({ log, auto = false, history = false, settings, onComplete }: { log: TalkLog; auto?: boolean; history?: boolean; settings?: CoachSettings; onComplete?: () => void }) {
   const { state, update } = useStore();
   const stored = state.data.parent.talks.find(row => row.id === log.id);
   const corrections = stored?.corrections, review = stored?.reviewResult;
@@ -43,7 +44,7 @@ export function TalkCorrections({ log, auto = false, history = false, settings }
       const safe = filterCorrections(result, lines.filter(line => line.role === 'user').map(line => line.text));
       // 서버가 보낸 학습 결과만 저장한다. 직접 고침 표시는 사용자가 답한 뒤에만 붙인다.
       const data = { praiseKo: safe.praiseKo, items: safe.items.map(item => ({ said: item.said, better: item.better, focus: item.focus, whyKo: item.whyKo, hintKo: item.hintKo, pattern: item.pattern })), createdAt: toDateKey() };
-      update(draft => { const row = draft.data.parent.talks.find(row => row.id === log.id); if (row && !row.corrections) row.corrections = data; });
+      update(draft => { const row = draft.data.parent.talks.find(row => row.id === log.id); if (row && !row.corrections) { row.corrections = data; if (row.growth) row.growth = buildTalkGrowth(row); } });
     } catch (error) {
       if (alive.current && !abort.current.signal.aborted) setError(error instanceof AiError && error.kind === 'unauthorized' ? 'AI 연결 권한이 없어요. Worker 설정을 확인해 주세요.' : error instanceof AiError && !['network', 'server'].includes(error.kind) ? error.message : '교정을 받지 못했어요. 다시 받기를 눌러 주세요. 대화 기록은 저장되어 있어요.');
     } finally { busy.current = false; if (alive.current) setPending(false); }
@@ -54,6 +55,7 @@ export function TalkCorrections({ log, auto = false, history = false, settings }
     queueMicrotask(() => { if (!cancelled && auto && !requested.current && !corrections) void receive(); });
     return () => { cancelled = true; };
   }, [auto, corrections, receive]);
+  useEffect(() => { if (!history && (step === 'done' || corrections?.items.length === 0)) onComplete?.(); }, [history, step, corrections, onComplete]);
   const item = corrections?.items[index];
   const stopListening = () => { speechEpoch.current++; listeningHandle.current?.stop(); listeningHandle.current = undefined; setListening(false); };
   const record = async (repeat: boolean) => {
@@ -71,7 +73,8 @@ export function TalkCorrections({ log, auto = false, history = false, settings }
   const reveal = (unknown = false) => {
     if (!item) return;
     stopListening();
-    if (!unknown && selfFixed(item, answer)) update(draft => { const row = draft.data.parent.talks.find(row => row.id === log.id)?.corrections?.items[index]; if (row) row.selfFixed = true; });
+    const fixed = !unknown && selfFixed(item, answer);
+    update(draft => { const logRow = draft.data.parent.talks.find(row => row.id === log.id), row = logRow?.corrections?.items[index]; if (row && (fixed || logRow?.growth)) row.selfFixed = fixed; if (logRow?.growth) logRow.growth = buildTalkGrowth(logRow); });
     setMessage(''); setStep('answer');
   };
   const next = () => {
@@ -104,5 +107,7 @@ export function TalkCorrections({ log, auto = false, history = false, settings }
       </article>}
       {!history && step === 'done' && <p role="status">오늘의 교정을 모두 확인했어요. 저장한 표현은 다음 대화에서 다시 써 봐요.</p>}
     </>}
+    {!history && onComplete && step !== 'done' && !!corrections?.items.length && <button className="btn btn-ghost" onClick={() => { stopListening(); setStep('done'); }}>교정 연습 건너뛰기</button>}
+    {!history && onComplete && !corrections && !pending && <button className="btn btn-ghost" onClick={() => setStep('done')}>교정 없이 다시 말하기로</button>}
   </section>;
 }

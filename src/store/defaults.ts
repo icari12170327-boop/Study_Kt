@@ -11,7 +11,7 @@ import { defaultBingoSettings } from '../content/math/bingo';
 import { defaultTalkSettings } from '../lib/talk';
 
 export function emptyProfileData(level: Level = 'g3'): ProfileData {
-  return { ...(level === 'adult' ? { retrieval: [] } : {}), weeklyAi: {}, stories: {}, puzzles: emptyPuzzleData(level), games: [], obby: normalizeObby(undefined), customCards: [], bizSituations: [], bingo: { recent: [], best: {} }, science: { collected: {}, experiments: {}, badges: [], recentWrong: [] }, math: defaultMathState(level), stars: 0, streak: 0, days: {}, wrongNotes: [], srs: {}, coupons: [], notes: [], talks: [], friendMemory: '' };
+  return { ...(level === 'adult' ? { retrieval: [], previewHistory: {} } : {}), weeklyAi: {}, stories: {}, puzzles: emptyPuzzleData(level), games: [], obby: normalizeObby(undefined), customCards: [], bizSituations: [], bingo: { recent: [], best: {} }, science: { collected: {}, experiments: {}, badges: [], recentWrong: [] }, math: defaultMathState(level), stars: 0, streak: 0, days: {}, wrongNotes: [], srs: {}, coupons: [], notes: [], talks: [], friendMemory: '' };
 }
 
 /** 학년별 기본 미션. 10월 기준 2학기 단원과 1학기 복습 단원을 모두 켠다. */

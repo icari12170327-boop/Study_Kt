@@ -1,6 +1,6 @@
 import type { RetrievalItem, ReviewResult } from '../types';
 import { addDays, parseDateKey, toDateKey } from './date';
-import { normalizeWords, scoreSpeech } from './similarity';
+import { normalizeRetrievalWords } from './retrievalWords';
 
 export const validRetrievalDate = (value: unknown): value is string => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && toDateKey(parseDateKey(value)) === value;
 const text = (value: unknown, max: number): value is string => typeof value === 'string' && !!value.trim() && value.length <= max;
@@ -12,15 +12,18 @@ export function normalizeRetrieval(raw: unknown, today: string): RetrievalItem[]
     if (!value || typeof value !== 'object') continue;
     const row = value as Partial<RetrievalItem>;
     if (typeof row.text !== 'string') continue;
-    const key = normalizeWords(row.text).join(' ');
+    const key = normalizeRetrievalWords(row.text).join(' ');
     if (!key || !text(row.id, 100) || !text(row.text, 160) || !['correction', 'preview'].includes(row.source ?? '') || !['coach', 'biz'].includes(row.mode ?? '') ||
       ![0, 1, 2, 3].includes(row.stage ?? -1) || !Number.isSafeInteger(row.misses) || row.misses! < 0 || !validRetrievalDate(row.createdAt) || !validRetrievalDate(row.dueDate) ||
       (row.learnedAt !== undefined && (!validRetrievalDate(row.learnedAt) || row.stage !== 3 || row.learnedAt < row.createdAt)) || ids.has(row.id) || phrases.has(key)) continue;
     if (row.learnedAt && addDays(row.learnedAt, 30) <= today) continue;
     ids.add(row.id); phrases.add(key);
-    result.push({ id: row.id, text: row.text.trim(), ...(text(row.focus, 40) && normalizeWords(row.focus).length && row.text.trim().includes(row.focus.trim()) ? { focus: row.focus.trim() } : {}), source: row.source!, mode: row.mode!, stage: row.stage!, dueDate: row.dueDate, misses: row.misses!, createdAt: row.createdAt, ...(row.learnedAt ? { learnedAt: row.learnedAt } : {}) });
+    result.push({ id: row.id, text: row.text.trim(), ...(text(row.focus, 40) && normalizeRetrievalWords(row.focus).length && row.text.trim().includes(row.focus.trim()) ? { focus: row.focus.trim() } : {}), source: row.source!, mode: row.mode!, stage: row.stage!, dueDate: row.dueDate, misses: row.misses!, createdAt: row.createdAt, ...(row.learnedAt ? { learnedAt: row.learnedAt } : {}) });
   }
-  return result.slice(-60);
+  // 익히지 않은 교정 표현을 우선 보관하고, 남는 자리만 미리 보기로 채운다.
+  const rank = (item: RetrievalItem) => (item.learnedAt ? 2 : 0) + Number(item.source === 'preview');
+  const kept = new Set(result.map((item, index) => ({ item, index })).sort((a, b) => rank(a.item) - rank(b.item) || b.index - a.index).slice(0, 60).map(row => row.index));
+  return result.filter((_, index) => kept.has(index));
 }
 export function pickReviewTargets(items: readonly RetrievalItem[], today: string, mode?: RetrievalItem['mode']): RetrievalItem[] {
   return items.filter(item => !item.learnedAt && item.dueDate <= today)
@@ -28,13 +31,13 @@ export function pickReviewTargets(items: readonly RetrievalItem[], today: string
 }
 /** 목표 표현의 단어를 연속해서 직접 말한 경우만 성공으로 기록한다. */
 export function reusedExpression(target: string, userLines: readonly string[]): boolean {
-  const words = normalizeWords(target);
+  const words = normalizeRetrievalWords(target);
   if (!words.length) return false;
   return userLines.some(line => {
-    const spoken = normalizeWords(line);
+    const spoken = normalizeRetrievalWords(line);
     return spoken.some((_, start) => {
       const part = spoken.slice(start, start + words.length);
-      return part.length === words.length && scoreSpeech(words.join(' '), part.join(' ')).score === 1;
+      return part.length === words.length && part.every((word, i) => word === words[i]);
     });
   });
 }
@@ -48,7 +51,7 @@ const FUNCTION_WORDS = new Set([
 ]);
 
 function retrievalExpression(item: RetrievalItem): string {
-  const words = normalizeWords(item.focus ?? '');
+  const words = normalizeRetrievalWords(item.focus ?? '');
   return words.length === 1 && FUNCTION_WORDS.has(words[0]) ? item.text : item.focus ?? item.text;
 }
 
@@ -65,8 +68,8 @@ export function updateRetrieval(items: readonly RetrievalItem[], targets: readon
 }
 export function addCorrectionTarget(items: readonly RetrievalItem[], text: string, mode: RetrievalItem['mode'], today: string, id: string, focus?: string): RetrievalItem[] {
   const normalized = normalizeRetrieval(items, today);
-  const existing = normalized.find(item => normalizeWords(item.text).join(' ') === normalizeWords(text).join(' '));
-  if (existing) return normalizeRetrieval(normalized.map(item => item.id === existing.id && !item.focus ? { ...item, focus } : item), today);
+  const existing = normalized.find(item => normalizeRetrievalWords(item.text).join(' ') === normalizeRetrievalWords(text).join(' '));
+  if (existing) return normalizeRetrieval(normalized.map(item => item.id === existing.id ? { ...item, source: 'correction', ...(!item.focus && focus ? { focus } : {}) } : item), today);
   return normalizeRetrieval([...normalized, { id, text, ...(focus !== undefined ? { focus } : {}), source: 'correction', mode, stage: 0, dueDate: addDays(today, 1), misses: 0, createdAt: today }], today);
 }
 
