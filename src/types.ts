@@ -47,6 +47,8 @@ export interface MissionConfig {
 }
 
 export interface ProfileSettings {
+  lastBackupAt?: string;
+  iosTabNoticeDismissed?: boolean;
   readingQuiz?: { enabled: boolean };
   stories?: { enabled: boolean };
   wordProblemRatio?: number;
