@@ -1,3 +1,4 @@
+import { useGamePause } from '../components/useGamePause';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Level, ObbyColor, ObbyHat, ProfileId } from '../types';
 import type { Go } from '../route';
@@ -20,6 +21,7 @@ export function ObbyGame({ profileId, go }: { profileId: ProfileId; go: Go }) {
   const appearance = normalizeObby(data.obby), hats = unlockedHats(appearance.best);
   const [color, setColor] = useState(appearance.color), [hat, setHat] = useState<ObbyHat | undefined>(appearance.hat);
   const [mode, setMode] = useState<'prepare' | 'playing' | 'result'>('prepare');
+  const { paused, now: gameNow, isPaused, resume } = useGamePause(mode === 'playing');
   const [run, setRun] = useState(() => startRun([])), runRef = useRef(run);
   const plan = useRef<RunPlan | undefined>(undefined), done = useRef(false);
   const [phase, setPhase] = useState<'idle' | 'jump' | 'fall'>('idle'), phaseRef = useRef(phase), motionUntil = useRef(0);
@@ -45,14 +47,14 @@ export function ObbyGame({ profileId, go }: { profileId: ProfileId; go: Go }) {
     const rng = seededRng(Math.floor(Math.random() * 0x100000000));
     const filler = buildLevelQueue(profile.level, data.math.level, [], 64, rng).map(row => row.problem);
     const initial = startRun(buildFishPool(data.days[date]?.mathAttempts ?? [], filler, 8));
-    plan.current = { date, index, startedAt: performance.now(), grade: profile.level, level: data.math.level, rng, color, hat };
+    plan.current = { date, index, startedAt: gameNow(), grade: profile.level, level: data.math.level, rng, color, hat };
     runRef.current = initial; setRun(initial);
     update(draft => {
       reserveGame(draft.settings[profileId], draft.data[profileId], date, 'obby');
       draft.data[profileId].obby = normalizeObby({ ...draft.data[profileId].obby, color, hat });
     });
     setMode('playing');
-  }, [allowed, color, data, hat, profile.level, profileId, settings, update]);
+  }, [allowed, color, data, hat, profile.level, profileId, settings, update, gameNow]);
   useEffect(() => {
     if (mode !== 'prepare') return;
     const keydown = (event: KeyboardEvent) => {
@@ -73,10 +75,11 @@ export function ObbyGame({ profileId, go }: { profileId: ProfileId; go: Go }) {
     return () => window.removeEventListener('keydown', keydown);
   }, [mode, color, start]);
   useEffect(() => {
-    if (mode !== 'playing') return;
+    if (mode !== 'playing' || paused) return;
     let frame = 0, lastPaint = 0, stopped = false;
-    const tick = (now: number) => {
-      if (stopped || done.current) return;
+    const tick = () => {
+      if (stopped || done.current || isPaused()) return;
+      const now = gameNow();
       const left = roundRemaining(plan.current!.startedAt, now);
       if (left === 0) { setRemaining(0); end(); return; }
       if (phaseRef.current !== 'idle' && now >= motionUntil.current) { phaseRef.current = 'idle'; setPhase('idle'); }
@@ -84,18 +87,19 @@ export function ObbyGame({ profileId, go }: { profileId: ProfileId; go: Go }) {
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
-    // 중간에 화면을 나가도 예약한 한 판과 도달 기록을 남긴다.
-    return () => { stopped = true; cancelAnimationFrame(frame); persist(); };
-  }, [mode, end, persist]);
-  const blocked = () => done.current || !plan.current || performance.now() < runRef.current.lockedUntil;
+    return () => { stopped = true; cancelAnimationFrame(frame); };
+  }, [mode, end, paused, isPaused, gameNow]);
+  // 일시정지는 판 종료가 아니다. 실제 화면 이탈에서만 예약한 판을 저장한다.
+  useEffect(() => () => persist(), [persist]);
+  const blocked = () => isPaused() || done.current || !plan.current || gameNow() < runRef.current.lockedUntil;
   const changeInput = (value: AnswerInput) => {
     if (blocked()) return;
-    if (!roundRemaining(plan.current!.startedAt, performance.now())) { end(); return; }
+    if (!roundRemaining(plan.current!.startedAt, gameNow())) { end(); return; }
     setInput(value);
   };
   const submit = () => {
     if (blocked()) return;
-    const now = performance.now(), current = plan.current!;
+    const now = gameNow(), current = plan.current!;
     if (!roundRemaining(current.startedAt, now)) { end(); return; }
     const fish = runRef.current.queue[0];
     // 이전 문제의 확인 연타가 새 문제에 이전 답을 적용하지 않게 한다.
@@ -118,7 +122,7 @@ export function ObbyGame({ profileId, go }: { profileId: ProfileId; go: Go }) {
     go({ name: 'home', profileId });
   };
   const fish = run.queue[0];
-  return <div className="page reward-game obby-game"><TopBar title="🏃 오비 달리기" onBack={back} />
+  return <div className={`page reward-game obby-game ${paused ? 'game-paused' : ''}`}><TopBar title="🏃 오비 달리기" onBack={back} />
     {mode === 'prepare' ? <section className="panel form obby-prepare"><h2>내 캐릭터로 달려요!</h2>
       <div className="obby-preview"><ObbyAvatar color={color} hat={hat} /></div>
       <h3>몸 색 고르기</h3><div className="obby-colors" role="group" aria-label="몸 색">
@@ -139,12 +143,13 @@ export function ObbyGame({ profileId, go }: { profileId: ProfileId; go: Go }) {
       <p className="small muted">게임 점수는 별과 학습 기록에 더하지 않아요.</p><button className="btn btn-primary" onClick={() => go({ name: 'home', profileId })}>홈으로</button>
     </section> : <>
       <div className="game-status"><strong role="timer" aria-label="남은 시간">⏱ {Math.ceil(remaining / 1000)}초</strong><strong>Stage {run.stage}</strong><span>{obbyScore(run)}점</span></div>
+      {paused && <section className="panel game-pause" role="dialog" aria-modal="true" aria-label="게임 일시정지" onKeyDown={event => { if (event.key === 'Tab') { event.preventDefault(); event.currentTarget.querySelector('button')?.focus(); } }}><h2>잠깐 쉬고 있어요</h2><p>남은 시간은 그대로예요.</p><button className="btn btn-primary" autoFocus onClick={resume}>계속하기</button></section>}
       <ObbyCourse run={run} color={color} hat={hat} phase={phase} />
       {fish && <section className="question-card"><span className={`badge ${fish.golden ? 'badge-warn' : ''}`}>{fish.golden ? '🔥 용암 · 30점' : '장애물 · 10점'}</span>
         {fish.problem.answer.kind === 'fraction' && <p className="small muted">기약분수로 답해요. 대분수는 자연수 칸도 채워요.</p>}
-        <NumberPad key={`${run.stage}-${run.falls}`} kind={fish.problem.answer.kind} value={input} onChange={changeInput} onSubmit={submit} onNext={() => {}} nextButtonRef={nextButton} onActivity={() => {}} disabled={phase === 'fall'} />
+        <NumberPad key={`${run.stage}-${run.falls}`} kind={fish.problem.answer.kind} value={input} onChange={changeInput} onSubmit={submit} onNext={() => {}} nextButtonRef={nextButton} onActivity={() => {}} disabled={paused || phase === 'fall'} />
       </section>}
-      {message && <p className={`feedback ${phase === 'fall' ? 'bad' : 'ok'}`} role="status">{message}{phase === 'fall' && ` (${Math.max(0, Math.ceil((run.lockedUntil - performance.now()) / 1000))}초)`}</p>}
+      {message && <p className={`feedback ${phase === 'fall' ? 'bad' : 'ok'}`} role="status">{message}{phase === 'fall' && ` (${Math.max(0, Math.ceil((run.lockedUntil - gameNow()) / 1000))}초)`}</p>}
     </>}
   </div>;
 }

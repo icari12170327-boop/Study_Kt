@@ -184,3 +184,43 @@ describe('오비 실제 DOM 입력·종료·학습 분리', () => {
     expect(saved().data.kid2.games![0]).toMatchObject({ stage: 2, score: 10, golden: 0 });
   });
 });
+
+it('숨김과 재개 대기에는 프레임·오답 잠금·게임 시간이 멈추고 한 판만 기록한다', async () => {
+  vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+  await mount(); const before = learningOnly(saved()); await click(button('🏃 달리기 시작'));
+  await frame(1000); await key('0'); await key('Enter');
+  now = 2000;
+  vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+  await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+  expect(frames.size).toBe(0); expect(container.textContent).toContain('잠깐 쉬고 있어요');
+  expect(saved().data.kid2.games).toHaveLength(1); expect(saved().data.kid2.games![0].score).toBe(0);
+  const timer = container.querySelector('[role=timer]')!.textContent;
+  await frame(200000); vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+  await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+  expect(frames.size).toBe(0); expect(container.querySelector('[role=timer]')!.textContent).toBe(timer);
+  await key('5'); await key('Enter'); expect(container.querySelector('[aria-label=답]')?.getAttribute('value')).toBe('');
+  await click(button('계속하기')); await frame(201999); expect(button('확인').disabled).toBe(true);
+  await frame(202000); expect(button('확인').disabled).toBe(false);
+  await frame(287999); expect(container.textContent).not.toContain('달리기 끝!');
+  await frame(288000); expect(container.textContent).toContain('달리기 끝!');
+  expect(saved().data.kid2.games).toHaveLength(1); expect(learningOnly(saved())).toEqual(before); expect(frames.size).toBe(0);
+});
+
+it('낚시는 숨김부터 계속하기까지 입력·물고기 프레임·남은 시간이 모두 멈춘다', async () => {
+  vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })));
+  vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+  localStorage.setItem('study-kt:v1', JSON.stringify(state));
+  await act(async () => root.render(createElement(StoreProvider, null, createElement(RewardGames, { profileId: 'kid2', initial: 'fishing', go: vi.fn() }))));
+  const before = learningOnly(saved()); await click(button('🎣 낚시 시작')); await frame(5000);
+  expect(container.querySelector('[role=timer]')!.textContent).toContain('85초');
+  now = 5000; vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+  await act(async () => document.dispatchEvent(new Event('visibilitychange'))); expect(frames.size).toBe(0);
+  expect([...container.querySelectorAll<HTMLButtonElement>('[data-fish-id]')].every(fish => fish.disabled)).toBe(true);
+  await frame(500000); vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+  await act(async () => document.dispatchEvent(new Event('visibilitychange'))); await key('Enter');
+  expect(container.querySelector('.number-answer')).toBeNull(); expect(frames.size).toBe(0); expect(container.querySelector('[role=timer]')!.textContent).toContain('85초');
+  await click(button('계속하기')); await frame(501000); expect(container.querySelector('[role=timer]')!.textContent).toContain('84초');
+  await frame(584999); expect(container.textContent).not.toContain('낚시 끝!');
+  await frame(585000); expect(container.textContent).toContain('낚시 끝!'); expect(frames.size).toBe(0);
+  expect(saved().data.kid2.games).toHaveLength(1); expect(learningOnly(saved())).toEqual(before);
+});

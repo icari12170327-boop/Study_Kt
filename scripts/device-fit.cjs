@@ -6,7 +6,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const url = process.argv[2] || 'http://127.0.0.1:5173';
 const out = path.resolve(process.argv[3] || '/tmp/study-kt-device-fit');
 const sizes = [[390,844],[844,390],[1333,800],[800,1333],[2560,1440],[2048,1152]];
-const screens = ['home','math','sudoku5','sudoku6','blocks','pattern','bingo','obby','fishing','kid-talk','coach','corrections'];
+const screens = ['home','math','sudoku5','sudoku6','blocks','pattern','bingo','obby','fishing','kid-talk','coach','corrections','device-check'];
 // 테스트 데이터·API 응답은 모두 가짜다. 실제 가족 기록과 키는 읽거나 출력하지 않는다.
 const fixture = `
 import React from '/node_modules/.vite/deps/react.js?DEVICE_FIT_REACT_HASH';
@@ -28,6 +28,8 @@ import {MathBingo} from '/src/pages/MathBingo.tsx';
 import {ObbyGame} from '/src/pages/ObbyGame.tsx';
 import {FishingGame} from '/src/pages/FishingGame.tsx';
 import {TalkSession} from '/src/pages/TalkSession.tsx';
+import {SpeakingSession} from '/src/pages/SpeakingSession.tsx';
+import {TalkRetell} from '/src/components/TalkRetell.tsx';
 import {TalkCorrections} from '/src/components/TalkCorrections.tsx';
 import {TopBar} from '/src/components/common.tsx';
 import {Parent} from '/src/pages/Parent.tsx';
@@ -42,6 +44,7 @@ for(const id of ['kid1','kid2']){
  state.data[id].puzzles.levels={sudoku:{level:5,streak:0,fails:0,solved:0,hinted:0},pattern:{level:5,streak:0,fails:0,solved:0,hinted:0},blocks:{level:5,streak:0,fails:0,solved:0,hinted:0}};
 }
 if(screen==='home'){for(const m of state.settings.kid2.missions){m.enabled=true;state.data.kid2.days[today].progress[m.type]=m.target;}state.data.kid2.days[today].completed=true;state.data.kid2.days[today].completedAt='10:42';}
+if(screen==='speaking'){state.settings.kid2.missions=state.settings.kid2.missions.map(m=>({...m,enabled:m.type==='speaking',target:m.type==='speaking'?1:m.target}));}
 if(screen==='math')state.data.kid2.days[today].progress.math=0;
 state.settings.parent.coach.subtitle='now';
 const log={id:'fixture-talk',date:today,mode:'coach',seconds:180,englishRatio:1,lines:[{role:'kid',text:'I go yesterday.',at:1}],corrections:{items:[{said:'I go yesterday.',better:'I went yesterday.',focus:'went',hintKo:'언제 한 일인가요?',whyKo:'지난 일이에요.',pattern:'tense'}],praiseKo:'뜻을 잘 전했어요.',createdAt:today}};
@@ -54,7 +57,9 @@ if(screen==='sudoku6'){
 localStorage.setItem('study-kt:v1',JSON.stringify(state));
 let component,props={profileId:'kid2',go:()=>{}};
 if(screen==='home')component=Home;
-else if(screen==='parent-settings')component=Parent;
+else if(screen==='speaking')component=SpeakingSession;
+else if(screen==='retell'){component=()=>h('div',{className:'page'},h(TopBar,{title:'다시 말하기',onBack:()=>{}}),h(TalkRetell,{log}));}
+else if(['parent-settings','device-check'].includes(screen))component=Parent;
 else if(screen==='math')component=MathSession;
 else if(['sudoku5','sudoku6','blocks','pattern'].includes(screen))component=BrainPuzzles;
 else if(screen==='bingo')component=MathBingo;
@@ -80,6 +85,7 @@ async function prepare(page, screen, bingoMode = 'practice') {
   await page.goto(`${url}/?device-fit=${screen}`); await page.locator('.page').waitFor();
   if(['sudoku5','sudoku6','blocks','pattern'].includes(screen))await page.locator('.puzzle-choice').filter({hasText:screen.startsWith('sudoku')?'스도쿠':screen==='blocks'?'블록 세기':'도형 규칙'}).click();
   if(screen==='bingo'){if(bingoMode==='practice')await page.getByRole('button',{name:'🐢 연습',exact:true}).click();await page.getByRole('button',{name:'시작하기',exact:true}).click();await page.locator('.bingo-board').waitFor();}
+  if(screen==='device-check')await page.getByRole('button',{name:'백업·보안',exact:true}).click();
   if(screen==='parent-settings')await page.getByRole('button',{name:'미션 설정',exact:true}).click();
   if(screen==='obby')await page.getByRole('button',{name:'🏃 달리기 시작',exact:true}).click();
   if(screen==='coach')await page.getByRole('button',{name:/🌱 코치 모드/}).click();
@@ -151,4 +157,5 @@ async function main(){
     if(failures.length||errors.length||safeFailures.length||reviewFailures.length)process.exitCode=1;
   }finally{await browser.close();}
 }
-main().catch(error=>{console.error(error.stack);process.exitCode=1});
+module.exports={prepare,audit};
+if(require.main===module)main().catch(error=>{console.error(error.stack);process.exitCode=1});

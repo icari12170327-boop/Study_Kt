@@ -1,16 +1,20 @@
 import { useEffect, useRef, type CSSProperties } from 'react';
 import type { Fish } from '../content/games/fishing';
 
-export function FishPond({ fish, cursor, onChoose, onCursor }: { fish: readonly Fish[]; cursor: number; onChoose: (fish: Fish) => void; onCursor?: (index: number) => void }) {
+const realNow = () => performance.now();
+
+export function FishPond({ fish, cursor, onChoose, onCursor, paused = false, now = realNow }: { fish: readonly Fish[]; cursor: number; onChoose: (fish: Fish) => void; onCursor?: (index: number) => void; paused?: boolean; now?: () => number }) {
   const nodes = useRef(new Map<string, HTMLButtonElement>());
+  const start = useRef(now());
   const ids = fish.slice(0, 8).map(row => row.id).join('|');
   useEffect(() => {
+    if (paused || document.hidden) return;
     const motion = matchMedia('(prefers-reduced-motion: reduce)');
     let frame = 0;
-    const start = performance.now();
-    const paint = (now: number) => {
+    const paint = () => {
+      if (document.hidden) return;
       // 프레임 수가 아니라 경과 초로 좌표를 구하고 최대 8마리의 DOM만 갱신한다.
-      const seconds = (now - start) / 1000;
+      const seconds = (now() - start.current) / 1000;
       ids.split('|').filter(Boolean).forEach((id, index) => {
         const node = nodes.current.get(id);
         if (!node) return;
@@ -23,9 +27,9 @@ export function FishPond({ fish, cursor, onChoose, onCursor }: { fish: readonly 
     };
     frame = requestAnimationFrame(paint);
     return () => cancelAnimationFrame(frame);
-  }, [ids]);
+  }, [ids, paused, now]);
   return <div className="fish-pond" role="group" aria-label="헤엄치는 물고기">
-    {fish.slice(0, 8).map((row, index) => <button key={row.id} data-fish-id={row.id} onFocus={() => onCursor?.(index)} ref={node => { if (node) nodes.current.set(row.id, node); else nodes.current.delete(row.id); }}
+    {fish.slice(0, 8).map((row, index) => <button key={row.id} disabled={paused} data-fish-id={row.id} onFocus={() => onCursor?.(index)} ref={node => { if (node) nodes.current.set(row.id, node); else nodes.current.delete(row.id); }}
       style={{ '--fish-row': Math.floor(index / 2), '--fish-wide-row': Math.floor(index / 4), '--fish-wide-col': index % 4, left: index % 2 ? '75%' : '25%', top: `${Math.floor(index / 2) * 112 + 14}px`, transform: 'translateX(-50%)' } as CSSProperties}
       className={`fish ${row.golden ? 'golden' : ''} ${cursor === index ? 'chosen' : ''}`} aria-label={`${row.golden ? '금빛 물고기' : '물고기'} ${index + 1}: ${row.problem.question}`} aria-pressed={cursor === index} onClick={() => onChoose(row)}>
       <span className="fish-emoji" aria-hidden="true">{row.golden ? '🐠' : '🐟'}</span><span className="fish-question">{row.problem.question}</span><span className="small">{row.points}점</span>
