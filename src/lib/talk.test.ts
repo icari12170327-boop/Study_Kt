@@ -60,7 +60,7 @@ describe('대화 저장 마이그레이션', () => {
     expect(migrated.data).toEqual(legacy.data);
     expect(migrated.settings.kid1.missions.find((m) => m.type === 'vocab')?.enabled).toBe(false);
     expect(migrated.settings.kid1.missions.find((m) => m.type === 'speaking')?.enabled).toBe(false);
-    expect(migrated.settings.kid1.missions.find((m) => m.type === 'talk')).toEqual({ type: 'talk', enabled: true, target: 20 });
+    expect(migrated.settings.kid1.missions.find((m) => m.type === 'talk')).toEqual({ type: 'talk', enabled: true, target: 10 });
     expect(migrated.settings.kid2.missions.find((m) => m.type === 'talk')?.target).toBe(15);
     expect(migrated.settings.parent.missions.find((m) => m.type === 'talk')?.enabled).toBe(false);
     expect(legacy).toEqual(before);
