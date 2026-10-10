@@ -16,8 +16,12 @@ function checkUnique(view: PatternView, expected: PatternTile) {
   expect(view.options.filter(option => samePatternTile(option, expected))).toHaveLength(1);
   expect(new Set(view.options.map(describePatternTile)).size).toBe(4);
   for (const option of view.options) if (!samePatternTile(option, expected)) {
-    expect(PATTERN_ATTRIBUTES.filter(attr => option[attr] !== expected[attr])).toHaveLength(1);
+    expect([1, 2]).toContain(PATTERN_ATTRIBUTES.filter(attr => option[attr] !== expected[attr]).length);
   }
+  const changes = view.options.filter(option => !samePatternTile(option, expected)).map(option => PATTERN_ATTRIBUTES.filter(attr => option[attr] !== expected[attr]).length).sort();
+  expect(changes).toEqual([1, 1, 2]);
+  expect(PATTERN_ATTRIBUTES.filter(attr => new Set(view.options.map(option => option[attr])).size === 2)).toHaveLength(2);
+  for (const attr of PATTERN_ATTRIBUTES) expect(new Set(view.options.map(option => option[attr])).size).toBeLessThanOrEqual(2);
   for (const entry of [...view.cells.filter((row): row is PatternTile => !!row), ...view.options]) {
     expect(entry.count).toBeGreaterThanOrEqual(1); expect(entry.count).toBeLessThanOrEqual(6);
     if (entry.shape !== 'arrow') expect(entry.dir).toBeUndefined(); else expect([0, 90, 180, 270]).toContain(entry.dir);
@@ -53,8 +57,8 @@ describe('T21 도형 규칙 후보', () => {
     expect(consistentRules(view, 'shape')).toContainEqual({ kind: 'cycle', values: ['circle', 'circle', 'triangle'] });
     expect(patternPredictions(view)?.shape).toBe('circle');
     const grid = generatePattern(4, seededRng(1), 0).view;
-    const complete = grid.cells.map(row => row ?? grid.options[generatePattern(4, seededRng(1), 0).answer - 1]);
-    complete[0] = null as never;
+    const complete: (PatternTile | null)[] = grid.cells.map(row => row ?? grid.options[generatePattern(4, seededRng(1), 0).answer - 1]);
+    complete[0] = null;
     const source = { layout: 'grid' as const, cells: complete };
     for (const rule of consistentRules(source, 'shape')) {
       const prediction = source.cells.map((_, i) => predictRule(source, 'shape', rule, i));
@@ -75,6 +79,26 @@ describe('T21 도형 규칙 후보', () => {
   });
 });
 describe('T21 단계별 200판', () => {
+  for (const level of levels) it(`★${level}: 보기 중심 요령 35% 이하, 과거 보기 제거 뒤 40% 이하`, () => {
+    const centers = (options: PatternTile[]) => {
+      const scores = options.map(a => options.reduce((sum, b) => sum + PATTERN_ATTRIBUTES.filter(attr => a[attr] === b[attr]).length, 0));
+      return options.filter((_, i) => scores[i] === Math.max(...scores));
+    };
+    let hit = 0, filteredHit = 0, firstHit = 0, filteredFirstHit = 0;
+    for (let seed = 0; seed < 200; seed++) {
+      const puzzle = generatePattern(level, seededRng(seed)), view = puzzle.view, answer = view.options[puzzle.answer - 1];
+      const all = centers(view.options);
+      // 동점을 무작위로 풀거나 첫 보기를 골라도 정답에 치우치지 않는다. 네 꼭짓점은 유사도가 같다.
+      expect(all).toHaveLength(4);
+      hit += 1 / all.length; firstHit += Number(all[0] === answer);
+      const unseen = view.options.filter(option => !view.cells.some(tile => tile && samePatternTile(tile, option)));
+      const filtered = centers(unseen);
+      if (filtered.includes(answer)) filteredHit += 1 / filtered.length;
+      filteredFirstHit += Number(filtered[0] === answer);
+    }
+    expect(hit / 200).toBeLessThanOrEqual(0.35); expect(firstHit / 200).toBeLessThanOrEqual(0.35);
+    expect(filteredHit / 200).toBeLessThanOrEqual(0.4); expect(filteredFirstHit / 200).toBeLessThanOrEqual(0.4);
+  });
   for (const level of levels) it(`★${level}: 형태·규칙·유일 해·속성 하나만 다른 보기·같은 시드`, () => {
     const blanks = new Set<number>(), turns = new Set<string>();
     for (let seed = 0; seed < 200; seed++) {
@@ -99,9 +123,14 @@ describe('T21 단계별 200판', () => {
       } else {
         expect(view.cells).toHaveLength(9); expect(shown).toHaveLength(8); blanks.add(view.cells.indexOf(null));
         if (level === 4) {
-          expect(view.rules.shape).toMatchObject({ kind: 'cycle', axis: 'diagonal' }); expect(view.rules.count).toEqual({ kind: 'cycle', values: [1, 2, 3], axis: 'column' });
+          expect(view.rules.shape).toMatchObject({ kind: 'cycle', axis: 'diagonal' }); expect(view.rules.count).toMatchObject({ kind: 'step', axis: 'anti-diagonal' });
           expect(view.rules.color?.kind).toBe('fixed');
-        } else { expect(view.rules.color).toMatchObject({ kind: 'cycle', axis: 'column' }); expect(view.rules.count).toMatchObject({ kind: 'step', axis: 'row' }); }
+        } else { expect(view.rules.color).toMatchObject({ kind: 'cycle', axis: 'diagonal' }); expect(view.rules.count).toMatchObject({ kind: 'step', axis: 'column' }); }
+        const blank = view.cells.indexOf(null), attribute = level === 4 ? 'count' : 'color';
+        view.cells.forEach((tile, i) => {
+          // 같은 행·열의 어느 칸을 복사해도 이 속성의 정답을 얻을 수 없다.
+          if (tile && (Math.floor(i / 3) === Math.floor(blank / 3) || i % 3 === blank % 3)) expect(tile[attribute]).not.toBe(expected[attribute]);
+        });
       }
       if (level === 2 || level === 3) {
         // 어떤 과거 칸을 그대로 복사해도 정답을 얻지 못하는, 명세보다 강한 조건이다.
@@ -114,7 +143,7 @@ describe('T21 단계별 200판', () => {
       expect(explainRules(view)).not.toBe(''); expect(explainRules(view)).not.toContain('undefined');
       expect(patternGenerator.check(puzzle, puzzle.answer)).toBe(true); expect(patternGenerator.check(puzzle, String(puzzle.answer))).toBe(false);
     }
-    if (level >= 4) expect(blanks.size).toBe(9); if (level === 3) expect(turns).toEqual(new Set(['step', 'turn']));
+    if (level === 4) expect(blanks.size).toBe(7); if (level === 5) expect(blanks.size).toBe(9); if (level === 3) expect(turns).toEqual(new Set(['step', 'turn']));
   }, 20000);
 });
 describe('T21 대체 판과 규칙 설명', () => {
@@ -131,10 +160,12 @@ describe('T21 대체 판과 규칙 설명', () => {
   });
   it('설명은 실제 속성·반복·증감·회전·행열 규칙을 한국어로 말한다', () => {
     const view = board([tile(1), tile(2), tile(3), tile(4), tile(5), null]);
+    view.cells[0] = { ...tile(1), shape: 'arrow', dir: 0 };
     view.rules = { count: { kind: 'step', delta: 1 }, dir: { kind: 'turn', deg: 90 }, shape: { kind: 'cycle', values: ['circle', 'triangle'] }, color: { kind: 'fixed' } };
-    expect(explainRules(view)).toBe('모양: 동그라미 → 세모 반복 · 개수: 1개씩 늘어나요 · 방향: 시계 방향으로 90도씩 돌아요');
+    expect(explainRules(view)).toBe('모양: 동그라미 → 세모 반복 · 개수: 1개씩 늘어나요 · 방향: → ↓ ← ↑ 순서로 돌아요');
     view.rules.count = { kind: 'step', delta: -2 }; expect(explainRules(view)).toContain('2개씩 줄어들어요');
-    const grid = patternGenerator.generate(4, seededRng(1)).view; expect(explainRules(grid)).toContain('각 가로줄·세로줄에 세 모양이 한 번씩'); expect(explainRules(grid)).toContain('왼쪽에서 오른쪽');
+    const grid = patternGenerator.generate(4, seededRng(1)).view; expect(explainRules(grid)).toContain('가로줄과 세로줄에 같은 모양은 한 번씩'); expect(explainRules(grid)).toContain('아래로 한 칸 가면');
+    view.rules.dir = { kind: 'turn', deg: 180 }; expect(explainRules(view)).toContain('한 칸마다 반대쪽을 봐요'); expect(explainRules(view)).not.toContain('도씩');
   });
   it('이전 sequence·period 형식은 새 화면 데이터로 판정하지 않는다', () => expect(isPatternView({ sequence: [tile(1)], period: 2, options: [] })).toBe(false));
 });

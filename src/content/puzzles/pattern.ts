@@ -6,8 +6,8 @@ export type PatternDir = 0 | 90 | 180 | 270;
 export type PatternAttribute = 'shape' | 'color' | 'count' | 'dir';
 type Value = PatternShape | PatternColor | number | undefined;
 export interface PatternTile { shape: PatternShape; color: PatternColor; count: number; dir?: PatternDir }
-/** 격자의 규칙은 행·열·두 위치를 더한 순서 중 어느 방향으로 진행하는지도 가진다. */
-export type PatternRule = ({ kind: 'fixed' } | { kind: 'cycle'; values: Value[] } | { kind: 'step'; delta: number } | { kind: 'turn'; deg: 90 | 180 }) & { axis?: 'row' | 'column' | 'diagonal' };
+/** 격자의 규칙은 행·열·두 위치의 합이나 차 중 어느 방향으로 진행하는지도 가진다. */
+export type PatternRule = ({ kind: 'fixed' } | { kind: 'cycle'; values: Value[] } | { kind: 'step'; delta: number } | { kind: 'turn'; deg: 90 | 180 }) & { axis?: 'row' | 'column' | 'diagonal' | 'anti-diagonal' };
 export interface PatternView {
   layout: 'row' | 'grid'; cells: (PatternTile | null)[]; options: PatternTile[];
   rules: Partial<Record<PatternAttribute, PatternRule>>;
@@ -32,7 +32,7 @@ function boardOf(source: Source): Board {
 function coordinate(board: Board, index: number, rule: PatternRule): number {
   if (board.layout === 'row') return index;
   const r = Math.floor(index / 3), c = index % 3;
-  return rule.axis === 'row' ? r : rule.axis === 'column' ? c : r + c;
+  return rule.axis === 'row' ? r : rule.axis === 'column' ? c : rule.axis === 'anti-diagonal' ? r - c : r + c;
 }
 export function samePatternTile(a: PatternTile, b: PatternTile): boolean { return PATTERN_ATTRIBUTES.every(attribute => valueOf(a, attribute) === valueOf(b, attribute)); }
 export function describePatternTile(tile: PatternTile): string { return `${COLOR_LABELS[tile.color]} ${SHAPE_LABELS[tile.shape]} ${tile.count}개${tile.shape === 'arrow' ? ` ${DIR_LABELS[tile.dir ?? 0]} 방향` : ''}`; }
@@ -56,7 +56,7 @@ const CYCLES = Object.fromEntries(PATTERN_ATTRIBUTES.map(attribute => [attribute
 export function consistentRules(source: Source, attribute: PatternAttribute): PatternRule[] {
   const board = boardOf(source), shown = board.cells.flatMap((tile, index) => tile ? [{ index, value: valueOf(tile, attribute) }] : []);
   if (!shown.length) return [];
-  const axes: PatternRule['axis'][] = board.layout === 'row' ? [undefined] : ['row', 'column', 'diagonal'];
+  const axes: PatternRule['axis'][] = board.layout === 'row' ? [undefined] : ['row', 'column', 'diagonal', 'anti-diagonal'];
   const matches = (rule: PatternRule) => {
     if (!shown.every(row => predictRule(board, attribute, rule, row.index) === row.value)) return false;
     // 격자의 변하는 모양에는 명세의 라틴 방진 조건도 적용한다. 각 줄에 같은 세 모양이 한 번씩 있어야 한다.
@@ -96,9 +96,12 @@ export function explainRules(view: PatternView): string {
   const labels: Record<PatternAttribute, string> = { shape: '모양', color: '색', count: '개수', dir: '방향' };
   return PATTERN_ATTRIBUTES.flatMap(attribute => {
     const rule = view.rules[attribute]; if (!rule || rule.kind === 'fixed') return [];
-    const axis = view.layout === 'grid' ? rule.axis === 'diagonal' && attribute === 'shape' ? '각 가로줄·세로줄에 세 모양이 한 번씩, ' : rule.axis === 'row' ? '위에서 아래로, ' : rule.axis === 'column' ? '왼쪽에서 오른쪽으로, ' : '오른쪽이나 아래로 한 칸 갈 때, ' : '';
+    if (view.layout === 'grid' && attribute === 'shape') return ['모양: 가로줄과 세로줄에 같은 모양은 한 번씩 나와요'];
+    const axis = view.layout === 'grid' ? rule.axis === 'row' ? '아래로 한 칸씩 가면, ' : rule.axis === 'column' ? '오른쪽으로 한 칸씩 가면, ' : rule.axis === 'anti-diagonal' ? '아래로는 이 순서, 오른쪽으로는 거꾸로, ' : '오른쪽이나 아래로 한 칸씩 가면, ' : '';
     const valueLabel = (value: Value) => attribute === 'shape' ? SHAPE_LABELS[value as PatternShape] : attribute === 'color' ? COLOR_LABELS[value as PatternColor] : attribute === 'dir' ? DIR_LABELS[value as PatternDir] : `${value}개`;
-    const description = rule.kind === 'cycle' ? `${rule.values.map(valueLabel).join(' → ')} 반복` : rule.kind === 'step' ? `${Math.abs(rule.delta)}개씩 ${rule.delta > 0 ? '늘어나요' : '줄어들어요'}` : `시계 방향으로 ${rule.deg}도씩 돌아요`;
+    const arrows: Record<PatternDir, string> = { 0: '→', 90: '↓', 180: '←', 270: '↑' };
+    const description = rule.kind === 'cycle' ? `${rule.values.map(valueLabel).join(' → ')} 반복` : rule.kind === 'step' ? rule.axis === 'anti-diagonal' ? `아래로 한 칸 가면 ${Math.abs(rule.delta)}개 ${rule.delta > 0 ? '늘고' : '줄고'}, 오른쪽으로 한 칸 가면 ${Math.abs(rule.delta)}개 ${rule.delta > 0 ? '줄어요' : '늘어요'}` : `${Math.abs(rule.delta)}개씩 ${rule.delta > 0 ? '늘어나요' : '줄어들어요'}` : rule.deg === 180 ? '한 칸마다 반대쪽을 봐요' : `${Array.from({ length: 4 }, (_, i) => arrows[mod(Number(predictRule(view, 'dir', rule, 0)) + i * rule.deg, 360) as PatternDir]).join(' ')} 순서로 돌아요`;
+    if (rule.kind === 'step' && rule.axis === 'anti-diagonal') return [`${labels[attribute]}: ${description}`];
     return [`${labels[attribute]}: ${axis}${description}`];
   }).join(' · ');
 }
@@ -128,12 +131,15 @@ function candidate(level: Difficulty, rng: Rng): { view: PatternView; expected: 
     }
   } else {
     if (level === 4 || rng() < 0.5) rules.shape = { kind: 'cycle', values: shapes.slice(0, 3), axis: 'diagonal' };
-    else { base.shape = 'arrow'; base.dir = pick(DIRECTIONS, rng); rules.dir = { kind: 'turn', deg: pick([90, 180] as const, rng), axis: 'diagonal' }; }
-    if (level === 4) rules.count = { kind: 'cycle', values: [1, 2, 3], axis: 'column' };
+    else { base.shape = 'arrow'; base.dir = pick(DIRECTIONS, rng); rules.dir = { kind: 'turn', deg: pick([90, 180] as const, rng), axis: 'row' }; }
+    if (level === 4) {
+      const delta = rng() < 0.5 ? 1 : -1; base.count = randInt(3, 4, rng);
+      rules.count = { kind: 'step', delta, axis: 'anti-diagonal' };
+    }
     else {
-      rules.color = { kind: 'cycle', values: colors.slice(0, 3), axis: 'column' };
+      rules.color = { kind: 'cycle', values: colors, axis: 'diagonal' };
       const delta = rng() < 0.5 ? 1 : -1; base.count = delta > 0 ? randInt(1, 4, rng) : randInt(3, 6, rng);
-      rules.count = { kind: 'step', delta, axis: 'row' };
+      rules.count = { kind: 'step', delta, axis: 'column' };
     }
     length = 9;
   }
@@ -153,16 +159,27 @@ function candidate(level: Difficulty, rng: Rng): { view: PatternView; expected: 
   return { view, expected };
 }
 function distractors(view: PatternView, answer: PatternTile, rng: Rng): PatternTile[] {
-  const blank = view.cells.indexOf(null), choices: PatternTile[] = [];
+  const blank = view.cells.indexOf(null);
   const attributes: PatternAttribute[] = answer.shape === 'arrow' ? ['color', 'count', 'dir'] : ['shape', 'color', 'count'];
-  for (const attribute of attributes) {
+  const wrongValues = Object.fromEntries(attributes.map(attribute => {
     const rule = view.rules[attribute]!, correct = valueOf(answer, attribute);
     const nearby = rule.kind === 'turn' ? [mod(Number(correct) + 180, 360), mod(Number(correct) - rule.deg, 360)] : rule.kind === 'step' ? [Number(correct) - rule.delta, Number(correct) + rule.delta] : [predictRule(view, attribute, rule, Math.max(0, blank - 1)), predictRule(view, attribute, rule, blank + 1)];
     const domain = attribute === 'shape' ? SHAPES : DOMAINS[attribute];
-    const wrong = [...nearby, ...shuffle(domain, rng)].find(value => value !== correct && domain.includes(value));
-    choices.push({ ...answer, [attribute]: wrong });
+    return [attribute, [...new Set([...nearby, ...shuffle(domain, rng)])].filter(value => value !== correct && domain.includes(value))];
+  })) as Partial<Record<PatternAttribute, Value[]>>;
+  const pairs = shuffle(attributes.flatMap((a, i) => attributes.slice(i + 1).map(b => [a, b] as const)), rng);
+  // 2×2 조합은 어느 보기도 다른 보기의 중심이 되지 않는다. 가능한 한 움직이는 두 속성을 고른다.
+  pairs.sort((a, b) => b.filter(attr => view.rules[attr]?.kind !== 'fixed').length - a.filter(attr => view.rules[attr]?.kind !== 'fixed').length);
+  let best: PatternTile[] | undefined, bestScore = Infinity;
+  for (const [x, y] of pairs) for (const wrongX of wrongValues[x]!) for (const wrongY of wrongValues[y]!) {
+    const options = [{ ...answer, [x]: wrongX }, { ...answer, [y]: wrongY }, { ...answer, [x]: wrongX, [y]: wrongY }];
+    const shown = options.map(option => view.cells.some(tile => tile && samePatternTile(tile, option)));
+    // 앞 타일을 지운 뒤 정답만 중심에 남는 경우도 피한다. 동시 오답이 과거 타일이면 우선 제외한다.
+    const score = Number(shown[2]) * 10 + Number(shown[0]) + Number(shown[1]);
+    if (score < bestScore) { best = options; bestScore = score; }
+    if (score <= 1) return options;
   }
-  return choices;
+  return best!;
 }
 function accept(view: PatternView, expected: PatternTile, level: Difficulty): boolean {
   if (level >= 2 && view.cells.some(tile => tile && samePatternTile(tile, expected))) return false;
