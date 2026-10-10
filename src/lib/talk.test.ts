@@ -117,7 +117,7 @@ describe('자막 가림과 영어 비율', () => {
 describe('대화 미션과 보상', () => {
   it.each([false, true])('AI 연결 상태 %s를 목록·완료·비율·보상에 같은 기준으로 반영한다', (ready) => {
     const state = defaultState(), settings = state.settings.kid1, data = emptyProfileData('g5');
-    const options = { aiReady: ready }, date = '2026-10-07';
+    const options = { aiReady: ready, profileId: 'kid1' as const }, date = '2026-10-07';
     applyProgress(data, settings, date, { type: 'science', amount: 5 }, options);
     expect(enabledMissions(settings, options).some((m) => m.type === 'talk')).toBe(ready);
     expect(applyProgress(data, settings, date, { type: 'math', amount: 20 }, options).justCompleted).toBe(!ready);
@@ -127,11 +127,11 @@ describe('대화 미션과 보상', () => {
   });
   it('30초씩 끊어 대화해도 누적 1분마다 진행과 별을 한 번만 기록하고 백업한다', () => {
     const state = defaultState(), data = state.data.kid1, settings = state.settings.kid1, day = '2026-10-07';
-    recordTalkSeconds(data, settings, day, 30, true);
+    recordTalkSeconds(data, settings, day, 30, true, 'kid1');
     expect(data.days[day].talkSeconds).toBe(30);
     expect(data.days[day].progress.talk).toBeUndefined();
     const restored = importState(exportState(state));
-    recordTalkSeconds(restored.data.kid1, restored.settings.kid1, day, 30, true);
+    recordTalkSeconds(restored.data.kid1, restored.settings.kid1, day, 30, true, 'kid1');
     expect(restored.data.kid1.days[day].talkSeconds).toBe(60);
     expect(restored.data.kid1.days[day].progress.talk).toBe(1);
     expect(restored.data.kid1.stars).toBe(1);
@@ -160,26 +160,26 @@ describe('대화 미션과 보상', () => {
   });
   it('AI 설정이 없으면 대화를 완료 조건·진행 비율에서 빼고 쿠폰은 한 번 지급한다', () => {
     const state = defaultState(), settings = state.settings.kid1, data = emptyProfileData('g5');
-    applyProgress(data, settings, '2026-10-07', { type: 'science', amount: 5 }, { aiReady: false });
+    applyProgress(data, settings, '2026-10-07', { type: 'science', amount: 5 }, { aiReady: false, profileId: 'kid1' });
     expect(aiReady({})).toBe(false);
     expect(aiReady({ endpoint: 'https://worker.example', token: 'x'.repeat(32) })).toBe(true);
-    expect(applyProgress(data, settings, '2026-10-07', { type: 'math', amount: 20 }, { aiReady: false }).justCompleted).toBe(true);
+    expect(applyProgress(data, settings, '2026-10-07', { type: 'math', amount: 20 }, { aiReady: false, profileId: 'kid1' }).justCompleted).toBe(true);
     expect(isDayComplete(data.days['2026-10-07'], settings, { aiReady: true })).toBe(false);
     expect(dayRatio(data.days['2026-10-07'], settings, { aiReady: false })).toBe(1);
     expect(dayRatio(data.days['2026-10-07'], settings, { aiReady: true })).toBe(2 / 3);
-    applyProgress(data, settings, '2026-10-07', { type: 'math' }, { aiReady: false });
+    applyProgress(data, settings, '2026-10-07', { type: 'math' }, { aiReady: false, profileId: 'kid1' });
     expect(data.coupons).toHaveLength(1);
   });
   it('대화 진행은 분마다 오르고 목표를 초과한 추가 대화에는 별을 더 주지 않는다', () => {
     const state = defaultState(), settings = state.settings.kid2, data = emptyProfileData('g3');
     const day = '2026-10-07';
-    applyProgress(data, settings, day, { type: 'science', amount: 5 }, { aiReady: true });
-    applyProgress(data, settings, day, { type: 'math', amount: 20 }, { aiReady: true });
-    for (let i = 0; i < 14; i++) applyProgress(data, settings, day, { type: 'talk', amount: 1 }, { aiReady: true });
+    applyProgress(data, settings, day, { type: 'science', amount: 5 }, { aiReady: true, profileId: 'kid2' });
+    applyProgress(data, settings, day, { type: 'math', amount: 20 }, { aiReady: true, profileId: 'kid2' });
+    for (let i = 0; i < 14; i++) applyProgress(data, settings, day, { type: 'talk', amount: 1 }, { aiReady: true, profileId: 'kid2' });
     expect(data.stars).toBe(14);
     expect(data.days[day].completed).toBe(false);
-    expect(applyProgress(data, settings, day, { type: 'talk' }, { aiReady: true }).justCompleted).toBe(true);
-    applyProgress(data, settings, day, { type: 'talk', amount: 5 }, { aiReady: true });
+    expect(applyProgress(data, settings, day, { type: 'talk' }, { aiReady: true, profileId: 'kid2' }).justCompleted).toBe(true);
+    applyProgress(data, settings, day, { type: 'talk', amount: 5 }, { aiReady: true, profileId: 'kid2' });
     expect(data.stars).toBe(15);
     expect(data.coupons).toHaveLength(1);
     expect(data.days[day].progress.talk).toBe(20);

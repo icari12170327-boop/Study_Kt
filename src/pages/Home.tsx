@@ -1,3 +1,5 @@
+import { CompletionCard } from '../components/CompletionCard';
+import { useMinuteClock } from '../lib/useMinuteClock';
 import { WeeklyReportNotice } from './WeeklyReport';
 import { normalizePuzzleSettings } from '../content/puzzles/state';
 import { RewardGameCard } from '../components/RewardGameCard';
@@ -14,7 +16,8 @@ import { aiReady } from '../lib/talk';
 
 export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
   const { state } = useStore();
-  const today = toDateKey();
+  const now = useMinuteClock();
+  const today = toDateKey(now);
   const profile = state.profiles.find((p) => p.id === profileId)!;
   const data = state.data[profileId];
   const settings = state.settings[profileId];
@@ -35,6 +38,7 @@ export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
         onBack={() => go({ name: 'profiles' })}
       />
 
+      {profileId !== 'parent' && day?.completed && completeNow && <CompletionCard name={profile.name} day={day} now={now} missions={enabledMissions(settings, { aiReady: aiReady(state.ai) })} rewardLabel={settings.rewardLabel} />}
       <div className="stat-row">
         <div className="stat">
           <div className="stat-value">🔥 {currentStreak(data, today)}</div>
@@ -52,7 +56,7 @@ export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
 
       <h2 className="section-title">오늘의 미션 · {formatKoreanDate(today)}</h2>
 
-      {day?.completed && (
+      {day?.completed && (profileId === 'parent' || !completeNow) && (
         <div className="celebrate">
           <div className="celebrate-emoji">🎉</div>
           <div>

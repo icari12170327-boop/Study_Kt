@@ -1,3 +1,4 @@
+import { validMinuteTime } from '../lib/date';
 import { normalizePreviewHistory } from '../lib/talkPreview';
 import { normalizeRetrieval } from '../lib/retrieval';
 import { normalizeReadingQuiz } from '../lib/readingQuiz';
@@ -83,6 +84,10 @@ export function normalizeState(raw: unknown, today = toDateKey()): AppState {
         Number.isFinite(row.level) && Number.isFinite(row.counted) && Number.isFinite(row.correct) &&
         Number.isFinite(row.guesses) && Number.isFinite(row.medianSec)).slice(-30) : [],
     };
+    // 완료 시각은 아이의 완료된 날에만 보관한다. 과거 기록에 없는 시각은 추정하지 않는다.
+    for (const day of Object.values(data[p.id].days)) {
+      if (p.id === 'parent' || !day.completed || !validMinuteTime(day.completedAt)) delete day.completedAt;
+    }
     data[p.id].days = Object.fromEntries(Object.entries(data[p.id].days).map(([date, day]) =>
       [date, { ...day, ...(day.science !== undefined ? { science: normalizeScienceDay(day.science) } : {}), talkSeconds: typeof day.talkSeconds === 'number' && Number.isFinite(day.talkSeconds) && day.talkSeconds >= 0 ? Math.floor(day.talkSeconds) : (day.progress.talk ?? 0) * 60, mathAttempts: normalizeGameAttempts(day.mathAttempts, date, today) }]));
   }

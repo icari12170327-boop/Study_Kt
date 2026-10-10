@@ -27,3 +27,9 @@ export function formatKoreanDate(key: string): string {
   const week = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
   return `${d.getMonth() + 1}월 ${d.getDate()}일 (${week})`;
 }
+
+/** 로컬 시간의 분 단위 표시. 완료 시각과 현재 시각에 공통으로 쓴다. */
+export function minuteTime(date: Date): string {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+export const validMinuteTime = (value: unknown): value is string => typeof value === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);

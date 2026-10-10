@@ -151,7 +151,7 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
     if (amount <= 0 || (!final && minutes <= run.credited)) return;
     run.credited = minutes;
     run.savedSeconds = seconds;
-    update((draft) => { recordTalkSeconds(draft.data[profileId], draft.settings[profileId], run.date, amount, aiReady(draft.ai)); });
+    update((draft) => { recordTalkSeconds(draft.data[profileId], draft.settings[profileId], run.date, amount, aiReady(draft.ai), profileId); });
   };
   const summarize = async (run: Run, log: TalkLog) => {
     const input = summaryLines(log.lines);
@@ -288,7 +288,7 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
             const data = draft.data[profileId];
             const log = data.talks.find((talk) => talk.id === run.id);
             if (!log) return;
-            if (additional) recordTalkSeconds(data, draft.settings[profileId], run.date, additional, aiReady(draft.ai));
+            if (additional) recordTalkSeconds(data, draft.settings[profileId], run.date, additional, aiReady(draft.ai), profileId);
             log.seconds = Math.max(log.seconds, seconds);
           });
           if (alive.current) setDoneLog((old) => old?.id === run.id ? { ...old, seconds: Math.max(old.seconds, seconds) } : old);

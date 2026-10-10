@@ -139,7 +139,7 @@ describe('기존 저장·미션·별·SRS 흐름 회귀', () => {
     await writeNote(); await click(button('저장'));
     const after = saved(); expect(after.data.kid2.notes).toHaveLength(1); expect(after.data.kid2.notes[0].cards).toHaveLength(2);
     const expected = structuredClone(before); expected.data.kid2.notes = after.data.kid2.notes;
-    applyProgress(expected.data.kid2, expected.settings.kid2, toDateKey(), { type: 'reading' }, { aiReady: true });
+    applyProgress(expected.data.kid2, expected.settings.kid2, toDateKey(), { type: 'reading' }, { aiReady: true, profileId: 'kid2' });
     expect(after).toEqual(expected);
     expect(after.data.kid2.srs).toEqual(before.data.kid2.srs); expect(after.data.kid2.math).toEqual(before.data.kid2.math);
     expect(JSON.stringify(after)).not.toContain('checked'); expect(JSON.stringify(after)).not.toContain('"type":"fact"');

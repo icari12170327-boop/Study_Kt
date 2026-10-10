@@ -109,7 +109,7 @@ export function MathSession({ profileId, go }: { profileId: ProfileId; go: Go })
         correct: correct ? 1 : 0,
         total: 1,
         skill: item.problem.skill,
-      }, { aiReady: aiReady(draft.ai) });
+      }, { aiReady: aiReady(draft.ai), profileId });
       d.days[today].mathAttempts.push({ ...attempt, problem: withoutStory(item.problem) });
       if (correct && item.wrongId) {
         d.wrongNotes = d.wrongNotes.filter((w) => w.id !== item.wrongId);
@@ -129,7 +129,7 @@ export function MathSession({ profileId, go }: { profileId: ProfileId; go: Go })
   if (finished) {
     const completedNow = !wasCompleted.current && Boolean(data.days[today]?.completed);
     return (
-      <div className="page">
+      <div className="page math-session">
         <TopBar title="🔢 수학 도전" onBack={() => go({ name: 'home', profileId })} />
         <SessionDone correct={score.correct} total={score.total} completedToday={completedNow} rewardLabel={settings.rewardLabel}>
           {profileId !== 'parent' && grade !== 'adult' && canPlay(settings, data, today).ok && <button className="btn btn-primary" onClick={() => go({ name: 'games', profileId, game: 'fishing' })}>🎣 게임 열림!</button>}
@@ -157,7 +157,7 @@ export function MathSession({ profileId, go }: { profileId: ProfileId; go: Go })
   const answered = Boolean(feedback?.counted);
 
   return (
-    <div className="page">
+    <div className="page math-session">
       <TopBar
         title="🔢 수학 도전"
         onBack={() => go({ name: 'home', profileId })}

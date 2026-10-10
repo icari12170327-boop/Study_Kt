@@ -84,7 +84,7 @@ export function VocabSession({ profileId, go }: { profileId: ProfileId; go: Go }
     update((draft) => {
       const d = draft.data[profileId];
       d.srs[item.key] = reviewCard(d.srs[item.key], correct, today);
-      applyProgress(d, draft.settings[profileId], today, { type: 'vocab', correct: correct ? 1 : 0, total: 1 }, { aiReady: aiReady(draft.ai) });
+      applyProgress(d, draft.settings[profileId], today, { type: 'vocab', correct: correct ? 1 : 0, total: 1 }, { aiReady: aiReady(draft.ai), profileId });
     });
     if (item.mode !== 'meaning') void speak(item.card.en);
   };
