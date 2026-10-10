@@ -18,11 +18,14 @@ export function MathBingo({ profileId, go }: { profileId: ProfileId; go: Go }) {
   const [isNew, setIsNew] = useState(false);
   const [preview, setPreview] = useState<Cell[]>([]);
   const current = useRef<BingoGame | undefined>(undefined), saved = useRef(false);
+  const endedAt = useRef<number | undefined>(undefined);
   const board = useRef<HTMLDivElement>(null);
   const drag = useRef<{ pointerId: number; start: Cell; end: Cell; moved: boolean } | undefined>(undefined);
   const dispatch = useCallback((action: BingoAction) => {
     if (!current.current) return;
     const time = Date.now(), next = actBingo(current.current, action, time, Math.random);
+    // 마지막 포인터 입력 뒤 이어지는 클릭이 결과 버튼을 누르지 않도록 첫 종료 시각만 기록한다.
+    if (next.phase === 'ended' && current.current.phase !== 'ended') endedAt.current = performance.now();
     // 이벤트가 빠르게 겹쳐도 이전 선택이나 종료 전 상태를 다시 쓰지 않는다.
     current.current = next;
     setGame(next); setNow(time);
@@ -30,9 +33,10 @@ export function MathBingo({ profileId, go }: { profileId: ProfileId; go: Go }) {
   const start = () => {
     if (profileId === 'parent' || profile.level === 'adult' || !settings.enabled) return;
     const time = Date.now(), next = startBingoGame(profile.level, settings, mode, Math.random, time);
-    current.current = next; saved.current = false; drag.current = undefined;
+    current.current = next; saved.current = false; drag.current = undefined; endedAt.current = undefined;
     setGame(next); setNow(time); setIsNew(false); setPreview([]);
   };
+  const resultReady = () => endedAt.current !== undefined && performance.now() - endedAt.current >= 500;
   const phase = game?.phase;
   useEffect(() => {
     if (!phase || phase === 'paused' || phase === 'ended') return;
@@ -143,7 +147,7 @@ export function MathBingo({ profileId, go }: { profileId: ProfileId; go: Go }) {
         <div className="stat"><div className="stat-value">{game.bingos}</div><div className="stat-label">완성한 빙고</div></div>
         <div className="stat"><div className="stat-value">{game.hints}</div><div className="stat-label">힌트 수</div></div></div>
       {game.mode === 'time' ? <p>{game.limitSec}초 최고 기록: {best ? <><strong>{best.found}개</strong> · 힌트 {best.hints}번</> : '아직 없어요'}</p> : <p className="muted">연습 기록은 저장하지 않아요.</p>}
-      <div className="row-center"><button className="btn btn-primary" onClick={start}>한 판 더</button><button className="btn btn-soft" onClick={() => { current.current = undefined; setGame(undefined); }}>모드 고르기</button></div>
+      <div className="row-center"><button className="btn btn-primary" onClick={() => { if (resultReady()) start(); }}>한 판 더</button><button className="btn btn-soft" onClick={() => { if (!resultReady()) return; current.current = undefined; setGame(undefined); }}>모드 고르기</button></div>
     </section> : <>
       {game.mode === 'time' ? <section className={`bingo-timer ${seconds <= 10 ? 'bingo-urgent' : ''}`} aria-label="남은 시간">
         <div className="bingo-timer-label"><strong>{seconds}초</strong><span className="small">찾은 문제 {game.found}개 · 빙고 {game.bingos}판</span></div>

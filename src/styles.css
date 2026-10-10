@@ -788,6 +788,16 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
   .fish .small { font-size: .65rem; }
 }
 
+/* 가로 화면에서는 목표와 조작을 판 옆에 두어 판 높이를 충분히 확보한다. */
+@media (min-width: 900px) and (orientation: landscape) and (min-height: 501px) {
+  .bingo-page:has(.bingo-board) { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 10px 24px; align-content: start; }
+  .bingo-page:has(.bingo-board) > .topbar { grid-column: 1 / -1; }
+  .bingo-board-wrap { grid-column: 1; grid-row: 2 / span 6; justify-self: center; }
+  .bingo-timer, .bingo-goal, .bingo-feedback, .bingo-page:has(.bingo-board) > .row-center,
+  .bingo-page:has(.bingo-board) > p:last-child, .bingo-page:has(.bingo-board) > .badge { grid-column: 2; margin: 0; }
+  .bingo-board { width: min(calc(min(100vw, var(--page-max)) - 32px - 344px), 62dvh, calc(100dvh - 120px)); }
+}
+
 @media (max-width: 599px) {
   /* 폰의 글자·판·키 방식은 유지하면서 실제 높이에 맞춰 여백과 키패드만 압축한다. */
   .brain-puzzles { gap: 6px; }
