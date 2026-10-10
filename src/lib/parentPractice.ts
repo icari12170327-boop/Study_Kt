@@ -7,7 +7,7 @@ export function normalizePracticeFields(log: TalkLog): Partial<TalkLog> {
   const previewChunks = Array.isArray(log.previewChunks) ? [...new Set(log.previewChunks.filter(id => CHUNK_MAP.has(id)))].slice(0, 3) : undefined;
   const retrievalApplied = Array.isArray(log.retrievalApplied) ? [...new Set(log.retrievalApplied.filter(text => typeof text === 'string' && !!expressionKey(text) && text.length <= 160))].slice(0, 8) : undefined;
   const retells: RetellAttempt[] | undefined = Array.isArray(log.retells) ? [] : undefined;
-  for (let i = 0; i < Math.min(2, log.retells?.length ?? 0); i++) {
+  for (let i = 0; i < (retells ? Math.min(2, log.retells!.length) : 0); i++) {
     const attempt = log.retells![i];
     if (!attempt || typeof attempt.text !== 'string' || attempt.text.length > 6000 || attempt.limit !== (i === 0 ? 120 : 90) || typeof attempt.seconds !== 'number' || !Number.isFinite(attempt.seconds) || attempt.seconds <= 0 || attempt.seconds > attempt.limit) break;
     retells!.push({ text: attempt.text, seconds: attempt.seconds, limit: attempt.limit });

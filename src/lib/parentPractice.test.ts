@@ -68,6 +68,8 @@ describe('리캐스트 보수적 판정', () => {
   it.each([
     ['I go yesterday.', 'Oh, you went yesterday! What did you do?', 'went'],
     ['She like coffee.', 'She likes coffee.', 'likes'],
+    ['We discuss the schedule yesterday.', 'Oh, you discussed the schedule yesterday!', 'discussed'],
+    ['I like hiking last year.', 'You liked hiking last year.', 'liked'],
     ['I bought book yesterday.', 'You bought a book yesterday.', 'a'],
     ['We meet Monday.', 'We meet on Monday.', 'on'],
     ['I work here since last year.', "I've worked here since last year.", "I've worked"],
@@ -120,6 +122,13 @@ describe('다시 말하기·성장 지표·저장 분리', () => {
       expect(restored.data.kid1.previewHistory).toBeUndefined();
       const before = defaultState(), after = normalizeState(before, today); expect(after.data.kid1).toEqual(before.data.kid1); expect(after.data.parent.talks).toEqual([]);
     } finally { vi.useRealTimers(); }
+  });
+  it('배열이 아닌 다시 말하기 기록도 정규화 전체를 깨뜨리지 않는다', () => {
+    for (const raw of [null, 'invalid', { length: 1, 0: { text: 'Hello.', seconds: 10, limit: 120 } }]) {
+      const current = { ...log(), retells: raw } as unknown as TalkLog;
+      expect(normalizePracticeFields(current).retells).toBeUndefined();
+      const state = defaultState(); state.data.parent.talks = [current]; expect(normalizeState(state, today).data.parent.talks).toHaveLength(1);
+    }
   });
   it('형식·길이·개수·수치 상한을 확인하고 손상된 선택 필드만 뺀다', () => {
     expect(normalizePracticeFields({ ...log(), previewChunks: ['bad', chunk.id, chunk.id], retrievalApplied: ['', 'a'.repeat(161), item.better] }).previewChunks).toEqual([chunk.id]);

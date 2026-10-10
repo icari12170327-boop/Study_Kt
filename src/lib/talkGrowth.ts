@@ -1,6 +1,6 @@
 import type { TalkGrowth, TalkLog, RetrievalItem } from '../types';
 import { CHUNK_MAP } from '../content/talk/chunks';
-import { updateRetrieval } from './retrieval';
+import { updateRetrieval, validRetrievalDate } from './retrieval';
 import { expressionKey } from './talkPreview';
 import { weekRange, type WeekRange } from './weeklyReport';
 export const englishWordCount = (text: string): number => (text.match(/[A-Za-z]+(?:['’][A-Za-z]+)*/g) ?? []).length;
@@ -30,7 +30,7 @@ export const GROWTH_METRICS = [
 ] as const;
 const emptyGrowth = (): TalkGrowth => ({ averageEnglishWords: null, retellWordsPerMinute: null, correctionRate: null, selfFixedRate: null, englishRatio: null, reuseRate: null });
 export function parentWeeklyGrowth(logs: readonly TalkLog[], range: WeekRange): TalkGrowth {
-  const selected = logs.filter(log => log.date >= range.start && log.date <= range.end && log.growth);
+  const selected = logs.filter(log => validRetrievalDate(log.date) && log.date >= range.start && log.date <= range.end && log.growth);
   const result = emptyGrowth();
   for (const { key } of GROWTH_METRICS) {
     const values = selected.map(log => log.growth![key]).filter((value): value is number => value !== null);
