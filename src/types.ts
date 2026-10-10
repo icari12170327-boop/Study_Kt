@@ -154,6 +154,8 @@ export interface DayLog {
   correct: number;
   total: number;
   completed: boolean;
+  /** 아이의 첫 하루 미션 완료 시각. 예전 기록에는 없을 수 있다. */
+  completedAt?: string;
   mathBySkill: Record<string, SkillStat>;
   mathAttempts: MathAttempt[];
 }

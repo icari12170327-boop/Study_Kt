@@ -86,7 +86,7 @@ function NoteEditor({ profileId, isAdult, note, onDone }: { profileId: ProfileId
         if (target) Object.assign(target, { title: title.trim(), author: author.trim(), summary: summary.trim(), cards: clean });
       } else {
         d.notes.unshift({ id: uid(), title: title.trim(), author: author.trim(), date: today, summary: summary.trim(), cards: clean });
-        applyProgress(d, draft.settings[profileId], today, { type: 'reading' }, { aiReady: aiReady(draft.ai) });
+        applyProgress(d, draft.settings[profileId], today, { type: 'reading' }, { aiReady: aiReady(draft.ai), profileId });
       }
     });
     onDone();
@@ -202,7 +202,7 @@ function NoteReview({ profileId, allKeys, onDone }: { profileId: ProfileId; allK
       const d = draft.data[profileId];
       d.srs[keys[index]] = reviewCard(d.srs[keys[index]], known, today);
       // 복습 세션의 첫 카드에서 독서 미션 1회를 인정한다.
-      if (index === 0) applyProgress(d, draft.settings[profileId], today, { type: 'reading', correct: known ? 1 : 0, total: 1 }, { aiReady: aiReady(draft.ai) });
+      if (index === 0) applyProgress(d, draft.settings[profileId], today, { type: 'reading', correct: known ? 1 : 0, total: 1 }, { aiReady: aiReady(draft.ai), profileId });
     });
     setRevealed(false);
     setIndex(index + 1);

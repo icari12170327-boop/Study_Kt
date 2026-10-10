@@ -80,7 +80,7 @@ export function SpeakingSession({ profileId, go }: { profileId: ProfileId; go: G
     update((draft) => {
       const d = draft.data[profileId];
       d.srs[item.key] = reviewCard(d.srs[item.key], passed, today);
-      applyProgress(d, draft.settings[profileId], today, { type: 'speaking', correct: passed ? 1 : 0, total: 1 }, { aiReady: aiReady(draft.ai) });
+      applyProgress(d, draft.settings[profileId], today, { type: 'speaking', correct: passed ? 1 : 0, total: 1 }, { aiReady: aiReady(draft.ai), profileId });
     });
     setBest(null);
     setHeard('');

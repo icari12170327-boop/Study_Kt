@@ -1,5 +1,5 @@
-import type { DayLog, MissionType, ProfileData, ProfileSettings } from '../types';
-import { addDays } from './date';
+import type { DayLog, MissionType, ProfileData, ProfileSettings, ProfileId } from '../types';
+import { addDays, minuteTime } from './date';
 import { uid } from './random';
 
 export function emptyDay(date: string): DayLog {
@@ -12,7 +12,7 @@ export function ensureDay(data: ProfileData, date: string): DayLog {
   return data.days[date];
 }
 
-export interface ProgressOptions { aiReady: boolean }
+export interface ProgressOptions { aiReady: boolean; profileId?: ProfileId }
 
 export function enabledMissions(settings: ProfileSettings, options: ProgressOptions) {
   return settings.missions.filter((m) => m.enabled && m.target > 0 && (m.type !== 'talk' || options.aiReady));
@@ -91,6 +91,7 @@ export function applyProgress(
 
   if (!day.completed && isDayComplete(day, settings, options)) {
     day.completed = true;
+    if (options.profileId === 'kid1' || options.profileId === 'kid2') day.completedAt = minuteTime(new Date());
     data.streak = data.lastCompleted === addDays(today, -1) ? data.streak + 1 : 1;
     data.lastCompleted = today;
     data.coupons.push({ id: uid(), label: settings.rewardLabel, earnedAt: today });

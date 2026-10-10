@@ -52,7 +52,7 @@ export function recordScienceAnswer(state: AppState, profileId: ProfileId, id: s
   stat.correct += Number(correct);
   stat.total++;
   if (!stat.units.includes(q.unit)) stat.units.push(q.unit);
-  applyProgress(data, state.settings[profileId], date, { type: 'science', correct: Number(correct), total: 1 }, { aiReady: aiReady(state.ai) });
+  applyProgress(data, state.settings[profileId], date, { type: 'science', correct: Number(correct), total: 1 }, { aiReady: aiReady(state.ai), profileId });
   return true;
 }
 /** 선택 실험은 첫 완료에만 별 1개. 미션·정답률·쿠폰·연속일을 건드리지 않는다. */
@@ -63,7 +63,7 @@ export function recordExperiment(state: AppState, profileId: ProfileId, id: stri
   const data = state.data[profileId];
   if (Object.hasOwn(data.science.experiments, id)) return false;
   data.science.experiments[id] = { date, predicted, observed };
-  applyProgress(data, state.settings[profileId], date, { type: 'science', stars: 1, rewardOnly: true }, { aiReady: aiReady(state.ai) });
+  applyProgress(data, state.settings[profileId], date, { type: 'science', stars: 1, rewardOnly: true }, { aiReady: aiReady(state.ai), profileId });
   return true;
 }
 export function scienceSummary(data: ProfileData, today: string) {
