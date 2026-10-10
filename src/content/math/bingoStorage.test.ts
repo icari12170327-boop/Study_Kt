@@ -6,6 +6,35 @@ import type { BingoRecord } from '../../types';
 
 const rec: BingoRecord = { date: '2026-10-07', level: 'g5', limitSec: 120, found: 9, bingos: 1, hints: 2 };
 describe('빙고 선택 필드와 기존 데이터 호환', () => {
+  it('둘째의 기존 5×5 숫자 키를 이전하고 최고 비교·정규화 멱등·백업 왕복을 유지한다', () => {
+    const state = defaultState(), legacy = { ...rec, level: 'g3' as const, limitSec: 180, found: 99 };
+    state.data.kid2.bingo = { recent: [legacy], best: { '180': legacy } };
+    const before = structuredClone(state), normalized = normalizeState(state);
+    expect(state).toEqual(before);
+    expect(normalized.version).toBe(2);
+    expect(normalized.data.kid2.bingo).toEqual({ recent: [legacy], best: { '5x5-180': legacy } });
+    expect(normalizeState(normalized)).toEqual(normalized);
+    expect(importState(exportState(normalized))).toEqual(normalized);
+    expect(recordBingo(normalized.data.kid2, { ...legacy, found: 1 })).toBe(false);
+    expect(recordBingo(normalized.data.kid2, { ...legacy, found: 100 })).toBe(true);
+    expect(normalized.data.kid2.bingo?.best['5x5-180'].found).toBe(100);
+  });
+  it.each([
+    { found: 10, hints: 3, oldWins: true },
+    { found: 9, hints: 1, oldWins: true },
+    { found: 8, hints: 0, oldWins: false },
+    { found: 9, hints: 2, oldWins: false },
+  ])('둘째 예전·새 키 충돌 시 입력 순서와 무관하게 더 좋은 기록을 보존: %j', ({ found, hints, oldWins }) => {
+    const current = { ...rec, level: 'g3' as const, limitSec: 180 };
+    const legacy = { ...current, date: '2026-10-06', found, hints };
+    for (const best of [{ '180': legacy, '5x5-180': current }, { '5x5-180': current, '180': legacy }]) {
+      const state = defaultState(); state.data.kid2.bingo = { recent: [legacy, current], best };
+      const normalized = normalizeState(state);
+      expect(normalized.data.kid2.bingo?.best).toEqual({ '5x5-180': oldWins ? legacy : current });
+      expect(normalizeState(normalized)).toEqual(normalized);
+      expect(importState(exportState(normalized))).toEqual(normalized);
+    }
+  });
   it('normalizeState는 예전 최고와 새 판 크기별 최고를 보존하고 잘못된 키는 버린다', () => {
     const raw = JSON.parse(exportState(defaultState())), legacy = { ...rec, found: 99 };
     raw.data.kid1.bingo = { recent: [rec, legacy], best: { '120': legacy, '5x5-120': rec, '6x6-120': legacy,

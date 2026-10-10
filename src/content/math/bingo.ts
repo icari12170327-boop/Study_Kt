@@ -126,10 +126,18 @@ export function normalizeBingoData(raw: unknown): NonNullable<ProfileData['bingo
   const row = object(raw);
   const recent = (Array.isArray(row.recent) ? row.recent.map(validRecord).filter((rec): rec is BingoRecord => !!rec) : []).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 20);
   const best: Record<string, BingoRecord> = {};
+  const legacyG3: BingoRecord[] = [];
   for (const [key, value] of Object.entries(object(row.best))) {
     const rec = validRecord(value);
-    // 숫자만 있는 예전 키는 그대로 보존하고 새 판 크기별 최고 기록과 비교하지 않는다.
-    if (rec && [String(rec.limitSec), bingoBestKey(5, rec.limitSec), bingoBestKey(6, rec.limitSec)].includes(key)) best[key] = rec;
+    if (!rec) continue;
+    // 둘째의 예전 숫자 키는 이미 5×5 기록이다. 첫째의 6×6 숫자 키만 따로 보존한다.
+    if (key === String(rec.limitSec) && rec.level === 'g3') legacyG3.push(rec);
+    else if ([String(rec.limitSec), bingoBestKey(5, rec.limitSec), bingoBestKey(6, rec.limitSec)].includes(key)) best[key] = rec;
+  }
+  for (const rec of legacyG3) {
+    const key = bingoBestKey(5, rec.limitSec);
+    // 새 키를 먼저 읽어 동점이면 새 키를 유지하고, 더 좋은 예전 기록은 이어 받는다.
+    best[key] = best[key] ? updateBest(best, rec).best[key] : rec;
   }
   return { recent, best };
 }

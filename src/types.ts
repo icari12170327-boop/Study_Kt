@@ -241,7 +241,7 @@ export interface ProfileData {
   crownUntil?: string;
   customCards?: CustomCard[];
   bizSituations?: string[];
-  /** 최고 기록 키: 판 크기-제한 시간(예: 5x5-120). 숫자만 있는 예전 키는 보존한다. */
+  /** 최고 기록 키: 판 크기-제한 시간(예: 5x5-120). 첫째 숫자 키는 보존하고 둘째 숫자 키는 5×5로 이전한다. */
   bingo?: { recent: BingoRecord[]; best: Record<string, BingoRecord> };
   science: ScienceData;
   talks: TalkLog[];
