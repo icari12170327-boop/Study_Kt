@@ -11,7 +11,8 @@ async function main() {
       const page = await browser.newPage({ viewport: { width: size, height: size }, deviceScaleFactor: 1 });
       // 그림을 중앙 80%로 줄이고 바깥은 단색으로 채워 maskable 안전 영역을 확보한다.
       const image = maskable ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" fill="#4f46e5"/><g transform="translate(51.2 51.2) scale(.8)">${svg.replace(/<svg[^>]*>|<\/svg>/g, '')}</g></svg>` : svg;
-      await page.setContent(`<style>body{margin:0}svg{display:block;width:100vw;height:100vh}</style>${image}`);
+      // iOS가 투명한 모서리를 검게 채우지 않도록 180px 아이콘만 불투명 배경을 쓴다.
+      await page.setContent(`<style>body{margin:0${size === 180 ? ';background:#4f46e5' : ''}}svg{display:block;width:100vw;height:100vh}</style>${image}`);
       await page.screenshot({ path: path.join(root, 'public', file), omitBackground: true }); await page.close();
     }
   } finally { await browser.close(); }
