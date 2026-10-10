@@ -651,3 +651,18 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 .talk-corrections .coach-sentence { white-space: pre-wrap; font-weight: 400; }
 .talk-corrections .check { min-height: 44px; }
 .talk-corrections h3:focus { outline: 2px solid var(--primary); outline-offset: 4px; }
+
+/* T22b 보호자 영어 연습 전용: 공통 기기 스타일과 분리한다. */
+.t22b-preview { border: 1px solid var(--line); border-radius: 16px; padding: 16px; width: 100%; min-width: 0; text-align: left; }
+.t22b-chunk { padding: 12px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.t22b-chunk p { margin: 6px 0; }
+.t22b-recast { text-decoration-thickness: 2px; text-underline-offset: 4px; }
+.t22b-recast-label { display: inline-block; color: var(--primary); }
+.t22b-retell, .t22b-growth { min-width: 0; overflow-wrap: anywhere; }
+.t22b-expression-list { font-size: .9rem; line-height: 1.8; padding-left: 24px; }
+.t22b-retell-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.t22b-growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px; }
+.t22b-growth-bars { padding: 0; list-style: none; }
+.t22b-growth-bars li { display: grid; grid-template-columns: 48px minmax(24px, 1fr) auto; align-items: center; gap: 8px; margin: 12px 0; font-size: .8rem; }
+.t22b-growth-track { height: 16px; border-radius: 8px; background: var(--line); overflow: hidden; }
+.t22b-growth-track span { display: block; height: 100%; background: var(--primary); }
