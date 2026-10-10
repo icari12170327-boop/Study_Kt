@@ -137,7 +137,7 @@ export function SpeakingSession({ profileId, go }: { profileId: ProfileId; go: G
           </button>
         </div>
 
-        <RecognitionInput recognition={recognition} child={profileId !== 'parent'} onListen={() => { void startListening(); }} onKeyboard={() => { setKeyboard(true); requestAnimationFrame(() => input.current?.focus()); }} />
+        <RecognitionInput recognition={recognition} child={profileId !== 'parent'} keepResultOnStop onListen={() => { void startListening(); }} onKeyboard={() => { setKeyboard(true); requestAnimationFrame(() => input.current?.focus()); }} />
         {(keyboard || !recognition.available) && <form onSubmit={event => { event.preventDefault(); setError(''); if (typed.trim()) evaluate([typed]); }}>
           <label>따라 쓴 문장<input ref={input} value={typed} maxLength={300} onChange={event => setTyped(event.target.value)} /></label>
           <button className="btn btn-soft" disabled={!typed.trim()} type="submit">쓴 문장 확인</button>

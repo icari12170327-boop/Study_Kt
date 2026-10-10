@@ -206,6 +206,7 @@ textarea {
 .w-miss { color: var(--bad); text-decoration: underline wavy; }
 .btn-mic { background: var(--bad); color: #fff; font-size: 1.2rem; width: 100%; min-height: 64px; border-radius: 99px; }
 .btn-mic.on { animation: pulse 1s infinite; }
+@media (prefers-reduced-motion: reduce) { .btn-mic.on { animation: none; } }
 @keyframes pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
   50% { box-shadow: 0 0 0 14px rgba(239, 68, 68, 0); }
