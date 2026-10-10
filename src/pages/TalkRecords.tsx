@@ -1,3 +1,4 @@
+import { TalkCorrections } from '../components/TalkCorrections';
 import { BusinessFeedback } from '../components/BusinessFeedback';
 import { CoachWrapup } from '../components/CoachWrapup';
 import { coachTitle } from '../lib/coach';
@@ -75,6 +76,7 @@ function ProfileRecords({ profileId }: { profileId: ProfileId }) {
       {log.flagged && <p className="bad-text">⚠️ 보호자 확인이 필요한 대화예요.</p>}
       <h3>전체 자막</h3>{log.lines.map((line, index) => <p className="talk-record-line" key={index}><strong>{business ? line.role === 'kid' ? '나' : '상대' : line.role === 'kid' ? '아이' : '친구'}:</strong> {line.text}{line.peeked && <span className="small muted"> (자막을 봤어요)</span>}</p>)}
       {!log.lines.length && <p>저장된 자막이 없어요.</p>}
+      {business && (log.corrections || log.reviewResult) && <TalkCorrections key={`corrections-${log.id}`} log={log} history />}
       {business && (log.mode === 'coach' ? <CoachWrapup key={log.id} log={log} /> : <BusinessFeedback key={log.id} log={log} />)}
       {!business && log.summary && <><h3>요약</h3><p>{log.summary.highlightKo}</p><div className="chip-wrap">{log.summary.topicsKo.map((topic) => <span className="chip" key={topic}>{topic}</span>)}</div><h3>새 표현</h3>{log.summary.newExpressions.map((expression, index) => <p key={index}><span lang="en">{expression.en}</span> · {expression.ko}</p>)}<h3>다음 주제</h3><div className="chip-wrap">{log.summary.nextTopics.map((topic) => <span className="chip" key={topic}>{topic}</span>)}</div></>}
     </div>}

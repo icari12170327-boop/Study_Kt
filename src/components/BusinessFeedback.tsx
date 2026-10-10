@@ -8,7 +8,9 @@ import { businessMemorySummary, isBizFeedback, savePhrase, scenarioTitle } from 
 /** 같은 피드백을 대화 종료 화면과 보호자 기록 화면에서 사용한다. */
 export function BusinessFeedback({ log, auto = false }: { log: TalkLog; auto?: boolean }) {
   const { state, update } = useStore();
-  const feedback = state.data.parent.talks.find(row => row.id === log.id)?.feedback;
+  const stored = state.data.parent.talks.find(row => row.id === log.id);
+  const feedback = stored?.feedback;
+  const newCorrections = !!(stored?.reviewResult || stored?.corrections);
   const [pending, setPending] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState('');
   const alive = useRef(true), busy = useRef(false), requested = useRef(false);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
@@ -52,12 +54,12 @@ export function BusinessFeedback({ log, auto = false }: { log: TalkLog; auto?: b
     {pending && <p role="status">표현을 정리하고 있어요…</p>}
     {error && !feedback && <p className="bad-text" role="alert">{error}</p>}
     {feedback ? <>
-      <p>{feedback.overallKo}</p><h3>더 자연스러운 표현</h3>
+      <p>{feedback.overallKo}</p>{!newCorrections && <><h3>더 자연스러운 표현</h3>
       {!feedback.corrections.length && <p className="muted">고칠 표현이 없어요.</p>}
       {feedback.corrections.map((row, index) => <article className="business-expression" key={index}>
         <p lang="en" className="muted">{row.said}</p><p lang="en"><strong>→ {row.better}</strong></p><p>{row.why}</p>{saveButton(row.better, row.why)}
       </article>)}
-      <h3>다음에 써 볼 핵심 표현</h3>{feedback.nextExpressions.map((row, index) => <article className="business-expression" key={index}>
+      </>}<h3>다음에 써 볼 핵심 표현</h3>{feedback.nextExpressions.map((row, index) => <article className="business-expression" key={index}>
         <p lang="en"><strong>{row.en}</strong></p><p>{row.ko}</p>{saveButton(row.en, row.ko)}
       </article>)}
       {message && <p role="status">{message}</p>}
