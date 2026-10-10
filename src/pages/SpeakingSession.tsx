@@ -1,3 +1,4 @@
+import { RecognitionInput, useRecognition } from '../components/RecognitionInput';
 import { useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/StoreContext';
 import type { ProfileId } from '../types';
@@ -6,7 +7,7 @@ import { toDateKey } from '../lib/date';
 import { applyProgress } from '../lib/progress';
 import { aiReady } from '../lib/talk';
 import { reviewCard } from '../lib/srs';
-import { canRecognize, listenOnce, speak, type ListenHandle } from '../lib/speech';
+import { speak } from '../lib/speech';
 import { scoreSpeech, type SpeechScore } from '../lib/similarity';
 import { buildSpeakingSession } from '../content/english/session';
 import { ProgressBar, TopBar } from '../components/common';
@@ -21,7 +22,9 @@ export function SpeakingSession({ profileId, go }: { profileId: ProfileId; go: G
   const today = useMemo(() => toDateKey(), []);
   const [round, setRound] = useState(0);
   const target = settings.missions.find((m) => m.type === 'speaking')?.target ?? 5;
-  const supported = useMemo(canRecognize, []);
+  const recognition = useRecognition();
+  const [keyboard, setKeyboard] = useState(false), [typed, setTyped] = useState('');
+  const input = useRef<HTMLInputElement>(null);
 
   const items = useMemo(() => {
     const done = data.days[today]?.progress.speaking ?? 0;
@@ -32,11 +35,9 @@ export function SpeakingSession({ profileId, go }: { profileId: ProfileId; go: G
   const [index, setIndex] = useState(0);
   const [best, setBest] = useState<SpeechScore | null>(null);
   const [heard, setHeard] = useState('');
-  const [listening, setListening] = useState(false);
   const [error, setError] = useState('');
   const [hideKo, setHideKo] = useState(false);
   const [score, setScore] = useState({ correct: 0, total: 0 });
-  const handle = useRef<ListenHandle | null>(null);
   const wasCompleted = useRef(Boolean(data.days[today]?.completed));
 
   if (items.length === 0) {
@@ -82,33 +83,20 @@ export function SpeakingSession({ profileId, go }: { profileId: ProfileId; go: G
       d.srs[item.key] = reviewCard(d.srs[item.key], passed, today);
       applyProgress(d, draft.settings[profileId], today, { type: 'speaking', correct: passed ? 1 : 0, total: 1 }, { aiReady: aiReady(draft.ai), profileId });
     });
+    recognition.stop(); setTyped('');
     setBest(null);
     setHeard('');
     setError('');
     setIndex((i) => i + 1);
   };
 
-  const startListening = async () => {
-    setError('');
-    setListening(true);
-    handle.current = listenOnce('en-US');
-    try {
-      const alts = await handle.current.promise;
-      if (alts.length === 0) {
-        setError('소리가 들리지 않았어요. 다시 말해 볼까요?');
-        return;
-      }
-      const scored = alts.map((a) => ({ text: a, s: scoreSpeech(item.sentence.en, a) }));
-      const top = scored.reduce((a, b) => (b.s.score > a.s.score ? b : a));
-      setHeard(top.text);
-      setBest((prev) => (prev && prev.score >= top.s.score ? prev : top.s));
-    } catch (e) {
-      const msg = (e as Error).message;
-      setError(msg === 'not-allowed' ? '마이크 권한을 허용해 주세요.' : '음성 인식에 실패했어요. 다시 시도해 주세요.');
-    } finally {
-      setListening(false);
-    }
+  const evaluate = (alts: string[]) => {
+    if (!alts.length) { setError('소리가 들리지 않았어요. 다시 말해 볼까요?'); return; }
+    const scored = alts.map(text => ({ text, score: scoreSpeech(item.sentence.en, text) }));
+    const top = scored.reduce((a, b) => b.score.score > a.score.score ? b : a);
+    setHeard(top.text); setBest(previous => previous && previous.score >= top.score.score ? previous : top.score);
   };
+  const startListening = async () => { setError(''); const alts = await recognition.listen(); if (alts) evaluate(alts); };
 
   const passed = (best?.score ?? 0) >= PASS;
 
@@ -149,48 +137,14 @@ export function SpeakingSession({ profileId, go }: { profileId: ProfileId; go: G
           </button>
         </div>
 
-        {supported ? (
-          <>
-            <button
-              className={`btn btn-mic ${listening ? 'on' : ''}`}
-              onClick={() => (listening ? handle.current?.stop() : startListening())}
-            >
-              {listening ? '듣고 있어요… (누르면 멈춤)' : '🎤 말하기'}
-            </button>
-            {error && <p className="error">{error}</p>}
-            {best && (
-              <div className={`feedback ${passed ? 'ok' : 'bad'}`}>
-                {passed ? `통과! ${Math.round(best.score * 100)}점 ⭐` : `${Math.round(best.score * 100)}점. 빨간 단어를 신경 써서 다시 해 봐요.`}
-                {heard && <div className="small muted">들린 문장: “{heard}”</div>}
-              </div>
-            )}
-            <div className="row-center">
-              {passed ? (
-                <button className="btn btn-primary wide" onClick={() => record(true)}>
-                  다음 문장
-                </button>
-              ) : (
-                best && (
-                  <button className="btn btn-ghost" onClick={() => record(false)}>
-                    건너뛰기 (내일 다시)
-                  </button>
-                )
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            <p className="small muted">이 브라우저는 음성 인식을 지원하지 않아요. 크게 따라 말한 뒤 스스로 체크해요. (Chrome 권장)</p>
-            <div className="row-center">
-              <button className="btn btn-primary" onClick={() => record(true)}>
-                잘 말했어요 👍
-              </button>
-              <button className="btn btn-ghost" onClick={() => record(false)}>
-                어려웠어요
-              </button>
-            </div>
-          </>
-        )}
+        <RecognitionInput recognition={recognition} child={profileId !== 'parent'} keepResultOnStop onListen={() => { void startListening(); }} onKeyboard={() => { setKeyboard(true); requestAnimationFrame(() => input.current?.focus()); }} />
+        {(keyboard || !recognition.available) && <form onSubmit={event => { event.preventDefault(); setError(''); if (typed.trim()) evaluate([typed]); }}>
+          <label>따라 쓴 문장<input ref={input} value={typed} maxLength={300} onChange={event => setTyped(event.target.value)} /></label>
+          <button className="btn btn-soft" disabled={!typed.trim()} type="submit">쓴 문장 확인</button>
+        </form>}
+        {error && <p className="error">{error}</p>}
+        {best && <div className={`feedback ${passed ? 'ok' : 'bad'}`}>{passed ? `통과! ${Math.round(best.score * 100)}점 ⭐` : `${Math.round(best.score * 100)}점. 빨간 단어를 신경 써서 다시 해 봐요.`}{heard && <div className="small muted">확인한 문장: “{heard}”</div>}</div>}
+        <div className="row-center">{passed ? <button className="btn btn-primary wide" onClick={() => record(true)}>다음 문장</button> : best && <button className="btn btn-ghost" onClick={() => record(false)}>건너뛰기 (내일 다시)</button>}</div>
       </div>
     </div>
   );

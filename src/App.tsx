@@ -1,3 +1,4 @@
+import { requestStorageProtection } from './lib/deviceStorage';
 import { BrainPuzzles } from './pages/BrainPuzzles';
 import { RewardGames } from './pages/RewardGames';
 import { MathBingo } from './pages/MathBingo';
@@ -20,6 +21,8 @@ import { TalkSession } from './pages/TalkSession';
 export function App() {
   const [route, setRoute] = useState<Route>({ name: 'profiles' });
   const [parentUnlocked, setParentUnlocked] = useState(false);
+
+  useEffect(() => { void requestStorageProtection(); }, []);
 
   useEffect(() => {
     window.scrollTo(0, 0);

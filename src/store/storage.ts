@@ -1,3 +1,4 @@
+import { normalizeDeviceSettings } from '../lib/deviceCheck';
 import { validMinuteTime } from '../lib/date';
 import { normalizePreviewHistory } from '../lib/talkPreview';
 import { normalizeRetrieval } from '../lib/retrieval';
@@ -32,6 +33,8 @@ export function normalizeState(raw: unknown, today = toDateKey()): AppState {
   const data = { ...base.data };
   for (const p of profiles) {
     settings[p.id] = { ...defaultSettings(p.level, p.id), ...s.settings?.[p.id] };
+    delete settings[p.id].lastBackupAt; delete settings[p.id].iosTabNoticeDismissed;
+    if (p.id === 'parent') Object.assign(settings[p.id], normalizeDeviceSettings(s.settings?.parent ?? {}));
     settings[p.id].readingQuiz = normalizeReadingQuiz(s.settings?.[p.id]?.readingQuiz);
     settings[p.id].stories = normalizeStorySettings(s.settings?.[p.id]?.stories, p.level !== 'adult');
     settings[p.id].wordProblemRatio = normalizeWordProblemRatio(s.settings?.[p.id]?.wordProblemRatio);
@@ -130,7 +133,7 @@ export function exportState(state: AppState): string {
   return JSON.stringify({ ...state, ai: { endpoint: state.ai.endpoint } }, pruneProblems(), 2);
 }
 
-export function importState(text: string, localAi: AiConfig = {}): AppState {
+export function importState(text: string, localAi: AiConfig = {}, localDevice: Pick<AppState['settings']['parent'], 'lastBackupAt' | 'iosTabNoticeDismissed'> = {}): AppState {
   const parsed = JSON.parse(text);
   if (!parsed || ![1, 2].includes(parsed.version)) throw new Error('지원하지 않는 백업 파일입니다.');
   const restored = normalizeState(parsed);
@@ -138,5 +141,7 @@ export function importState(text: string, localAi: AiConfig = {}): AppState {
   restored.ai = { endpoint: restored.ai.endpoint };
   // 기존 토큰을 백업의 다른 주소로 보내지 않도록 현재 기기의 주소도 함께 유지한다.
   if (localAi.token) restored.ai = { ...localAi };
+  delete restored.settings.parent.lastBackupAt; delete restored.settings.parent.iosTabNoticeDismissed;
+  Object.assign(restored.settings.parent, normalizeDeviceSettings(localDevice));
   return restored;
 }

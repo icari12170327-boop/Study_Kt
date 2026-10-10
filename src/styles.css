@@ -206,6 +206,7 @@ textarea {
 .w-miss { color: var(--bad); text-decoration: underline wavy; }
 .btn-mic { background: var(--bad); color: #fff; font-size: 1.2rem; width: 100%; min-height: 64px; border-radius: 99px; }
 .btn-mic.on { animation: pulse 1s infinite; }
+@media (prefers-reduced-motion: reduce) { .btn-mic.on { animation: none; } }
 @keyframes pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
   50% { box-shadow: 0 0 0 14px rgba(239, 68, 68, 0); }
@@ -813,3 +814,15 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
   .brain-puzzles .pattern-options { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
   .brain-puzzles .pattern-option { min-height: 92px; padding: 6px 3px; gap: 4px; --pattern-icon: 20px; }
 }
+
+/* 기기 점검과 일시정지는 기존 화면 단계 변수를 그대로 쓴다. */
+.device-check dl { display: grid; gap: 0.75rem; margin: 0; }
+.device-check dl > div { border-bottom: 1px solid var(--line); padding-bottom: 0.5rem; }
+.device-check dd { margin: 0.25rem 0 0; overflow-wrap: anywhere; }
+.device-check dd p { margin: 0.25rem 0 0; }
+.device-check meter { width: 100%; height: 1.5rem; }
+.recognition-input { min-width: 0; }
+.recognition-input .row-center { flex-wrap: wrap; }
+.game-paused .obby-character, .game-paused .obby-obstacle { animation-play-state: paused; }
+.game-pause { position: fixed; z-index: 40; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(24rem, calc(100vw - 2rem - var(--safe-left) - var(--safe-right))); box-shadow: 0 0 0 100vmax #0006; text-align: center; }
+.game-paused .question-card, .game-paused .fish-pond { pointer-events: none; }

@@ -1,3 +1,4 @@
+import { useGamePause } from '../components/useGamePause';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ProfileId } from '../types';
 import type { Go } from '../route';
@@ -33,20 +34,21 @@ export function FishingGame({ profileId, go, plan }: { profileId: ProfileId; go:
     const record = { date: plan.date, game: 'fishing' as const, score: fishingScore(caught.current), caught: caught.current.length, golden: caught.current.filter(fish => fish.golden).length };
     update(draft => { finishGame(draft.data[profileId], plan.index, record); });
   }, [plan, profileId, update]);
-  const remaining = useGameClock(startedAt, !ended, end);
-  const visible = availableFish(pool, caught.current, cooldown.current, performance.now());
+  const { paused, now: gameNow, isPaused, resume } = useGamePause(!ended);
+  const remaining = useGameClock(startedAt, !ended && !paused, end, gameNow, isPaused);
+  const visible = availableFish(pool, caught.current, cooldown.current, gameNow());
   useEffect(() => { visibleRef.current = visible; }, [visible]);
   const moveCursor = useCallback((index: number) => { cursorRef.current = index; setCursor(index); }, []);
   const choose = useCallback((fish: Fish) => {
-    if (done.current || active.current || !availableFish(poolRef.current, caught.current, cooldown.current, performance.now()).some(row => row.id === fish.id)) return;
-    if (!roundRemaining(startedAt, performance.now())) { end(); return; }
+    if (isPaused() || done.current || active.current || !availableFish(poolRef.current, caught.current, cooldown.current, gameNow()).some(row => row.id === fish.id)) return;
+    if (!roundRemaining(startedAt, gameNow())) { end(); return; }
     active.current = fish; answered.current = false; setSelected(fish); setInput({}); setFeedback(undefined);
-  }, [startedAt, end]);
+  }, [startedAt, end, isPaused, gameNow]);
   const close = useCallback(() => {
     active.current = undefined; answered.current = false; setSelected(undefined); setFeedback(undefined); setInput({});
   }, []);
   useEffect(() => {
-    if (ended) return;
+    if (ended || paused) return;
     const keydown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey || event.isComposing || event.keyCode === 229 || document.querySelector('.modal-backdrop, [aria-modal="true"], dialog[open]')) return;
       if (active.current) { if (event.key === 'Escape' && !event.repeat) { event.preventDefault(); close(); } return; }
@@ -66,11 +68,11 @@ export function FishingGame({ profileId, go, plan }: { profileId: ProfileId; go:
     };
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
-  }, [ended, choose, close, moveCursor]);
+  }, [ended, paused, choose, close, moveCursor]);
   const submit = () => {
     const fish = active.current;
-    if (!fish || answered.current || done.current) return;
-    if (!roundRemaining(startedAt, performance.now())) { end(); return; }
+    if (isPaused() || !fish || answered.current || done.current) return;
+    if (!roundRemaining(startedAt, gameNow())) { end(); return; }
     const result = gradeAnswer(fish.problem.answer, input);
     if (result.reason) { setFeedback({ counted: false, correct: false, message: result.reason }); return; }
     answered.current = true;
@@ -81,7 +83,7 @@ export function FishingGame({ profileId, go, plan }: { profileId: ProfileId; go:
         poolRef.current = refillFishPool(poolRef.current, caught.current, filler);
         setPool(poolRef.current);
       }
-    } else cooldown.current.set(fish.id, performance.now() + 5000);
+    } else cooldown.current.set(fish.id, gameNow() + 5000);
     setFeedback({ counted: true, correct: result.correct, message: result.correct ? `잡았어요! +${fish.points}점 🎣` : `물고기가 도망갔어요. 정답은 ${formatAnswer(fish.problem)}. 곧 다시 만나요!` });
   };
   const score = fishingScore(caught.current);
@@ -90,16 +92,17 @@ export function FishingGame({ profileId, go, plan }: { profileId: ProfileId; go:
     if (!ended) end();
     go({ name: 'home', profileId });
   };
-  return <div className="page reward-game"><TopBar title="🎣 오늘의 낚시" onBack={back} />
+  return <div className={`page reward-game ${paused ? 'game-paused' : ''}`}><TopBar title="🎣 오늘의 낚시" onBack={back} />
     {ended ? <section className="panel done"><div className="done-emoji">🎣</div><h2>낚시 끝!</h2><p>잡은 물고기 {caught.current.length}마리 · 금빛 {caught.current.filter(fish => fish.golden).length}마리</p><strong className="game-score">{score}점</strong><p>오늘 최고 {Math.max(score, ...(state.data[profileId].games ?? []).filter(row => row.date === plan.date && row.game === 'fishing').map(row => row.score))}점</p><p className="small muted">게임 점수는 별과 학습 기록에 더하지 않아요.</p><button className="btn btn-primary" onClick={() => go({ name: 'home', profileId })}>홈으로</button></section> : <>
       <div className="game-status" role="timer" aria-label="남은 시간"><strong>⏱ {Math.ceil(remaining / 1000)}초</strong><span>{score}점 · {caught.current.length}마리</span></div>
+      {paused && <section className="panel game-pause" role="dialog" aria-modal="true" aria-label="게임 일시정지" onKeyDown={event => { if (event.key === 'Tab') { event.preventDefault(); event.currentTarget.querySelector('button')?.focus(); } }}><h2>잠깐 쉬고 있어요</h2><p>남은 시간은 그대로예요.</p><button className="btn btn-primary" autoFocus onClick={resume}>계속하기</button></section>}
       {selected ? <section className="question-card"><span className={`badge ${selected.golden ? 'badge-warn' : ''}`}>{selected.golden ? '금빛 물고기 · 30점' : '물고기 · 10점'}</span><h2 className="question-text">{selected.problem.question}</h2>
         {selected.problem.answer.kind === 'fraction' && <p className="small muted">기약분수로 답해요. 대분수는 자연수 칸도 채워요.</p>}
-        <NumberPad key={selected.id} kind={selected.problem.answer.kind} value={input} onChange={setInput} onSubmit={submit} onNext={() => { if (answered.current) close(); }} nextButtonRef={nextButton} onActivity={() => {}} disabled={feedback?.counted} />
+        <NumberPad key={selected.id} kind={selected.problem.answer.kind} value={input} onChange={value => { if (!isPaused()) setInput(value); }} onSubmit={submit} onNext={() => { if (answered.current) close(); }} nextButtonRef={nextButton} onActivity={() => {}} disabled={paused || feedback?.counted} />
         {feedback && <p className={`feedback ${feedback.correct ? 'ok' : 'bad'}`} role="status">{feedback.message}</p>}
         {feedback?.counted && <button ref={nextButton} className="btn btn-primary wide" onClick={close}>물고기 고르기</button>}
         <button className="btn btn-ghost wide" onClick={close}>닫기 · Esc</button>
-      </section> : <><p className="small muted">물고기를 눌러 문제를 풀어요. 금빛은 오늘 틀린 문제예요.</p><FishPond fish={visible} cursor={visible.length ? cursor % visible.length : 0} onChoose={choose} onCursor={moveCursor} /><p className="small muted">← → 고르기 · Enter 문제 열기 · Esc 닫기</p></>}
+      </section> : <><p className="small muted">물고기를 눌러 문제를 풀어요. 금빛은 오늘 틀린 문제예요.</p><FishPond fish={visible} cursor={visible.length ? cursor % visible.length : 0} onChoose={choose} onCursor={moveCursor} paused={paused} now={gameNow} /><p className="small muted">← → 고르기 · Enter 문제 열기 · Esc 닫기</p></>}
     </>}
   </div>;
 }

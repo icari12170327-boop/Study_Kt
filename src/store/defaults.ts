@@ -68,6 +68,7 @@ export function defaultSettings(level: Level, id?: ProfileId): ProfileSettings {
         rewardLabel: '유튜브 30분 이용권 📺',
       };
     case 'adult':
+      // 기기별 백업 날짜·안내 닫기는 실제 실행 뒤에만 선택 필드로 기록한다.
       return {
         readingQuiz: { enabled: true },
         stories: { enabled: false },
