@@ -38,7 +38,7 @@ export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
         onBack={() => go({ name: 'profiles' })}
       />
 
-      {profileId !== 'parent' && day?.completed && completeNow && <CompletionCard name={profile.name} day={day} now={now} missions={enabledMissions(settings, { aiReady: aiReady(state.ai) })} />}
+      {profileId !== 'parent' && day?.completed && completeNow && <CompletionCard name={profile.name} day={day} now={now} missions={enabledMissions(settings, { aiReady: aiReady(state.ai) })} rewardLabel={settings.rewardLabel} />}
       <div className="stat-row">
         <div className="stat">
           <div className="stat-value">🔥 {currentStreak(data, today)}</div>

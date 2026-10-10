@@ -324,7 +324,7 @@ describe('PR #21 데이터 이전·백업 호환', () => {
     const state = normalizeState(raw), data = state.data.kid2;
     expect(isDayComplete(data.days[date], state.settings.kid2, { aiReady: false })).toBe(false);
     expect(dayRatio(data.days[date], state.settings.kid2, { aiReady: false })).toBe(0.2);
-    for (let n = 0; n < 4; n++) applyProgress(data, state.settings.kid2, date, { type: 'science', correct: 1, total: 1 }, { aiReady: false });
+    for (let n = 0; n < 4; n++) applyProgress(data, state.settings.kid2, date, { type: 'science', correct: 1, total: 1 }, { aiReady: false, profileId: 'kid2' });
     expect(data.days[date].completed).toBe(true); expect(data.coupons).toHaveLength(1); expect(data.streak).toBe(6);
   });
   it('과학 미션이 없으면은 학년 기본5를 채우며 다른 목표·켜짐은 보존', () => {

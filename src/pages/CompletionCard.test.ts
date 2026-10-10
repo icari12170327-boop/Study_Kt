@@ -20,7 +20,7 @@ async function mount(profileId: ProfileId, stamp?: string) {
 it('아이 카드에 이름·실제 요일·첫 완료 시각·현재 분·끝낸 미션을 함께 표시한다', async () => {
   await mount('kid1', '10:40'); const card = host.querySelector('.completion-card')!;
   expect(card.textContent).toContain('오늘 학습 완료 ✅'); expect(card.textContent).toContain(defaultState().profiles[0].name);
-  expect(card.textContent).toContain('2026-10-10 (토)'); expect(card.textContent).toContain('10:40 완료'); expect(card.textContent).toContain('지금 시각 10:42'); expect(card.textContent).toContain('🔢 수학 도전 2문제');
+  expect(card.textContent).toContain('2026-10-10 (토)'); expect(card.textContent).toContain('10:40 완료'); expect(card.textContent).toContain('지금 시각 10:42'); expect(card.textContent).toContain('🔢 수학 도전 2문제'); expect(card.textContent).toContain(`쿠폰을 받았어요: ${defaultState().settings.kid1.rewardLabel}`);
   const before = localStorage.getItem('study-kt:v1'); await act(async () => vi.advanceTimersByTime(10000)); expect(card.textContent).toContain('지금 시각 10:43'); expect(card.textContent).toContain('10:40 완료'); expect(localStorage.getItem('study-kt:v1')).toBe(before);
   await act(async () => root.render(null)); expect(vi.getTimerCount()).toBe(0);
 });

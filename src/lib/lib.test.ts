@@ -58,10 +58,10 @@ describe('미션 진행과 보상', () => {
   it('모든 미션을 채우면 한 번만 쿠폰을 주고 연속 학습일을 올린다', () => {
     const data = emptyProfileData();
     const day = '2026-10-06';
-    expect(applyProgress(data, settings, day, { type: 'math', correct: 1, total: 1 }, { aiReady: false }).justCompleted).toBe(false);
-    expect(applyProgress(data, settings, day, { type: 'math', correct: 0, total: 1 }, { aiReady: false }).justCompleted).toBe(false);
-    expect(applyProgress(data, settings, day, { type: 'vocab', correct: 1, total: 1 }, { aiReady: false }).justCompleted).toBe(true);
-    expect(applyProgress(data, settings, day, { type: 'vocab', correct: 1, total: 1 }, { aiReady: false }).justCompleted).toBe(false);
+    expect(applyProgress(data, settings, day, { type: 'math', correct: 1, total: 1 }, { aiReady: false, profileId: 'kid1' }).justCompleted).toBe(false);
+    expect(applyProgress(data, settings, day, { type: 'math', correct: 0, total: 1 }, { aiReady: false, profileId: 'kid1' }).justCompleted).toBe(false);
+    expect(applyProgress(data, settings, day, { type: 'vocab', correct: 1, total: 1 }, { aiReady: false, profileId: 'kid1' }).justCompleted).toBe(true);
+    expect(applyProgress(data, settings, day, { type: 'vocab', correct: 1, total: 1 }, { aiReady: false, profileId: 'kid1' }).justCompleted).toBe(false);
     expect(data.coupons).toHaveLength(1);
     expect(data.stars).toBe(3);
     expect(data.streak).toBe(1);
@@ -71,8 +71,8 @@ describe('미션 진행과 보상', () => {
   it('연속으로 완료하면 연속 학습일이 늘고, 하루 빠지면 다시 1부터', () => {
     const data = emptyProfileData();
     const finish = (d: string) => {
-      applyProgress(data, settings, d, { type: 'math', amount: 2 }, { aiReady: false });
-      applyProgress(data, settings, d, { type: 'vocab' }, { aiReady: false });
+      applyProgress(data, settings, d, { type: 'math', amount: 2 }, { aiReady: false, profileId: 'kid1' });
+      applyProgress(data, settings, d, { type: 'vocab' }, { aiReady: false, profileId: 'kid1' });
     };
     finish('2026-10-01');
     finish('2026-10-02');
@@ -85,8 +85,8 @@ describe('미션 진행과 보상', () => {
 
   it('연산 단원별 통계를 기록한다', () => {
     const data = emptyProfileData();
-    applyProgress(data, settings, '2026-10-06', { type: 'math', correct: 1, total: 1, skill: 'g3-add3' }, { aiReady: false });
-    applyProgress(data, settings, '2026-10-06', { type: 'math', correct: 0, total: 1, skill: 'g3-add3' }, { aiReady: false });
+    applyProgress(data, settings, '2026-10-06', { type: 'math', correct: 1, total: 1, skill: 'g3-add3' }, { aiReady: false, profileId: 'kid1' });
+    applyProgress(data, settings, '2026-10-06', { type: 'math', correct: 0, total: 1, skill: 'g3-add3' }, { aiReady: false, profileId: 'kid1' });
     expect(data.days['2026-10-06'].mathBySkill['g3-add3']).toEqual({ correct: 1, total: 2 });
   });
 });

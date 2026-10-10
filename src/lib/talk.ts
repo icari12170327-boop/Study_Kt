@@ -81,7 +81,7 @@ export function talkSignals(input: { remaining: number; now: number; friendFinis
   };
 }
 /** 미션에 아직 반영되지 않은 초도 보존한다. 같은 실행에서 새로 지난 초만 전달한다. */
-export function recordTalkSeconds(data: ProfileData, settings: ProfileSettings, date: string, amount: number, ready: boolean, profileId?: ProfileId): void {
+export function recordTalkSeconds(data: ProfileData, settings: ProfileSettings, date: string, amount: number, ready: boolean, profileId: ProfileId): void {
   const day = ensureDay(data, date);
   const before = day.talkSeconds ?? (day.progress.talk ?? 0) * 60;
   day.talkSeconds = before + Math.max(0, Math.floor(amount));
