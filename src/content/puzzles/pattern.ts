@@ -1,5 +1,6 @@
 import { pick, randInt, seededRng, shuffle, type Rng } from '../../lib/random';
 import type { Difficulty, Puzzle, PuzzleGenerator } from './types';
+import { patternTricks, patternTrickLimits, requiresBothAttributes } from './patternTricks';
 export type PatternShape = 'circle' | 'triangle' | 'square' | 'star' | 'arrow';
 export type PatternColor = 'blue' | 'orange' | 'purple' | 'green';
 export type PatternDir = 0 | 90 | 180 | 270;
@@ -19,7 +20,7 @@ export const COLOR_LABELS: Record<PatternColor, string> = { blue: '파랑', oran
 export const DIR_LABELS: Record<PatternDir, string> = { 0: '오른쪽', 90: '아래', 180: '왼쪽', 270: '위' };
 export const PATTERN_ATTRIBUTES: readonly PatternAttribute[] = ['shape', 'color', 'count', 'dir'];
 export const PATTERN_MAX_ATTEMPTS = 40;
-export const PATTERN_MAX_OPTION_ATTEMPTS = 7000;
+export const PATTERN_MAX_OPTION_ATTEMPTS = 40;
 export const PATTERN_LEVELS = [{ layout: 'row' }, { layout: 'row' }, { layout: 'row' }, { layout: 'grid' }, { layout: 'grid' }] as const;
 const SHAPES: PatternShape[] = ['circle', 'triangle', 'square', 'star'];
 const COLORS: PatternColor[] = ['blue', 'orange', 'purple', 'green'];
@@ -110,7 +111,7 @@ function hintFor(view: PatternView): string {
   const kinds = [...new Set(Object.values(view.rules).filter(rule => rule.kind !== 'fixed').map(rule => rule.kind === 'cycle' ? '반복' : rule.kind === 'step' ? '늘어남·줄어듦' : '돌아감'))];
   return view.layout === 'grid' ? `가로줄과 세로줄에서 ${kinds.join(', ')} 규칙을 찾아봐요.` : Object.values(view.rules).some(rule => rule.kind === 'step') ? '늘어나거나 줄어드는 규칙과 반복 규칙을 따로 찾아봐요.' : Object.values(view.rules).some(rule => rule.kind === 'turn') ? '돌아가는 규칙과 반복 규칙을 따로 찾아봐요.' : Object.values(view.rules).filter(rule => rule.kind === 'cycle').length === 2 ? '서로 다른 박자로 반복되는 규칙을 찾아봐요.' : '한 가지 속성이 반복돼요.';
 }
-function candidate(level: Difficulty, rng: Rng): { view: PatternView; expected: PatternTile } {
+function candidate(level: Difficulty, rng: Rng, stepVariant?: boolean): { view: PatternView; expected: PatternTile } {
   const shapes = shuffle(SHAPES, rng), colors = shuffle(COLORS, rng);
   const base: PatternTile = { shape: shapes[0], color: colors[0], count: 1 };
   const rules: PatternView['rules'] = { shape: { kind: 'fixed' }, color: { kind: 'fixed' }, count: { kind: 'fixed' }, dir: { kind: 'fixed' } };
@@ -122,13 +123,13 @@ function candidate(level: Difficulty, rng: Rng): { view: PatternView; expected: 
     const periods = pick([[2, 3], [2, 4], [3, 4], [4, 3]] as const, rng);
     rules.shape = { kind: 'cycle', values: shapes.slice(0, periods[0]) }; rules.color = { kind: 'cycle', values: colors.slice(0, periods[1]) }; length = Math.max(...periods) * 2;
   } else if (level === 3) {
-    if (rng() < 0.5) {
+    if (stepVariant ?? rng() < 0.5) {
       const delta = rng() < 0.5 ? 1 : -1; base.count = delta > 0 ? 1 : 6;
       rules.count = { kind: 'step', delta };
       const attribute = pick(['shape', 'color'] as const, rng); rules[attribute] = { kind: 'cycle', values: (attribute === 'shape' ? shapes : colors).slice(0, randInt(2, 3, rng)) }; length = 5;
     } else {
       base.shape = 'arrow'; base.dir = pick(DIRECTIONS, rng);
-      const deg = pick([90, 180] as const, rng); rules.dir = { kind: 'turn', deg }; rules.color = { kind: 'cycle', values: colors.slice(0, 3) }; length = deg === 90 ? 5 : 4;
+      const deg = pick([90, 180] as const, rng); rules.dir = { kind: 'turn', deg }; rules.color = { kind: 'cycle', values: colors.slice(0, 3) }; length = deg === 90 ? 6 : 5;
     }
   } else {
     if (level === 4 || rng() < 0.5) rules.shape = { kind: 'cycle', values: shapes.slice(0, 3), axis: 'diagonal' };
@@ -164,25 +165,18 @@ function distractors(view: PatternView, answer: PatternTile, difficulty: Difficu
   const attributes: PatternAttribute[] = answer.shape === 'arrow' ? ['color', 'count', 'dir'] : ['shape', 'color', 'count'];
   const shown = view.cells.filter((tile): tile is PatternTile => !!tile);
   const seenValues = Object.fromEntries(PATTERN_ATTRIBUTES.map(attr => [attr, new Set(shown.map(tile => valueOf(tile, attr)))])) as Record<PatternAttribute, Set<Value>>;
-  const isShown = (tile: PatternTile) => shown.some(previous => samePatternTile(previous, tile));
-  const hasSeenValues = (tile: PatternTile) => PATTERN_ATTRIBUTES.every(attr => seenValues[attr].has(valueOf(tile, attr)));
-  const chance = (options: PatternTile[]) => options.includes(answer) ? 1 / options.length : 0;
-  const scores = (options: PatternTile[]) => options.map(a => options.reduce((sum, b) => sum + PATTERN_ATTRIBUTES.filter(attr => valueOf(a, attr) === valueOf(b, attr)).length, 0));
-  const centerChance = (options: PatternTile[], source = options, least = false) => {
-    const points = scores(source), remaining = options.map(tile => points[source.indexOf(tile)]), extreme = least ? Math.min(...remaining) : Math.max(...remaining);
-    return chance(options.filter((_, i) => remaining[i] === extreme));
-  };
-  type ChoicePolicy = 'balanced' | 'original' | 'inverse';
-  const acceptable = (wrong: PatternTile[], policy: ChoicePolicy = 'balanced') => {
-    const options = [answer, ...wrong], unseen = options.filter(tile => !isShown(tile));
-    if (centerChance(options) > 0.35 || centerChance(unseen) > 0.4) return false;
-    if (difficulty === 1) return true;
-    const familiar = options.filter(hasSeenValues), combined = familiar.filter(tile => !isShown(tile));
-    if (chance(unseen) > 0.4 || chance(familiar) > 0.4 || chance(combined) > 0.4 || centerChance(unseen, unseen, true) > 0.4) return false;
-    const original = centerChance(unseen, options), inverse = centerChance(options, options, true);
-    if (policy === 'balanced') return original <= 0.4 && inverse <= 0.4;
-    // 예외 보기에서도 반대 유사도가 정답의 표식이 되지 않도록 두 편향을 각각 없앤 후보를 섞는다.
-    return policy === 'original' ? original === 0 : inverse === 0 && original <= 0.5;
+  const acceptable = (wrong: PatternTile[]) => {
+    const options = [answer, ...wrong], board = { ...view, options };
+    if (!requiresBothAttributes(board, answer)) return false;
+    const metrics = patternTricks(board, answer), limits = patternTrickLimits(difficulty);
+    // ★3의 step은 1~6 범위에서 다음 수가 처음 등장하므로 빈도 최소 요령을 피할 수 없다.
+    // 이 유형은 판 생성 전에 10%로 선택하고, 단계 전체 200판의 빈도 적중률을 따로 검사한다.
+    if (difficulty === 3 && view.rules.count?.kind === 'step') limits.leastFrequent = 1;
+    return Object.entries(metrics).every(([key, value]) => {
+      if (key.endsWith('First')) return true;
+      if (difficulty === 1 && !['center', 'pastCenter', 'inverse', 'pastInverse'].includes(key)) return true;
+      return value <= limits[key as keyof typeof limits];
+    });
   };
   const wrongValues = Object.fromEntries(attributes.map(attribute => {
     const rule = view.rules[attribute]!, correct = valueOf(answer, attribute);
@@ -193,27 +187,17 @@ function distractors(view: PatternView, answer: PatternTile, difficulty: Difficu
     // 처음 보는 값이 곧 오답의 표식이 되지 않도록, 보인 대체 값이 있으면 반드시 그것을 쓴다.
     return [attribute, familiar.length ? familiar : values];
   })) as Partial<Record<PatternAttribute, Value[]>>;
-  const pairs = shuffle(attributes.flatMap((a, i) => attributes.slice(i + 1).map(b => [a, b] as const)), rng);
+  const eligible = difficulty === 1 ? attributes : attributes.filter(attr => view.rules[attr]?.kind !== 'fixed');
+  const pairs = shuffle(eligible.flatMap((a, i) => eligible.slice(i + 1).map(b => [a, b] as const)), rng);
   // 2×2 조합은 어느 보기도 다른 보기의 중심이 되지 않는다. 가능한 한 움직이는 두 속성을 고른다.
   pairs.sort((a, b) => b.filter(attr => view.rules[attr]?.kind !== 'fixed').length - a.filter(attr => view.rules[attr]?.kind !== 'fixed').length);
+  let attempts = 0;
   for (const [x, y] of pairs) for (const wrongX of wrongValues[x]!) for (const wrongY of wrongValues[y]!) {
+    if (++attempts > PATTERN_MAX_OPTION_ATTEMPTS) return null;
     const options = [{ ...answer, [x]: wrongX }, { ...answer, [y]: wrongY }, { ...answer, [x]: wrongX, [y]: wrongY }];
     if (acceptable(options)) return options;
   }
-  // 2×2로 기준을 만족하지 못하면 보인 속성값의 다른 조합을 유한하게 검사한다.
-  let pool = [{ ...answer }];
-  for (const attribute of attributes) {
-    const values = [valueOf(answer, attribute), ...wrongValues[attribute]!].filter(value => seenValues[attribute].has(value) || value === valueOf(answer, attribute));
-    pool = pool.flatMap(tile => values.map(value => ({ ...tile, [attribute]: value })));
-  }
-  pool = shuffle(pool.filter(tile => !samePatternTile(tile, answer) && PATTERN_ATTRIBUTES.filter(attr => valueOf(tile, attr) !== valueOf(answer, attr)).length <= 2), rng);
-  const policies: ChoicePolicy[] = ['balanced', rng() < 1 / 3 ? 'original' : 'inverse'];
-  let attempts = 0;
-  for (const policy of policies) for (let i = 0; i < pool.length; i++) for (let j = i + 1; j < pool.length; j++) for (let k = j + 1; k < pool.length; k++) {
-    if (++attempts > PATTERN_MAX_OPTION_ATTEMPTS) return null;
-    const options = [pool[i], pool[j], pool[k]];
-    if (acceptable(options, policy)) return options;
-  }
+
   return null;
 }
 function accept(view: PatternView, expected: PatternTile, level: Difficulty): boolean {
@@ -223,20 +207,20 @@ function accept(view: PatternView, expected: PatternTile, level: Difficulty): bo
 }
 export function generatePattern(difficulty: Difficulty, rng: Rng, attemptLimit = PATTERN_MAX_ATTEMPTS): Puzzle<PatternView, number> {
   const seed = randInt(0, 0xffffffff, rng), limit = Number.isInteger(attemptLimit) ? Math.max(0, Math.min(PATTERN_MAX_ATTEMPTS, attemptLimit)) : PATTERN_MAX_ATTEMPTS;
+  const stepVariant = difficulty === 3 ? rng() < 0.1 : undefined;
   let result: (ReturnType<typeof candidate> & { wrong: PatternTile[] }) | undefined;
   for (let attempt = 0; attempt < limit; attempt++) {
-    const next = candidate(difficulty, rng);
-    if (accept(next.view, next.expected, difficulty)) {
-      const wrong = distractors(next.view, next.expected, difficulty, rng);
-      if (wrong) { result = { ...next, wrong }; break; }
-    }
+    const next = candidate(difficulty, rng, stepVariant);
+    // 가벼운 보기 검사부터 해 규칙 후보 열거를 불필요하게 반복하지 않는다.
+    const wrong = distractors(next.view, next.expected, difficulty, rng);
+    if (wrong && accept(next.view, next.expected, difficulty)) { result = { ...next, wrong }; break; }
   }
   // 상한 뒤에는 단계별로 검증된 시드의 고정 판을 쓰며, 다음 호출과 배열을 공유하지 않는다.
   const fallback = !result;
   if (!result) {
-    const next = candidate(difficulty, seededRng([1, 5, 1, 1, 1][difficulty - 1]));
+    const next = candidate(difficulty, seededRng([1, 5, 2, 5, 8][difficulty - 1]), false);
     const wrong = distractors(next.view, next.expected, difficulty, seededRng(21));
-    if (!wrong) throw new Error('검증된 도형 규칙 대체 판의 보기를 만들지 못했어요.');
+    if (!wrong || !accept(next.view, next.expected, difficulty)) throw new Error('검증된 도형 규칙 대체 판의 보기를 만들지 못했어요.');
     result = { ...next, wrong };
   }
   const { view, expected, wrong } = result;
