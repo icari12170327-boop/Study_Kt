@@ -626,7 +626,7 @@ describe('지시문과 구조화된 텍스트 생성', () => {
     for (const scenarioId of Object.keys(scenarioRoles)) {
       const config = JSON.parse(buildCallBody({ ...session, profileId: 'parent', level: 'adult', mode: 'biz-talk', scenarioId, persona: { friendName: 'Alex', personaId: 'calm', voice: 'cedar' }, ...(scenarioId === 'biz-custom' ? { situation: '프로젝트 일정 공유 회의' } : {}) }, env.REALTIME_MODEL, 60).get('session') as string);
       expect(config.instructions).toContain('When you receive "[STUCK]", offer one short phrase starting with "You could say …", then wait for the user to continue.');
-      expect(config.instructions).toContain('Do not correct English during the conversation; save corrections for feedback afterward.');
+      expect(config.instructions).toContain('At most one recast per turn.');
       expect(config.instructions).toContain('When you receive "[WRAP_UP]", say a short goodbye.');
       expect(config.audio.input.turn_detection.eagerness).toBe('auto'); expect(config.audio.output.speed).toBe(1);
     }
@@ -935,6 +935,7 @@ describe('T20c 코치 뜻 길이·시간 초과 회귀', () => {
 
 describe('T20c 코치 생성 재시도 범위·상한', () => {
   const cases = [
+    { kind: 'talk-corrections', input: { mode: 'coach', level: 'zero', lines: [{ role: 'user', text: 'I like tea.' }] }, result: { items: [], praiseKo: '뜻을 잘 전했어요.' } },
     { kind: 'coach-gloss', input: { text: 'a'.repeat(280) }, result: { ko: '뜻' } },
     { kind: 'coach-check', input: { text: 'a'.repeat(280), level: 'zero' }, result: { corrected: 'Hello.', noteKo: '잘했어요.' } },
     { kind: 'coach-wrapup', input: { lines: [{ role: 'friend', text: 'a'.repeat(280), at: 1 }] }, result: { sentences: [{ en: 'Hello.', ko: '안녕.' }] } },
@@ -999,5 +1000,29 @@ describe('T20c 코치 생성 재시도 범위·상한', () => {
     await entered.promise; await vi.advanceTimersByTimeAsync(8000);
     expect((await pending).status).toBe(502); expect(outgoing).toHaveBeenCalledOnce();
     expect((await readUsage(await req('/api/usage'))).today.parent.generates).toBe(1);
+  });
+});
+
+ describe('T22a 교정 생성의 HTTP 경로', () => {
+  const item = { said: 'I go yesterday.', better: 'I went yesterday.', focus: 'went', whyKo: '지난 일이에요.', hintKo: '언제 한 일인가요?', pattern: 'tense' };
+  const input = { mode: 'biz', level: 'biz', lines: [{ role: 'user', text: 'I GO, yesterday!' }, { role: 'ai', text: 'Hello.' }] };
+  const body = { profileId: 'parent', level: 'adult', kind: 'talk-corrections', input };
+  it('서버 응답에서 사용자 인용·핵심 부분 검증 실패만 제외한다', async () => {
+    output = { items: [item, { ...item, said: 'Hello.' }, { ...item, focus: 'will go' }], praiseKo: '뜻을 잘 전했어요.' };
+    expect(await (await req('/api/generate', body)).json()).toEqual({ ok: true, data: { items: [item], praiseKo: '뜻을 잘 전했어요.' } });
+    expect(outgoing).toHaveBeenCalledOnce(); expect((await readUsage(await req('/api/usage'))).today.parent.generates).toBe(1);
+  });
+  it('아이 요청·잘못된 입력은 호출이나 사용량 예약 전에 거부한다', async () => {
+    expect((await req('/api/generate', { ...body, profileId: 'kid1', level: 'g5' })).status).toBe(400);
+    expect((await req('/api/generate', { ...body, input: { ...input, lines: [] } })).status).toBe(400);
+    expect(outgoing).not.toHaveBeenCalled(); expect((await readUsage(await req('/api/usage'))).today.parent.generates).toBe(0);
+  });
+  it('외부 생성 대기 중에도 공용 저장 잠금 밖에서 사용량·진행 목록을 조회할 수 있다', async () => {
+    const entered = deferred<void>(), result = deferred<Response>();
+    outgoing.mockImplementationOnce(async () => { expect(lockDepth).toBe(0); entered.resolve(); return result.promise; });
+    const pending = req('/api/generate', body); await entered.promise;
+    expect((await req('/api/usage')).status).toBe(200); expect((await req('/api/realtime/active')).status).toBe(200);
+    result.resolve(Response.json({ id: 'response', object: 'response', status: 'completed', output: [{ type: 'message', id: 'message', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: JSON.stringify({ items: [item], praiseKo: '잘했어요.' }), annotations: [] }] }] }));
+    expect((await pending).status).toBe(200); expect((await readUsage(await req('/api/usage'))).today.parent.generates).toBe(1);
   });
 });

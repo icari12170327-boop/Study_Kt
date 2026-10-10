@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { filterCorrections, type Corrections } from '../../shared/corrections';
 import { z } from 'zod';
 import type { GenerateRequest, SessionRequest } from '../../shared/ai';
 import type { Env } from './env';
@@ -84,7 +85,7 @@ class GenerationSchemaError extends ProxyError {
 }
 export async function generateText(env: Env, req: GenerateRequest): Promise<unknown> {
   const input = inputSchemas[req.kind].parse(req.input);
-  const short = req.kind === 'biz-feedback' && 'mode' in input && input.mode === 'short';
+  const short = req.kind === 'biz-feedback' && 'mode' in inputSchemas['biz-feedback'].parse(input);
   const schema = short ? shortFeedbackSchema : outputSchemas[req.kind];
   const client = new OpenAI({ apiKey: env.OPENAI_API_KEY, maxRetries: 0, timeout: 8000 });
   let flagged = false;
@@ -118,7 +119,7 @@ export async function generateText(env: Env, req: GenerateRequest): Promise<unkn
     try { return schema.parse(JSON.parse(result.output_text)); }
     catch { throw new GenerationSchemaError(); }
   };
-  const coach = ['coach-gloss', 'coach-check', 'coach-wrapup'].includes(req.kind);
+  const coach = ['coach-gloss', 'coach-check', 'coach-wrapup', 'talk-corrections'].includes(req.kind);
   let data: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
     try { data = await create(); break; }
@@ -127,6 +128,10 @@ export async function generateText(env: Env, req: GenerateRequest): Promise<unkn
       if (coach && attempt === 0 && (error instanceof GenerationSchemaError || error instanceof OpenAI.APIConnectionTimeoutError)) continue;
       throw error;
     }
+  }
+  if (req.kind === 'talk-corrections') {
+    const parsed = inputSchemas['talk-corrections'].parse(input);
+    return filterCorrections(data as Corrections, parsed.lines.filter(line => line.role === 'user').map(line => line.text));
   }
   if (req.kind === 'memory-merge') return (data as { memory: string }).memory;
   if (req.kind === 'talk-summary') return { ...(data as object), flagged };
