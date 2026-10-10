@@ -40,14 +40,35 @@ it('Safari 탭 안내는 닫으면 다시 보이지 않고 14일 경계에서만
   await act(async () => root.render(null)); const state = saved(); state.settings.parent.lastBackupAt = '2026-09-28'; localStorage.setItem('study-kt:v1', JSON.stringify(state));
   await mount(); expect(host.textContent).not.toContain('Safari 탭과'); expect(host.textContent).not.toContain('백업한 지');
 });
+it('백업 날짜가 없는 기존 사용자에게는 경과일을 추정하지 않고 첫 백업을 안내한다', async () => {
+  const state = defaultState(); localStorage.setItem('study-kt:v1', JSON.stringify(state));
+  await mount(); expect(host.textContent).toContain('아직 백업 기록이 없어요'); expect(host.textContent).not.toContain('백업한 지');
+  expect(saved().settings.parent.lastBackupAt).toBeUndefined();
+});
 it('관측 API 실패와 음성 인식 없음에도 모든 항목과 TTS·마이크 시험은 독립적으로 보인다', async () => {
   await mount(createElement(DeviceCheck));
-  for (const text of ['화면', '홈 화면 앱', '음성 인식', '영어 읽기 목소리', '2개', '마이크 권한', '조회 미지원', '저장 보호', '보호됨', '마지막 백업', '2026-09-27']) expect(host.textContent).toContain(text);
+  for (const text of ['화면', '홈 화면 앱', '음성 인식', '영어 읽기 목소리', '2개', '마이크 권한', '조회 미지원', '저장 보호', '보호됨', '마지막 백업(받기 시작)', '2026-09-27']) expect(host.textContent).toContain(text);
   await click('🔊 소리 시험'); expect(speech.speak).toHaveBeenCalledWith(expect.any(String), { lang: 'en-US' });
   let resolve!: () => void; const stop = vi.fn();
   vi.mocked(startMicrophoneTest).mockImplementation(onVolume => { onVolume(0.5); return { done: new Promise(done => { resolve = done; }), stop }; });
   await click('🎤 마이크 시험'); expect(host.querySelector('meter')?.getAttribute('value')).toBe('0.5'); expect(button('마이크 시험 중…').disabled).toBe(true);
   await act(async () => root.render(null)); expect(stop).toHaveBeenCalledOnce(); await act(async () => resolve());
+});
+it('마이크 재개가 멈춰도 시간 초과·화면 숨김 뒤 시험 버튼을 다시 쓸 수 있다', async () => {
+  vi.useFakeTimers();
+  const actual = await vi.importActual<typeof import('../lib/microphoneTest')>('../lib/microphoneTest');
+  vi.mocked(startMicrophoneTest).mockImplementation(actual.startMicrophoneTest);
+  const stop = vi.fn(), close = vi.fn().mockResolvedValue(undefined);
+  vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValue({ getTracks: () => [{ stop }] } as unknown as MediaStream);
+  vi.stubGlobal('AudioContext', class { state = 'suspended'; close = close; resume = () => new Promise<void>(() => {}); });
+  await mount(createElement(DeviceCheck)); await click('🎤 마이크 시험');
+  await act(async () => vi.advanceTimersByTimeAsync(3000));
+  expect(stop).toHaveBeenCalledOnce(); expect(close).toHaveBeenCalledOnce(); expect(button('🎤 마이크 시험').disabled).toBe(false);
+  expect(host.textContent).toContain('마이크를 쓰지 못했어요');
+  await click('🎤 마이크 시험');
+  vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+  await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+  expect(stop).toHaveBeenCalledTimes(2); expect(close).toHaveBeenCalledTimes(2); expect(button('🎤 마이크 시험').disabled).toBe(false);
 });
 it('내보내기 시작 성공 때만 백업 날짜를 갱신하며 학습 데이터는 그대로다', async () => {
   await mount(); await click('백업·보안'); const before = saved();
@@ -55,4 +76,6 @@ it('내보내기 시작 성공 때만 백업 날짜를 갱신하며 학습 데�
   await click('백업 파일 받기'); expect(saved().settings.parent.lastBackupAt).toBe('2026-09-27'); expect(host.textContent).toContain('백업 파일을 만들지 못했어요');
   vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:backup'); vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {}); vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
   await click('백업 파일 받기'); expect(saved().settings.parent.lastBackupAt).toBe(toDateKey()); expect(saved().data).toEqual(before.data); expect(saved().version).toBe(2);
+  expect(host.textContent).toContain('백업 파일 받기를 시작했어요. 저장된 파일을 확인해 주세요.');
+  expect(host.textContent).not.toContain('백업 파일을 받았어요');
 });

@@ -401,7 +401,7 @@ function Backup() {
       url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = `study-kt-backup-${date}.json`; a.click();
       update(draft => { draft.settings.parent.lastBackupAt = date; });
-      setMessage('백업 파일을 받았어요. 안전한 곳에 보관해 주세요.');
+      setMessage('백업 파일 받기를 시작했어요. 저장된 파일을 확인해 주세요.');
     } catch { setMessage('백업 파일을 만들지 못했어요. 한 번 더 눌러 주세요.'); }
     finally { if (url) URL.revokeObjectURL(url); }
   };

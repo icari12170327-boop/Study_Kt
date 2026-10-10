@@ -34,7 +34,7 @@ export function checkDevice(env: DeviceEnv) {
     { label: '마이크 권한', value: env.microphone === 'granted' ? '허용' : env.microphone === 'denied' ? '차단' : env.microphone === 'prompt' ? '아직 선택하지 않음' : '조회 미지원', ok: env.microphone === 'granted', advice: '마이크 시험을 눌러 허용해 주세요. 차단했다면 브라우저 설정에서 바꿔 주세요.' },
     { label: '저장 보호', value: !env.persistSupported ? '미지원' : env.persisted === undefined ? '확인하지 못함' : env.persisted ? '보호됨' : '보호되지 않음', ok: env.persisted === true, advice: '백업 파일을 정기적으로 받아 두세요. 저장 보호는 브라우저가 결정해요.' },
     { label: '저장 사용량', value: env.usage === undefined || env.quota === undefined ? '조회 미지원' : `${mb(env.usage)} 사용 · ${mb(Math.max(0, env.quota - env.usage))} 여유`, ok: env.usage !== undefined && env.quota !== undefined && env.usage < env.quota * 0.9, advice: '백업을 받은 뒤 기기의 저장 공간을 확보해 주세요.' },
-    { label: '마지막 백업', value: age === undefined ? '기록 없음' : `${env.lastBackupAt} · ${age}일 전`, ok: age !== undefined && age < 14, advice: '백업 파일 받기를 눌러 다른 안전한 곳에 보관해 주세요.' },
+    { label: '마지막 백업(받기 시작)', value: age === undefined ? '기록 없음' : `${env.lastBackupAt} · ${age}일 전`, ok: age !== undefined && age < 14, advice: '백업 파일 받기를 누르고 저장된 파일을 확인해 주세요.' },
   ];
   return { standalone, iosTab, stage, backupDays: age, items };
 }

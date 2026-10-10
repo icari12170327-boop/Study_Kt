@@ -67,6 +67,6 @@ export function StorageNotices() {
   const report = checkDevice({ ...browserDeviceEnv(), lastBackupAt: state.settings.parent.lastBackupAt });
   return <>
     {report.iosTab && !state.settings.parent.iosTabNoticeDismissed && <aside className="panel form" aria-label="홈 화면 추가 안내"><p>홈 화면에 추가하면 기록이 더 안전해요. Safari 탭과 홈 화면 앱은 기록이 따로예요. 옮기려면 백업 파일을 쓰세요</p><p className="small muted">Safari의 공유 버튼에서 ‘홈 화면에 추가’를 골라 주세요.</p><button className="btn btn-soft" onClick={() => update(draft => { draft.settings.parent.iosTabNoticeDismissed = true; })}>안내 닫기</button></aside>}
-    {report.backupDays !== undefined && report.backupDays >= 14 && <p role="status">백업한 지 {report.backupDays}일 지났어요. 백업·보안에서 백업 파일을 받아 주세요.</p>}
+    {report.backupDays === undefined ? <p role="status">아직 백업 기록이 없어요. 백업·보안에서 백업 파일을 받아 주세요.</p> : report.backupDays >= 14 && <p role="status">백업한 지 {report.backupDays}일 지났어요. 백업·보안에서 백업 파일을 받아 주세요.</p>}
   </>;
 }
