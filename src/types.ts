@@ -102,7 +102,7 @@ export interface TalkLog {
   reviewResult?: ReviewResult;
 }
 export interface ReviewResult { targets: string[]; reused: string[] }
-export interface RetrievalItem { id: string; text: string; source: 'correction' | 'preview'; mode: 'coach' | 'biz'; stage: 0 | 1 | 2 | 3; dueDate: string; misses: number; createdAt: string; learnedAt?: string }
+export interface RetrievalItem { id: string; text: string; focus?: string; source: 'correction' | 'preview'; mode: 'coach' | 'biz'; stage: 0 | 1 | 2 | 3; dueDate: string; misses: number; createdAt: string; learnedAt?: string }
 export interface CoachSettings {
   level: import('../shared/ai').CoachLevel;
   repeat: import('../shared/ai').CoachRepeat;

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { filterCorrections, focusParts, isCorrections, normalizeCorrections, normalizeReviewResult, saveCorrection, selfFixed } from './talkCorrections';
-import { addCorrectionTarget, normalizeRetrieval, pickReviewTargets, reusedExpression, updateRetrieval } from './retrieval';
+import { deletePhrase } from './business';
+import { addCorrectionTarget, reviewOpportunity, normalizeRetrieval, pickReviewTargets, reusedExpression, updateRetrieval } from './retrieval';
 import { defaultState } from '../store/defaults';
 import { exportState, importState, normalizeState } from '../store/storage';
 import { seededRng } from './random';
@@ -26,7 +27,8 @@ describe('오늘의 교정 안전 검증·직접 고침', () => {
     expect(selfFixed({ ...item, better: 'I am working today.', focus: 'am working' }, "I'm working today.")).toBe(true);
     const long = { ...item, better: 'I have worked here for a very long time now.', focus: 'have worked' };
     expect(selfFixed(long, 'I have worked here for a long time now.')).toBe(true);
-    expect(selfFixed(long, 'I have worked here for long time now.')).toBe(false);
+    expect(selfFixed(long, 'I have worked here for long time now.')).toBe(true);
+    expect(selfFixed(long, 'I have worked here time now.')).toBe(false);
     expect(selfFixed(long, 'I work here for a very long time now.')).toBe(false);
     expect(focusParts(item.better, item.focus)).toEqual(['I ', 'went', ' yesterday.']);
   });
@@ -79,11 +81,11 @@ describe('저장 정규화·백업·분리', () => {
     expect(normalizeRetrieval([target({ stage: 3, createdAt: '2026-08-01', learnedAt: '2026-09-11' })], today)).toHaveLength(1);
   });
   it('version 2·기존 기록·아이 기록을 유지하고 보호자만 새 선택 필드를 복원한다', () => {
-    const raw = defaultState(); raw.data.parent.talks = [log]; raw.data.parent.retrieval = [target()];
+    const raw = defaultState(); raw.data.parent.talks = [log]; raw.data.parent.retrieval = [target({ focus: 'went' })];
     raw.data.kid1.talks = [{ ...log, mode: undefined, corrections: undefined, reviewResult: undefined }];
     const oldChild = structuredClone(raw.data.kid1);
     const normalized = normalizeState(raw, today);
-    expect(normalized.version).toBe(2); expect(normalized.data.parent.talks[0]).toEqual(log); expect(normalized.data.parent.retrieval).toEqual([target()]); expect(normalized.data.kid1).toEqual(oldChild);
+    expect(normalized.version).toBe(2); expect(normalized.data.parent.talks[0]).toEqual(log); expect(normalized.data.parent.retrieval).toEqual([target({ focus: 'went' })]); expect(normalized.data.kid1).toEqual(oldChild);
     raw.data.kid1.retrieval = [target()]; raw.data.kid1.talks[0].corrections = result; raw.data.kid1.talks[0].reviewResult = log.reviewResult;
     const stripped = normalizeState(raw, today);
     expect(stripped.data.kid1.retrieval).toBeUndefined(); expect(stripped.data.kid1.talks[0].corrections).toBeUndefined(); expect(stripped.data.kid1.talks[0].reviewResult).toBeUndefined();
@@ -97,12 +99,69 @@ describe('저장 정규화·백업·분리', () => {
       saveCorrection(state.data.parent, fixed, 'coach', today, Date.now(), seededRng(1));
       state.data.parent.talks = [{ ...log, corrections: { ...result, items: [fixed] } }];
       expect(state.data.parent.customCards?.[0]).toMatchObject({ en: item.better, ko: item.whyKo, source: '교정' });
-      expect(state.data.parent.retrieval?.[0]).toMatchObject({ stage: 0, dueDate: '2026-10-11' });
+      expect(state.data.parent.retrieval?.[0]).toMatchObject({ stage: 0, dueDate: '2026-10-11', focus: 'went' });
       const restored = importState(exportState(state)); expect(restored.data.parent).toEqual(state.data.parent); expect(restored.version).toBe(2);
       const protectedFields = (data: typeof before) => Object.fromEntries(Object.entries(data).filter(([key]) => !['customCards', 'retrieval', 'talks'].includes(key)));
       const rest = protectedFields(state.data.parent), old = protectedFields(before);
       expect(rest).toEqual(old);
       const first = structuredClone(state.data.parent.retrieval); saveCorrection(state.data.parent, fixed, 'coach', today, Date.now(), seededRng(2)); expect(state.data.parent.retrieval).toEqual(first);
     } finally { vi.useRealTimers(); }
+  });
+});
+
+describe('T22a 리뷰: 짧은 교정·핵심 표현·기회', () => {
+  it.each([
+    ['I went to the park yesterday.', 'went', 'I went to park yesterday.', true],
+    ['We discussed the schedule yesterday.', 'discussed', 'We discussed schedule yesterday.', true],
+    ['I went to the park yesterday.', 'went', 'I go to the park yesterday.', false],
+    ['We discussed the schedule yesterday.', 'discussed', 'We discuss schedule yesterday.', false],
+    ['I have worked here since last year.', 'have worked', "I've worked here since last year.", true],
+    ['I went to the park yesterday.', 'went', 'went park yesterday', false],
+    ['She likes coffee.', 'likes', 'She like coffee.', false],
+  ])('직접 고침: %s / %s / %s → %s', (better, focus, answer, passed) => {
+    expect(selfFixed({ ...item, better, focus }, answer)).toBe(passed);
+  });
+  it('핵심 표현이 있으면 상황·주어가 달라도 성공, 없으면 기존 전체 문장 규칙을 유지한다', () => {
+    const current = target({ text: 'I have worked here since last year.', focus: 'have worked' });
+    for (const said of ["I've worked here since 2025.", 'We have worked here for one year.', 'Yes, I have worked on a project.']) {
+      const result = updateRetrieval([current], [current], [said], today);
+      expect(result.items[0].stage).toBe(1); expect(result.result.reused).toEqual([current.text]);
+    }
+    for (const said of ['I work here since last year.', 'I have been working here since last year.', 'worked have', 'I have not worked here.']) expect(updateRetrieval([current], [current], [said], today).result.reused).toEqual([]);
+    const legacy = target({ text: current.text });
+    expect(updateRetrieval([legacy], [legacy], ["I've worked here since 2025."], today).result.reused).toEqual([]);
+    expect(updateRetrieval([legacy], [legacy], ["I've worked here since last year."], today).result.reused).toEqual([legacy.text]);
+    expect(updateRetrieval([current], [current], ['I have', 'worked here.'], today).result.reused).toEqual([]);
+  });
+  it('복습 focus는 40자·부분 문자열·영어 단어를 확인하고 기존 항목을 지우지 않는다', () => {
+    const current = target({ text: ' ' + 'a'.repeat(40) + ' ', focus: 'a'.repeat(40) });
+    expect(normalizeRetrieval([current], today)[0].focus).toBe('a'.repeat(40));
+    const trimmed = normalizeRetrieval([target({ text: ' I went yesterday. ', focus: ' went ' })], today);
+    expect(trimmed[0].focus).toBe('went'); expect(normalizeRetrieval(trimmed, today)).toEqual(trimmed);
+    for (const focus of ['a'.repeat(41), 'missing', '', '   ', '!!!', 123, null]) expect(normalizeRetrieval([{ ...target(), focus }], today)).toEqual([target()]);
+    const existing = target({ stage: 2, dueDate: '2026-10-15', misses: 2 });
+    expect(addCorrectionTarget([existing], existing.text, 'coach', today, 'new', 'went')).toEqual([{ ...existing, focus: 'went' }]);
+    expect(addCorrectionTarget([{ ...existing, focus: 'went' }], existing.text, 'coach', today, 'new', 'yesterday')).toEqual([{ ...existing, focus: 'went' }]);
+  });
+  it('120초 또는 영어 발화 세 줄부터 실패를 세고 짧은 대화에서도 성공은 기록한다', () => {
+    expect(reviewOpportunity(119, ['Hi.', 'I like tea.'])).toBe(false);
+    expect(reviewOpportunity(120, [])).toBe(true);
+    expect(reviewOpportunity(10, ['Hi.', 'Yes.', 'I like tea.'])).toBe(true);
+    expect(reviewOpportunity(10, ['Hi.', '네.', '좋아요.'])).toBe(false);
+    const current = target({ stage: 2, misses: 2, dueDate: '2026-10-01', focus: 'went' });
+    const skipped = updateRetrieval([current], [current], ['Hi.'], today, false);
+    expect(skipped.items).toEqual([current]);
+    expect(updateRetrieval([current], [current], ['I went to a cafe.'], today, false).items[0]).toMatchObject({ stage: 3, misses: 0, dueDate: '2026-10-17' });
+    expect(updateRetrieval([current], [current], [], today, true).items[0]).toMatchObject({ stage: 2, misses: 3, dueDate: '2026-10-17' });
+  });
+  it('내 표현 삭제는 연결된 복습·기존 SRS만 지우고 다른 표현과 보상은 유지한다', () => {
+    const state = defaultState(), data = state.data.parent;
+    saveCorrection(data, item, 'coach', today, Date.parse('2026-10-10T12:00:00Z'), seededRng(1));
+    const id = data.customCards![0].id; data.retrieval!.push(target({ id: 'unrelated', text: 'I like tea.' }));
+    data.srs[`vocab:my-phrases:${id}`] = { box: 1, due: today, seen: 1, lapses: 0 }; data.srs[`speak:my-phrases:${id}`] = { box: 1, due: today, seen: 1, lapses: 0 }; data.srs.other = { box: 1, due: today, seen: 1, lapses: 0 };
+    const before = structuredClone(data); deletePhrase(data, id);
+    expect(data.customCards).toEqual([]); expect(data.retrieval).toEqual([target({ id: 'unrelated', text: 'I like tea.' })]); expect(data.srs).toEqual({ other: before.srs.other });
+    for (const key of ['days', 'stars', 'streak', 'coupons', 'math', 'wrongNotes'] as const) expect(data[key]).toEqual(before[key]);
+    const old = defaultState().data.kid1; deletePhrase(old, 'missing'); expect(old.retrieval).toBeUndefined();
   });
 });

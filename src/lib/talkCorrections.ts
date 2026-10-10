@@ -16,7 +16,7 @@ export function isCorrections(raw: unknown): raw is Corrections {
 /** 핵심 교정 부분을 빠뜨린 답은 전체 단어가 비슷해도 직접 고침으로 세지 않는다. */
 export function selfFixed(item: CorrectionItem, answer: string): boolean {
   const focus = normalizeWords(item.focus).join(' '), words = normalizeWords(answer).join(' ');
-  return !!focus && (` ${words} `).includes(` ${focus} `) && scoreSpeech(item.better, answer).score >= 0.9 && scoreSpeech(answer, item.better).score >= 0.9;
+  return !!focus && (` ${words} `).includes(` ${focus} `) && scoreSpeech(item.better, answer).score >= 0.8 && scoreSpeech(answer, item.better).score >= 0.8;
 }
 export function focusParts(better: string, focus: string): [string, string, string] {
   const at = better.indexOf(focus);
@@ -36,5 +36,5 @@ export function normalizeReviewResult(raw: unknown): ReviewResult | undefined {
 export function saveCorrection(data: import('../types').ProfileData, item: CorrectionItem, mode: 'coach' | 'biz', today: string, now: number, rng: import('./random').Rng): void {
   if (savePhrase(data, item.better, item.whyKo, '교정', now, rng) === 'invalid') return;
   const card = data.customCards?.find(card => card.en.trim().toLowerCase() === item.better.trim().toLowerCase());
-  if (card) data.retrieval = addCorrectionTarget(data.retrieval ?? [], item.better, mode, today, `retr-${card.id}`);
+  if (card) data.retrieval = addCorrectionTarget(data.retrieval ?? [], item.better, mode, today, `retr-${card.id}`, item.focus);
 }

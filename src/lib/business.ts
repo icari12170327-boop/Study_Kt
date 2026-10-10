@@ -67,6 +67,7 @@ export function savePhrase(data: ProfileData, en: string, ko: string, source: st
 }
 export function deletePhrase(data: ProfileData, id: string): void {
   data.customCards = (data.customCards ?? []).filter(card => card.id !== id);
+  if (data.retrieval) data.retrieval = data.retrieval.filter(item => item.id !== `retr-${id}`);
   delete data.srs[`vocab:${MY_PHRASES}:${id}`]; delete data.srs[`speak:${MY_PHRASES}:${id}`];
 }
 /** 표시가 없는 이전 보호자 설정만 한 번 전환하며, 사용자가 나중에 끈 설정은 유지한다. */

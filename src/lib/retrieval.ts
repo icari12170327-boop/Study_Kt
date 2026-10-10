@@ -18,7 +18,7 @@ export function normalizeRetrieval(raw: unknown, today: string): RetrievalItem[]
       (row.learnedAt !== undefined && (!validRetrievalDate(row.learnedAt) || row.stage !== 3 || row.learnedAt < row.createdAt)) || ids.has(row.id) || phrases.has(key)) continue;
     if (row.learnedAt && addDays(row.learnedAt, 30) <= today) continue;
     ids.add(row.id); phrases.add(key);
-    result.push({ id: row.id, text: row.text.trim(), source: row.source!, mode: row.mode!, stage: row.stage!, dueDate: row.dueDate, misses: row.misses!, createdAt: row.createdAt, ...(row.learnedAt ? { learnedAt: row.learnedAt } : {}) });
+    result.push({ id: row.id, text: row.text.trim(), ...(text(row.focus, 40) && normalizeWords(row.focus).length && row.text.trim().includes(row.focus.trim()) ? { focus: row.focus.trim() } : {}), source: row.source!, mode: row.mode!, stage: row.stage!, dueDate: row.dueDate, misses: row.misses!, createdAt: row.createdAt, ...(row.learnedAt ? { learnedAt: row.learnedAt } : {}) });
   }
   return result.slice(-60);
 }
@@ -38,18 +38,25 @@ export function reusedExpression(target: string, userLines: readonly string[]): 
     });
   });
 }
-export function updateRetrieval(items: readonly RetrievalItem[], targets: readonly RetrievalItem[], userLines: readonly string[], today: string): { items: RetrievalItem[]; result: ReviewResult } {
-  const reused = targets.filter(item => reusedExpression(item.text, userLines));
+export function updateRetrieval(items: readonly RetrievalItem[], targets: readonly RetrievalItem[], userLines: readonly string[], today: string, countMisses = true): { items: RetrievalItem[]; result: ReviewResult } {
+  const reused = targets.filter(item => reusedExpression(item.focus ?? item.text, userLines));
   const targetIds = new Set(targets.map(item => item.id)), successIds = new Set(reused.map(item => item.id));
   return { result: { targets: targets.map(item => item.text), reused: reused.map(item => item.text) }, items: items.map(item => {
     if (!targetIds.has(item.id) || item.learnedAt) return { ...item };
     if (successIds.has(item.id)) return item.stage === 3 ? { ...item, misses: 0, learnedAt: today } : { ...item, stage: (item.stage + 1) as RetrievalItem['stage'], misses: 0, dueDate: addDays(today, [1, 3, 7][item.stage]) };
+    if (!countMisses) return { ...item };
     const misses = item.misses + 1;
     return { ...item, misses, dueDate: addDays(today, misses >= 3 ? 7 : 1) };
   }) };
 }
-export function addCorrectionTarget(items: readonly RetrievalItem[], text: string, mode: RetrievalItem['mode'], today: string, id: string): RetrievalItem[] {
+export function addCorrectionTarget(items: readonly RetrievalItem[], text: string, mode: RetrievalItem['mode'], today: string, id: string, focus?: string): RetrievalItem[] {
   const normalized = normalizeRetrieval(items, today);
-  if (normalized.some(item => normalizeWords(item.text).join(' ') === normalizeWords(text).join(' '))) return normalized;
-  return normalizeRetrieval([...normalized, { id, text, source: 'correction', mode, stage: 0, dueDate: addDays(today, 1), misses: 0, createdAt: today }], today);
+  const existing = normalized.find(item => normalizeWords(item.text).join(' ') === normalizeWords(text).join(' '));
+  if (existing) return normalizeRetrieval(normalized.map(item => item.id === existing.id && !item.focus ? { ...item, focus } : item), today);
+  return normalizeRetrieval([...normalized, { id, text, ...(focus !== undefined ? { focus } : {}), source: 'correction', mode, stage: 0, dueDate: addDays(today, 1), misses: 0, createdAt: today }], today);
+}
+
+/** 너무 짧은 대화에서 못 쓴 표현을 실패로 세지 않는다. 직접 사용 성공은 시간과 무관하다. */
+export function reviewOpportunity(seconds: number, userLines: readonly string[]): boolean {
+  return seconds >= 120 || userLines.filter(line => /[A-Za-z]/.test(line)).length >= 3;
 }

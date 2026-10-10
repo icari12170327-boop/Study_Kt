@@ -1,6 +1,6 @@
 import { parentPersona } from '../lib/voices';
 import { TalkCorrections } from '../components/TalkCorrections';
-import { pickReviewTargets, updateRetrieval } from '../lib/retrieval';
+import { pickReviewTargets, reviewOpportunity, updateRetrieval } from '../lib/retrieval';
 import type { RetrievalItem } from '../types';
 import { BusinessFeedback } from '../components/BusinessFeedback';
 import { CoachSubtitle } from '../components/CoachSubtitle';
@@ -174,7 +174,10 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
       update((draft) => {
         const data = draft.data[profileId];
         if (data.talks.some(talk => talk.id === log.id)) return;
-        if (run.business || run.coach) data.retrieval = updateRetrieval(data.retrieval ?? [], run.reviewTargets ?? [], log.lines.filter(line => line.role === 'kid').map(line => line.text), toDateKey()).items;
+        if (run.business || run.coach) {
+          const userLines = log.lines.filter(line => line.role === 'kid').map(line => line.text);
+          data.retrieval = updateRetrieval(data.retrieval ?? [], run.reviewTargets ?? [], userLines, toDateKey(), reviewOpportunity(seconds, userLines)).items;
+        }
         data.talks = [...data.talks, log].slice(-60);
       });
       if (alive.current) { setDoneLog(log); setPhase('done'); setRemaining(Math.max(0, run.cap - seconds)); }

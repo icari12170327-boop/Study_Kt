@@ -83,7 +83,7 @@ export function TalkCorrections({ log, auto = false, history = false, settings }
   };
   return <section className="panel form talk-corrections" aria-label="오늘의 교정">
     <h2>오늘의 교정</h2>
-    {review && <p>지난 표현 다시 쓰기: {review.targets.length}개 중 {review.reused.length}개 성공{review.reused.length > 0 && ' ✅'}</p>}
+    {!!review?.targets.length && <p>지난 표현 다시 쓰기: {review.targets.length}개 중 {review.reused.length}개 성공{review.reused.length > 0 && ' ✅'}</p>}
     {pending && <p role="status">오늘의 표현을 정리하고 있어요…</p>}
     {error && !corrections && <p className="bad-text" role="alert">{error}</p>}
     {!corrections && !pending && <button className="btn btn-primary" onClick={() => { void receive(); }}>다시 받기</button>}
@@ -94,10 +94,10 @@ export function TalkCorrections({ log, auto = false, history = false, settings }
         <h3 ref={title} tabIndex={-1}>{step === 'try' ? '먼저 고쳐 보기' : step === 'answer' ? '정답' : step === 'practice' ? '듣고 따라 말하기' : '내 표현에 저장'}</h3>
         {step === 'try' ? <><p lang="en">내 말: {item.said}</p><p>{item.hintKo}</p><p>어떻게 고치면 좋을까요?</p>
           <label>내가 고친 문장<textarea ref={input} value={answer} maxLength={300} rows={3} onChange={event => setAnswer(event.target.value)} /></label>
-          <div className="row-center">{canRecognize() && <button className="btn" disabled={listening} onClick={() => { void record(false); }}>🎤 말하기</button>}<button className="btn" onClick={() => input.current?.focus()}>⌨️ 입력</button><button className="btn btn-primary" disabled={!answer.trim()} onClick={() => reveal()}>고친 문장 확인</button><button className="btn btn-ghost" onClick={() => reveal(true)}>모르겠어요</button></div>
+          <div className="row-center">{canRecognize() && <button className="btn btn-soft" disabled={listening} onClick={() => { void record(false); }}>🎤 말하기</button>}<button className="btn btn-soft" onClick={() => input.current?.focus()}>⌨️ 입력</button><button className="btn btn-primary" disabled={!answer.trim()} onClick={() => reveal()}>고친 문장 확인</button><button className="btn btn-ghost" onClick={() => reveal(true)}>모르겠어요</button></div>
         </> : <><Better better={item.better} focus={item.focus} /><p>{item.whyKo}</p>{item.selfFixed && <p className="good-text">직접 고쳤어요! 👏</p>}
           {step === 'answer' && <button className="btn btn-primary" onClick={() => setStep('practice')}>듣고 따라 말하기</button>}
-          {step === 'practice' && <><div className="row-center">{canSpeak() && <button className="btn" disabled={playing} onClick={() => { setPlaying(true); void speak(item.better, { lang: 'en-US', rate: coach.speed }).finally(() => { if (alive.current) setPlaying(false); }); }}>🔊 듣기</button>}{canRecognize() && <button className="btn" disabled={listening} onClick={() => { void record(true); }}>🎤 따라 말하기</button>}</div><p className="small muted">말하기가 어려우면 건너뛰어도 괜찮아요.</p><button className="btn btn-primary" onClick={() => { stopListening(); setStep('save'); }}>저장으로</button></>}
+          {step === 'practice' && <><div className="row-center">{canSpeak() && <button className="btn btn-soft" disabled={playing} onClick={() => { setPlaying(true); void speak(item.better, { lang: 'en-US', rate: coach.speed }).finally(() => { if (alive.current) setPlaying(false); }); }}>🔊 듣기</button>}{canRecognize() && <button className="btn btn-soft" disabled={listening} onClick={() => { void record(true); }}>🎤 따라 말하기</button>}</div><p className="small muted">말하기가 어려우면 건너뛰어도 괜찮아요.</p><button className="btn btn-primary" onClick={() => { stopListening(); setStep('save'); }}>저장으로</button></>}
           {step === 'save' && <><label className="check"><input type="checkbox" checked={save} onChange={event => setSave(event.target.checked)} />내 표현에 저장</label><button className="btn btn-primary" onClick={next}>{save ? '저장하고 다음' : '저장 없이 다음'}</button></>}
         </>}
         {listening && <p role="status">듣고 있어요…</p>}{message && <p role="status">{message}</p>}

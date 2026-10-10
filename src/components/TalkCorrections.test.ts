@@ -49,7 +49,7 @@ it('음성 인식 없이 입력→정답→연습→저장으로 selfFixed·내 
   for (const key of ['days', 'stars', 'streak', 'coupons', 'math', 'wrongNotes', 'srs']) expect(after.data.parent[key]).toEqual(before.data.parent[key]); expect(after.data.kid1).toEqual(before.data.kid1);
   await click('모르겠어요'); await click('듣고 따라 말하기'); await click('저장으로');
   await act(async () => host.querySelector<HTMLInputElement>('input[type=checkbox]')!.click()); await click('저장 없이 다음');
-  expect(host.textContent).toContain('오늘의 교정을 모두 확인했어요.'); expect(saved().data.parent.customCards).toHaveLength(1); expect(saved().data.parent.talks[0].corrections.items[1].selfFixed).toBeUndefined();
+  expect(host.textContent).toContain('오늘의 교정을 모두 확인했어요.'); expect(saved().data.parent.customCards).toHaveLength(1); expect(saved().data.parent.retrieval).toHaveLength(1); expect(saved().data.parent.talks[0].corrections.items[1].selfFixed).toBeUndefined();
 });
 it('실패하면 기록을 그대로 두고 다시 받기 중 중복 클릭을 차단한다', async () => {
   vi.mocked(generate).mockRejectedValueOnce(new AiError('network')); await mount();
@@ -87,4 +87,18 @@ it('음성 인식·듣기를 재사용하고 나갈 때 인식을 정리한다',
   vi.mocked(generate).mockResolvedValue(result); await mount(); await click('🎤 말하기'); await act(async () => resolve([item.better])); await click('고친 문장 확인'); await click('듣고 따라 말하기'); await click('🔊 듣기');
   expect(speech.speak).toHaveBeenCalledWith(item.better, { lang: 'en-US', rate: 0.85 });
   vi.mocked(speech.listenOnce).mockReturnValue({ promise: new Promise(() => {}), stop }); await click('🎤 따라 말하기'); await act(async () => root.render(null)); expect(stop).toHaveBeenCalled();
+});
+
+it('대상이 없는 새 기록은 0개 성공 안내 없이 새 교정 흐름 표식을 유지한다', async () => {
+  log.reviewResult = { targets: [], reused: [] }; store(); vi.mocked(generate).mockResolvedValue(result); await mount();
+  expect(host.textContent).not.toContain('지난 표현 다시 쓰기'); expect(saved().data.parent.talks[0].reviewResult).toEqual({ targets: [], reused: [] });
+  expect(saved().data.parent.retrieval).toEqual([]); expect(saved().data.parent.customCards).toEqual([]);
+});
+it('음성·입력 버튼은 테마 색상을 명시하며 저장 전에는 복습 대상을 만들지 않는다', async () => {
+  vi.mocked(speech.canRecognize).mockReturnValue(true); vi.mocked(speech.canSpeak).mockReturnValue(true); vi.stubGlobal('speechSynthesis', { cancel: vi.fn() });
+  vi.mocked(generate).mockResolvedValue(result); await mount();
+  for (const label of ['🎤 말하기', '⌨️ 입력']) expect(button(label).classList.contains('btn-soft')).toBe(true);
+  await click('모르겠어요'); await click('듣고 따라 말하기');
+  for (const label of ['🔊 듣기', '🎤 따라 말하기']) expect(button(label).classList.contains('btn-soft')).toBe(true);
+  expect(saved().data.parent.retrieval).toEqual([]); expect(saved().data.parent.customCards).toEqual([]);
 });
