@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type CSSProperties } from 'react';
 import type { Fish } from '../content/games/fishing';
 
 export function FishPond({ fish, cursor, onChoose, onCursor }: { fish: readonly Fish[]; cursor: number; onChoose: (fish: Fish) => void; onCursor?: (index: number) => void }) {
@@ -26,7 +26,7 @@ export function FishPond({ fish, cursor, onChoose, onCursor }: { fish: readonly 
   }, [ids]);
   return <div className="fish-pond" role="group" aria-label="헤엄치는 물고기">
     {fish.slice(0, 8).map((row, index) => <button key={row.id} data-fish-id={row.id} onFocus={() => onCursor?.(index)} ref={node => { if (node) nodes.current.set(row.id, node); else nodes.current.delete(row.id); }}
-      style={{ left: index % 2 ? '75%' : '25%', top: `${Math.floor(index / 2) * 112 + 14}px`, transform: 'translateX(-50%)' }}
+      style={{ '--fish-row': Math.floor(index / 2), '--fish-wide-row': Math.floor(index / 4), '--fish-wide-col': index % 4, left: index % 2 ? '75%' : '25%', top: `${Math.floor(index / 2) * 112 + 14}px`, transform: 'translateX(-50%)' } as CSSProperties}
       className={`fish ${row.golden ? 'golden' : ''} ${cursor === index ? 'chosen' : ''}`} aria-label={`${row.golden ? '금빛 물고기' : '물고기'} ${index + 1}: ${row.problem.question}`} aria-pressed={cursor === index} onClick={() => onChoose(row)}>
       <span className="fish-emoji" aria-hidden="true">{row.golden ? '🐠' : '🐟'}</span><span className="fish-question">{row.problem.question}</span><span className="small">{row.points}점</span>
     </button>)}

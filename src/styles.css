@@ -1,4 +1,14 @@
 :root {
+  --device-font: 16px;
+  --page-max: 100%;
+  --touch-size: 44px;
+  --pad-width: 18rem;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --board-height: calc(100dvh - 220px - var(--safe-top) - var(--safe-bottom));
+  font-size: var(--device-font);
   --bg: #f5f3ff;
   --card: #ffffff;
   --text: #1f2937;
@@ -18,20 +28,6 @@
   -webkit-text-size-adjust: 100%;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #111827;
-    --card: #1f2937;
-    --text: #f3f4f6;
-    --muted: #9ca3af;
-    --line: #374151;
-    --primary-soft: #312e81;
-    --ok-soft: #064e3b;
-    --bad-soft: #7f1d1d;
-    --shadow: none;
-  }
-}
-
 * {
   box-sizing: border-box;
 }
@@ -40,6 +36,7 @@ body {
   margin: 0;
   background: var(--bg);
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 button,
@@ -51,9 +48,9 @@ textarea {
 }
 
 .page {
-  max-width: 760px;
+  max-width: var(--page-max);
   margin: 0 auto;
-  padding: max(12px, env(safe-area-inset-top)) 16px 48px;
+  padding: max(12px, var(--safe-top)) max(16px, var(--safe-right)) max(48px, var(--safe-bottom)) max(16px, var(--safe-left));
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -95,10 +92,6 @@ textarea {
 .btn.danger, .danger { color: var(--bad); }
 .link-btn { background: none; border: none; color: var(--primary); cursor: pointer; padding: 4px 0; font-weight: 600; }
 .row-center { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-
-@media (prefers-color-scheme: dark) {
-  .btn-soft { color: #c7d2fe; }
-}
 
 /* 진행률 */
 .progress { height: 10px; background: var(--line); border-radius: 99px; overflow: hidden; width: 100%; }
@@ -282,9 +275,10 @@ textarea {
 
 /* PIN */
 .modal-backdrop {
-  position: fixed; inset: 0; background: rgba(17, 24, 39, 0.55); display: grid; place-items: center; z-index: 10; padding: 16px;
+  position: fixed; inset: 0; background: rgba(17, 24, 39, 0.55); display: grid; place-items: center; z-index: 10; padding: max(16px, var(--safe-top)) max(16px, var(--safe-right)) max(16px, var(--safe-bottom)) max(16px, var(--safe-left)); overflow-y: auto;
 }
 .modal { background: var(--card); border-radius: 22px; padding: 22px; width: min(360px, 100%); text-align: center; }
+.modal { max-height: calc(100dvh - max(32px, var(--safe-top)) - max(32px, var(--safe-bottom))); overflow-y: auto; }
 .modal h2 { font-size: 1.1rem; margin: 0 0 12px; }
 .pin-dots { display: flex; gap: 14px; justify-content: center; margin: 12px 0; }
 .dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--primary); }
@@ -294,12 +288,6 @@ textarea {
   height: 60px; border-radius: 16px; border: none; background: var(--bg); font-size: 1.4rem; font-weight: 700; cursor: pointer;
 }
 .pin-key.muted { font-size: 1rem; color: var(--muted); }
-
-@media (max-width: 420px) {
-  .question-text { font-size: 1.7rem; }
-  .num-input { width: 130px; }
-  .options { grid-template-columns: 1fr; }
-}
 
 /* 수학 도전: 터치와 DeX 입력 */
 .math-level { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -320,7 +308,7 @@ textarea {
 .guess-notice { margin: 0; font-size: 0.95rem; color: var(--muted); }
 .math-success { animation: math-pop 0.35s ease-out; }
 @keyframes math-pop { from { transform: scale(0.94); } to { transform: scale(1); } }
-@media (prefers-reduced-motion: reduce) { .math-success { animation: none; } }
+
 .math-overview { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .math-chart { width: 100%; max-height: 180px; }
 .math-chart-grid { stroke: var(--line); }
@@ -347,7 +335,6 @@ textarea {
 .talk-page .chip { min-height: 48px; overflow-wrap: anywhere; max-width: 100%; }
 .talk-record { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); color: var(--text); text-align: left; font: inherit; cursor: pointer; overflow-wrap: anywhere; }
 .talk-record-line { overflow-wrap: anywhere; }
-@media (prefers-reduced-motion: reduce) { .talk-speaking { animation: none; } }
 
 /* 과학: 큰 선택 영역과 주제별 전시 칸 */
 .profile-outfit { font-size: 1.8rem; }
@@ -377,7 +364,6 @@ button.science-choice { flex-direction: column; align-items: flex-start; }
 .science-detail { max-height: 85vh; overflow-y: auto; text-align: left; display: flex; flex-direction: column; gap: 10px; }
 .science-overview summary { min-height: 48px; padding: 12px 0; cursor: pointer; font-weight: 700; }
 .science-record { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding: 12px 0; overflow-wrap: anywhere; }
-@media (prefers-reduced-motion: reduce) { .science-acquired { animation: none; } }
 
 /* 과학 문제는 큰 보기와 항상 펼쳐지는 해설을 사용한다. */
 .science-question { font-size: clamp(1.25rem, 3vw, 1.8rem); line-height: 1.55; }
@@ -431,8 +417,6 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 .bingo-bonus, .bingo-new { color: var(--ok); }
 @keyframes bingo-shake { 25%, 75% { transform: translateX(-3px); } 50% { transform: translateX(3px); } }
 @keyframes bingo-hint { from { box-shadow: inset 0 0 0 2px var(--warn); } to { background: var(--primary-soft); box-shadow: inset 0 0 0 5px var(--warn); } }
-@media (prefers-color-scheme: dark) { .bingo-lines line { stroke: #a5b4fc; } .bingo-goal h2 strong { color: #a5b4fc; } }
-@media (prefers-reduced-motion: reduce) { .bingo-cell.hinted, .bingo-cell.shake { animation: none; } .bingo-cell.hinted { box-shadow: inset 0 0 0 4px var(--warn); } }
 
 /* 보호자 비즈니스 대화와 저장 표현 */
 .business-scenarios { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -443,7 +427,6 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 .business-expression p { margin: 6px 0 12px; }
 .business-alternatives { border-left: 4px solid var(--primary); overflow-wrap: anywhere; }
 .business-feedback { overflow-wrap: anywhere; }
-@media (max-width: 520px) { .business-scenarios { grid-template-columns: 1fr; } }
 
 /* 소리를 먼저 듣는 보호자 코치 화면 */
 .coach-choice { width: 100%; margin-bottom: 14px; border-color: var(--primary); }
@@ -469,7 +452,6 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 .fish-question { max-width: 100%; overflow-wrap: anywhere; font-size: .85rem; line-height: 1.25; }
 .pond-empty { padding: 30px; text-align: center; }
 .reward-game .done { display: grid; gap: 14px; }
-@media (prefers-reduced-motion: reduce) { .fish { will-change: auto; } }
 
 /* 오비 코스와 캐릭터는 이미지 없이 DOM과 CSS로 그린다. */
 .obby-game { display: grid; gap: 14px; }
@@ -501,10 +483,6 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 @keyframes obby-fall { 20%, 75% { transform: translateY(100px) rotate(30deg); opacity: .3; } }
 @keyframes obby-arrive { from { transform: translateX(80px); } to { transform: translateX(0); } }
 @keyframes obby-blink { 50% { opacity: .4; } }
-@media (prefers-reduced-motion: reduce) {
-  .obby-floor, .obby-runner .obby-idle, .obby-obstacle { animation: none; }
-  .obby-jump, .obby-fall { animation: obby-blink .25s ease-in-out; }
-}
 
 /* 두뇌 퍼즐: 작은 화면에서도 숫자 칸은 최소 44px를 유지한다. */
 .puzzle-home { margin-top: 12px; }
@@ -533,13 +511,6 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 .puzzle-hint-ready { animation: puzzle-glow 1s ease-in-out infinite alternate; }
 .puzzle-overview { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 8px; }
 @keyframes puzzle-glow { to { box-shadow: 0 0 0 4px var(--primary-soft); } }
-@media (max-width: 480px) {
-  .puzzle-picker { grid-template-columns: 1fr; }
-  .puzzle-choice { display: grid; grid-template-columns: 54px 1fr; text-align: left; gap: 8px; }
-  .puzzle-choice-icon { grid-row: span 3; }
-  .puzzle-grid .puzzle-cell { height: 48px; }
-}
-@media (prefers-reduced-motion: reduce) { .puzzle-hint-ready { animation: none; border: 2px solid var(--primary); } }
 
 /* T06b: 그림 식, 도형 보기, 반응형 블록 그림 */
 .balance-puzzle { max-width: 560px; margin: 20px auto; text-align: center; }
@@ -556,7 +527,7 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 .pattern-tile { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .pattern-shapes { display: grid; justify-content: center; gap: 2px; width: 100%; }
 .pattern-shapes svg { width: var(--pattern-icon, 24px); height: var(--pattern-icon, 24px); }
-@media (min-width: 600px) { .pattern-row li { width: 76px; flex-basis: 76px; --pattern-icon: 20px; } }
+
 .pattern-explanation { line-height: 1.7; overflow-wrap: anywhere; }
 .pattern-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 540px; margin: 20px auto; }
 .pattern-option { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 8px; background: var(--card); color: var(--text); border: 2px solid var(--line); border-radius: 16px; min-height: 110px; cursor: pointer; }
@@ -608,11 +579,6 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 .story-stats { width: 100%; border-collapse: collapse; font-size: .85rem; }
 .story-stats caption { text-align: left; padding: 12px 0; }
 .story-stats th, .story-stats td { text-align: left; border-bottom: 1px solid var(--line); padding: 8px 4px; overflow-wrap: anywhere; }
-@media (max-width: 430px) {
-  .story-episode-link { flex-wrap: wrap; }
-  .story-episode-link span:last-child { margin-left: auto; }
-  .story-paragraph { padding: 14px; }
-}
 
 /* 주간 리포트: 막대와 카드만으로 숫자를 읽는다. */
 .weekly-report { min-width: 0; }
@@ -629,7 +595,6 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 .weekly-report textarea { width: 100%; box-sizing: border-box; }
 .weekly-ai p { white-space: pre-wrap; }
 .weekly-notice { width: 100%; margin: 12px 0; }
-@media (max-width: 600px) { .weekly-sections { grid-template-columns: minmax(0, 1fr); } }
 
 /* AI 독서 질문 후보는 기본 입력과 네이티브 체크박스로 편집한다. */
 .reading-quiz { min-width: 0; }
@@ -640,12 +605,6 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 .reading-quiz p { overflow-wrap: anywhere; }
 .reading-editor .qa-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px; }
 .reading-editor input:not([type=checkbox]) { min-width: 0; min-height: 48px; }
-@media (max-width: 600px) {
-  .reading-editor .qa-row { grid-template-columns: minmax(0, 1fr) 44px; }
-  .reading-editor .qa-row input:first-child { grid-column: 1; grid-row: 1; }
-  .reading-editor .qa-row input:nth-child(2) { grid-column: 1; grid-row: 2; }
-  .reading-editor .qa-row button { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
-}
 
 .talk-corrections { overflow-wrap: anywhere; }
 .talk-corrections .coach-sentence { white-space: pre-wrap; font-weight: 400; }
@@ -667,4 +626,180 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 .t22b-growth-track { height: 16px; border-radius: 8px; background: var(--line); overflow: hidden; }
 .t22b-growth-track span { display: block; height: 100%; background: var(--primary); }
 
+/* 완료 확인은 홈 첫 화면에 모아서 캡처 한 장에 담는다. */
+.completion-card { background: var(--ok-soft); color: var(--text); border: 2px solid var(--ok); border-radius: var(--radius); padding: 1rem 1.25rem; text-align: center; }
+.completion-card h2 { font-size: 1.5rem; margin: 0 0 .4rem; }
+.completion-name { font-size: 1.4rem; }
+.completion-card p { margin: .5rem 0; }
+.completion-times { display: flex; justify-content: center; flex-wrap: wrap; gap: .5rem 2rem; font-size: 1.2rem; }
+.completion-missions { font-size: .9rem; overflow-wrap: anywhere; }
+.puzzle-stage, .puzzle-controls { min-width: 0; }
+
+/* 매체 규칙: 기존 폰·다크·모션 → 화면 단계 → 높이가 짧은 가로 화면 순서. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111827;
+    --card: #1f2937;
+    --text: #f3f4f6;
+    --muted: #9ca3af;
+    --line: #374151;
+    --primary-soft: #312e81;
+    --ok-soft: #064e3b;
+    --bad-soft: #7f1d1d;
+    --shadow: none;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  .btn-soft { color: #c7d2fe; }
+}
+@media (max-width: 420px) {
+  .question-text { font-size: 1.7rem; }
+  .num-input { width: 130px; }
+  .options { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { .math-success { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .talk-speaking { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .science-acquired { animation: none; } }
+@media (prefers-color-scheme: dark) { .bingo-lines line { stroke: #a5b4fc; } .bingo-goal h2 strong { color: #a5b4fc; } }
+@media (prefers-reduced-motion: reduce) { .bingo-cell.hinted, .bingo-cell.shake { animation: none; } .bingo-cell.hinted { box-shadow: inset 0 0 0 4px var(--warn); } }
+@media (max-width: 520px) { .business-scenarios { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .fish { will-change: auto; } }
+@media (prefers-reduced-motion: reduce) {
+  .obby-floor, .obby-runner .obby-idle, .obby-obstacle { animation: none; }
+  .obby-jump, .obby-fall { animation: obby-blink .25s ease-in-out; }
+}
+@media (max-width: 480px) {
+  .puzzle-picker { grid-template-columns: 1fr; }
+  .puzzle-choice { display: grid; grid-template-columns: 54px 1fr; text-align: left; gap: 8px; }
+  .puzzle-choice-icon { grid-row: span 3; }
+  .puzzle-grid .puzzle-cell { height: 48px; }
+}
+@media (prefers-reduced-motion: reduce) { .puzzle-hint-ready { animation: none; border: 2px solid var(--primary); } }
+@media (min-width: 600px) { .pattern-row li { width: 76px; flex-basis: 76px; --pattern-icon: 20px; } }
+@media (max-width: 430px) {
+  .story-episode-link { flex-wrap: wrap; }
+  .story-episode-link span:last-child { margin-left: auto; }
+  .story-paragraph { padding: 14px; }
+}
+@media (max-width: 600px) { .weekly-sections { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) {
+  .reading-editor .qa-row { grid-template-columns: minmax(0, 1fr) 44px; }
+  .reading-editor .qa-row input:first-child { grid-column: 1; grid-row: 1; }
+  .reading-editor .qa-row input:nth-child(2) { grid-column: 1; grid-row: 2; }
+  .reading-editor .qa-row button { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+}
 @media (prefers-color-scheme: dark) { .t22b-recast-label { color: #c7d2fe; } }
+@media (min-width: 600px) {
+  :root { --device-font: 17px; --page-max: 960px; --touch-size: 48px; }
+  .page { padding-bottom: max(16px, var(--safe-bottom)); }
+  .page button, .page input, .page select, .page [role="button"], .modal button { min-width: var(--touch-size); min-height: var(--touch-size); }
+  .page input[type="checkbox"], .page input[type="radio"] { width: var(--touch-size); height: var(--touch-size); }
+  .topbar { grid-template-columns: var(--touch-size) minmax(0, 1fr) auto; }
+  .topbar h1 { overflow-wrap: anywhere; }
+  .icon-btn { width: var(--touch-size); height: var(--touch-size); }
+  .mission-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mission-card { min-width: 0; }
+  .mission-title { flex-wrap: wrap; }
+  .number-answer { width: var(--pad-width); max-width: 100%; }
+  .number-key { min-width: var(--touch-size); min-height: var(--touch-size); font-size: clamp(1.3rem, 2vw, 1.8rem); }
+  .puzzle-play-area { display: grid; grid-template-columns: minmax(0, 1fr) var(--pad-width); gap: 1rem; align-items: start; }
+  .puzzle-controls { display: flex; flex-direction: column; align-items: center; gap: .4rem; }
+  .puzzle-controls .puzzle-feedback { margin: .3rem 0; }
+  .puzzle-controls .puzzle-other { margin: .4rem 0; }
+  .puzzle-grid { max-width: none; width: min(100%, var(--board-height)); aspect-ratio: 1; margin: 0 auto; }
+  .puzzle-grid .puzzle-cell { height: auto; font-size: clamp(1.2rem, 2vw, 2rem); }
+  .puzzle-instruction { margin: 0; }
+  .blocks-puzzle { margin: 0; }
+  .blocks-picture { max-width: 100%; width: auto; height: min(var(--board-height), calc(var(--page-max) - var(--pad-width) - 2rem)); }
+  .puzzle-play-area:has(.pattern-puzzle) { display: grid; }
+  .puzzle-stage:has(.pattern-puzzle), .pattern-puzzle { display: contents; }
+  .pattern-puzzle .pattern-sequence { grid-column: 1; grid-row: 2 / span 4; margin: 0 auto; width: min(100%, calc(100dvh - 300px)); max-width: none; }
+  .pattern-grid { aspect-ratio: 1; }
+  .pattern-grid li { min-height: var(--touch-size); --pattern-icon: clamp(20px, 2vw, 36px); }
+  .pattern-latin-rule { grid-column: 1; grid-row: 1; margin: 0; }
+  .pattern-options { grid-column: 2; grid-row: 2; width: 100%; margin: 0; }
+  .pattern-puzzle > .small { grid-column: 2; grid-row: 3; margin: 0; }
+  .pattern-confirm { grid-column: 2; grid-row: 4; margin: 0; }
+  .pattern-option { min-height: 100px; }
+  .puzzle-play-area:has(.pattern-puzzle) .puzzle-controls { grid-column: 2; grid-row: 5; align-items: stretch; }
+  .puzzle-play-area:has(.pattern-puzzle) .puzzle-controls > * { width: var(--pad-width); }
+  .brain-puzzles { gap: .6rem; }
+  .math-session .question-card { max-width: 42rem; width: 100%; align-self: center; }
+  .bingo-board { width: min(calc(100vw - 48px), calc(100dvh - 300px), calc(var(--page-max) - 32px)); }
+  .bingo-cell { font-size: clamp(1.2rem, 3vw, 2rem); }
+  .fish-pond { width: min(100%, calc((100dvh - 220px) * 1.5)); height: min(60dvh, calc(100dvh - 220px)); align-self: center; }
+  .fish { min-height: 72px; height: calc((100% - 40px) / 4); padding: 4px; }
+  .fish-question { font-size: .8rem; }
+  .fish { top: calc(var(--fish-row) * ((100% - 12px) / 4) + 6px) !important; }
+  .obby-course { width: min(100%, calc((100dvh - 200px) * 2)); height: min(30dvh, 260px); }
+  .obby-game:has(.obby-course) { grid-template-columns: minmax(0, 1fr) var(--pad-width); }
+  .obby-game:has(.obby-course) > .topbar, .obby-game:has(.obby-course) > .game-status { grid-column: 1 / -1; }
+  .obby-game:has(.obby-course) > .obby-course { grid-column: 1; }
+  .obby-game:has(.obby-course) > .question-card { grid-column: 2; grid-row: 3 / span 2; padding: .6rem; }
+  .obby-game:has(.obby-course) > .feedback { grid-column: 1; }
+  .talk-page .talk-lines, .talk-page .talk-controls, .talk-page .coach-line { width: 100%; max-width: 720px; align-self: center; }
+}
+@media (min-width: 1200px) {
+  :root { --device-font: 18px; --page-max: 1080px; }
+}
+@media (min-width: 1800px) {
+  :root { --device-font: 20px; --page-max: 1280px; }
+  .mission-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 600px) and (max-height: 500px) {
+  :root { --device-font: 16px; --touch-size: 44px; --pad-width: 260px; --board-height: calc(100dvh - 122px - var(--safe-top) - var(--safe-bottom)); }
+  .page { gap: 4px; padding-top: max(6px, var(--safe-top)); padding-bottom: max(6px, var(--safe-bottom)); }
+  .brain-puzzles .topbar .btn { min-height: 44px; padding: 8px; }
+  .brain-puzzles .puzzle-status { font-size: .8rem; }
+  .brain-puzzles .puzzle-instruction { font-size: .85rem; line-height: 1.2; }
+  .puzzle-play-area { gap: 10px; }
+  .pad-field .num-input { min-height: 44px; height: 44px; padding: 2px; }
+  .number-answer { gap: 6px; }
+  .number-pad { grid-template-columns: repeat(4, minmax(44px, 1fr)); gap: 4px; }
+  .number-key { min-height: 44px; height: 44px; }
+  .puzzle-controls { gap: 0; }
+  .puzzle-controls .puzzle-feedback { min-height: 0; margin: 0; font-size: .8rem; }
+  .pad-field { flex-direction: row; gap: 6px; }
+  .puzzle-controls .puzzle-feedback:empty { display: none; }
+  .puzzle-controls .puzzle-other { margin: 2px 0; }
+  .pattern-puzzle .pattern-sequence { width: min(100%, var(--board-height)); }
+  .pattern-option { min-height: 72px; padding: 4px; gap: 4px; --pattern-icon: 16px; }
+  .pattern-puzzle .pattern-latin-rule { font-size: .75rem; }
+  .pattern-options { gap: 4px; }
+  .pattern-tile { gap: 2px; }
+  .pattern-puzzle > .small { font-size: .75rem; }
+  .pattern-confirm { min-height: 44px; }
+  .math-session .question-card { display: grid; grid-template-columns: minmax(0, 1fr) 260px; padding: 8px; gap: 6px; max-width: none; }
+  .math-session .question-card .number-answer { grid-column: 2; grid-row: 1 / span 5; }
+  .math-session .question-card > .feedback, .math-session .question-card > .hint { grid-column: 1; }
+  .bingo-board { width: min(calc(100dvh - 80px), 100%); }
+  .bingo-page:has(.bingo-board) { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 6px 16px; }
+  .bingo-page:has(.bingo-board) > .topbar { grid-column: 1 / -1; }
+  .bingo-board-wrap { grid-column: 1; grid-row: 2 / span 4; justify-self: center; }
+  .bingo-size-5, .bingo-size-6 { min-width: 0; }
+  .bingo-size-5 .bingo-cell, .bingo-size-6 .bingo-cell { min-height: 44px; }
+  .bingo-timer, .bingo-goal, .bingo-feedback, .bingo-page:has(.bingo-board) > .row-center { grid-column: 2; margin: 0; }
+  .bingo-page:has(.bingo-board) > p:last-child { grid-column: 2; margin: 0; }
+  .obby-course { height: 200px; }
+  .obby-game .game-status { padding: 4px; }
+  .fish-pond { height: calc(100dvh - 182px - var(--safe-top) - var(--safe-bottom)); width: min(100%, calc((100dvh - 182px) * 3)); }
+  .fish { min-height: 48px; height: calc((100% - 32px) / 2); width: 20%; left: calc(var(--fish-wide-col) * 25% + 12.5%) !important; top: calc(var(--fish-wide-row) * 50% + 10px) !important; }
+  .fish-emoji { display: none; }
+  .fish .small { font-size: .65rem; }
+}
+
+@media (max-width: 599px) {
+  /* 폰의 글자·판·키 방식은 유지하면서 실제 높이에 맞춰 여백과 키패드만 압축한다. */
+  .brain-puzzles { gap: 6px; }
+  .brain-puzzles .puzzle-instruction { margin: 0; }
+  .brain-puzzles .puzzle-grid { margin: 6px auto; }
+  .brain-puzzles .puzzle-feedback { min-height: 20px; margin: 0; }
+  .brain-puzzles .number-pad { gap: 4px; }
+  .brain-puzzles .pad-field { flex-direction: row; gap: 6px; }
+  .brain-puzzles .number-key { min-height: 44px; height: 44px; }
+  .brain-puzzles .pad-field .num-input { min-height: 44px; height: 44px; }
+  .brain-puzzles .number-answer { gap: 8px; }
+  .brain-puzzles .blocks-picture { height: min(32dvh, 270px); width: 100%; }
+  .brain-puzzles .pattern-options { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .brain-puzzles .pattern-option { min-height: 92px; padding: 6px 3px; gap: 4px; --pattern-icon: 20px; }
+}
