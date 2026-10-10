@@ -20,6 +20,7 @@ export interface PuzzleRendererProps {
   revealed?: boolean;
   onSubmit?: (input?: unknown) => void;
   onNext?: () => void;
+  onRestart?: () => void;
 }
 /** 보기형 퍼즐은 키패드 없이 Component에서 change를 호출할 수 있다. */
 export interface PuzzleRenderer {
@@ -84,8 +85,8 @@ const numericAdapter = {
 export const PUZZLE_RENDERERS: Partial<Record<PuzzleType, PuzzleRenderer>> = {
   balance: { ...numericAdapter, Component: BalancePuzzle, icon: '⚖️', example: '🍎 + 🍎 = 10',
     instruction: '같은 그림은 같은 수예요. 물음표 그림의 수를 찾아요.', answerPrompt: '물음표 그림 하나는 얼마일까요?' },
-  pattern: { Component: PatternPuzzle, icon: '🟦', example: '● → ▲ → ● → ?', instruction: '앞에서부터 반복되는 순서를 보고 다음 칸을 골라요.',
-    answerPrompt: '다음 칸에 올 보기를 골라요.', initialInput: () => null, answerInput: puzzle => puzzle.answer,
+  pattern: { Component: PatternPuzzle, icon: '🟦', example: '● → ▲ → ● → ?', instruction: '모양, 색, 개수, 방향의 규칙을 찾아 물음표에 올 보기를 골라요.',
+    answerPrompt: '물음표 칸에 올 보기를 골라요.', initialInput: () => null, answerInput: puzzle => puzzle.answer,
     complete: input => typeof input === 'number' && Number.isInteger(input) && input >= 1 && input <= 4, toAnswer: input => input },
   blocks: { ...numericAdapter, Component: BlocksPuzzle, icon: '🧊', example: '쌓인 블록은 모두 몇 개?',
     instruction: '빈 곳 없이 바닥부터 쌓았고, 숨어 있는 기둥은 없어요. 블록은 모두 몇 개일까요?' },

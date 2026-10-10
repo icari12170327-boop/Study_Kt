@@ -547,13 +547,17 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 .balance-term { display: inline-flex; align-items: center; gap: 10px; font-size: 2rem; }
 .balance-sign { font-size: 1.4rem; }
 .balance-target { font-size: 2rem; font-weight: 700; margin: 16px 0; }
-.pattern-sequence { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; padding: 0; list-style: none; }
-.pattern-sequence li { display: flex; flex-direction: column; justify-content: center; text-align: center; gap: 8px; width: 120px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.pattern-sequence { gap: 8px; padding: 4px; list-style: none; }
+.pattern-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
+.pattern-grid { display: grid; grid-template-columns: repeat(3, minmax(44px, 1fr)); max-width: 440px; margin: 16px auto; }
+.pattern-sequence li { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px; min-width: 44px; min-height: 92px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.pattern-row li { width: 60px; flex: 0 0 60px; padding: 3px; --pattern-icon: 16px; }
 .pattern-unknown strong { font-size: 2rem; }
 .pattern-tile { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.pattern-shapes { display: flex; justify-content: center; gap: 3px; width: 100%; }
-.pattern-shapes svg { width: 28px; height: 28px; flex-shrink: 0; }
-.pattern-label { font-size: .85rem; overflow-wrap: anywhere; }
+.pattern-shapes { display: grid; justify-content: center; gap: 2px; width: 100%; }
+.pattern-shapes svg { width: var(--pattern-icon, 24px); height: var(--pattern-icon, 24px); }
+@media (min-width: 600px) { .pattern-row li { width: 76px; flex-basis: 76px; --pattern-icon: 20px; } }
+.pattern-explanation { line-height: 1.7; overflow-wrap: anywhere; }
 .pattern-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 540px; margin: 20px auto; }
 .pattern-option { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 8px; background: var(--card); color: var(--text); border: 2px solid var(--line); border-radius: 16px; min-height: 110px; cursor: pointer; }
 .pattern-option.selected { border-color: var(--primary); background: var(--primary-soft); box-shadow: 0 0 0 2px var(--primary); }

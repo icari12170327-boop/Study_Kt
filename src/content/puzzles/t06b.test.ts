@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { seededRng } from '../../lib/random';
 import { balanceGenerator, BALANCE_LEVELS, solveBalance, type BalanceView } from './balance';
 import { blocksGenerator, BLOCKS_LEVELS, blockCells, blocksGeometry } from './blocks';
-import { patternGenerator, PATTERN_LEVELS, describePatternTile, samePatternTile, patternChoiceKey } from './pattern';
+import { patternGenerator, PATTERN_LEVELS, describePatternTile, samePatternTile, patternPredictions, patternChoiceKey } from './pattern';
 import type { Difficulty } from './types';
 
 const levels: Difficulty[] = [1, 2, 3, 4, 5];
@@ -26,22 +26,16 @@ describe('T06b 생성기 검증', () => {
         expect(values[view.target]).toBe(puzzle.answer);
       }
     });
-    it(`도형 ${level}단계 200판: 반복 규칙과 일치하는 보기가 정확히 하나`, () => {
-      const config = PATTERN_LEVELS[level - 1];
+    it(`도형 ${level}단계 200판: 속성별 규칙과 일치하는 보기가 정확히 하나`, () => {
       for (let seed = 0; seed < 200; seed++) {
         const { view, answer } = patternGenerator.generate(level, seededRng(seed));
-        expect(view.period).toBe(config.period);
-        expect(view.sequence.length).toBeGreaterThanOrEqual(config.period * 2);
-        for (let i = config.period; i < view.sequence.length; i++) expect(view.sequence[i]).toEqual(view.sequence[i - config.period]);
-        const expected = view.sequence[view.sequence.length % config.period];
+        expect(view.layout).toBe(PATTERN_LEVELS[level - 1].layout);
+        const expected = patternPredictions(view)!;
+        expect(expected).not.toBeNull();
         expect(view.options).toHaveLength(4);
         expect(view.options.filter(tile => samePatternTile(tile, expected))).toHaveLength(1);
         expect(view.options[answer - 1]).toEqual(expected);
         expect(new Set(view.options.map(describePatternTile)).size).toBe(4);
-        // 색이 달라도 항상 글자로 구분할 수 있고, 반복 주기 안에서는 모양도 서로 다르다.
-        expect(new Set(view.sequence.slice(0, config.period).map(tile => tile.shape)).size).toBe(config.period);
-        expect(new Set(view.sequence.map(tile => tile.color)).size).toBe(config.color ? config.period : 1);
-        expect(new Set(view.sequence.map(tile => tile.count)).size > 1).toBe(config.count);
       }
     });
     it(`블록 ${level}단계 200판: 높이 합·받침·SVG 경계`, () => {
@@ -66,7 +60,7 @@ describe('T06b 생성기 검증', () => {
     for (const generator of [balanceGenerator, patternGenerator, blocksGenerator]) it(`${generator.type} ${level}단계: 시드와 극단 난수에도 유한 생성`, () => {
       expect(generator.generate(level, seededRng(725))).toEqual(generator.generate(level, seededRng(725)));
       for (const value of [0, 0.999999]) {
-        let calls = 0; const limit = generator.type === 'blocks' ? 2002 : 200;
+        let calls = 0; const limit = generator.type === 'blocks' || generator.type === 'pattern' ? 2002 : 200;
         const puzzle = generator.generate(level, () => { if (++calls > limit) throw new Error('난수 호출 상한 초과'); return value; });
         expect(calls).toBeLessThan(limit);
         expect(generator.check(puzzle as never, puzzle.answer)).toBe(true);

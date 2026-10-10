@@ -69,7 +69,8 @@ describe('두뇌 퍼즐 입구와 공통 틀', () => {
       expect(renderer.padValue).toBeUndefined(); expect(renderer.setPad).toBeUndefined();
       expect(html.match(/aria-pressed=/g)).toHaveLength(4);
       expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
-      expect(html).toContain('1~4로 고르고 Enter'); expect(html).toContain('pattern-label');
+      expect(html).toContain('1~4로 고르고 Enter'); expect(html).not.toContain('pattern-label');
+      expect(html).toContain('role="img" aria-label='); expect(html).toContain('pattern-explanation');
     } else {
       const edited = renderer.setPad!(input, selected, '12');
       expect(renderer.padValue!(edited, selected)).toBe('12'); expect(renderer.padValue!(input, selected)).toBe('');
