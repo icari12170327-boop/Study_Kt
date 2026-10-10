@@ -40,9 +40,11 @@ export function requiresBothAttributes(view: PatternView, answer: PatternTile): 
     && (Object.values(view.rules).filter(rule => rule.kind !== 'fixed').length < 2 || changed.every(key => !!view.rules[key] && view.rules[key]?.kind !== 'fixed'));
 }
 
-export function patternTrickLimits(level: Difficulty) {
+/** 판별 상한과 단계 평균 상한을 구분해 격자 위치를 살리면서 평균 검사는 유지한다. */
+export function patternTrickLimits(level: Difficulty, scope: 'board' | 'average' = 'average') {
   const removed = level === 2 ? 0.5 : 0.4;
+  const frequency = scope === 'board' && level >= 4 ? 0.5 : removed;
   return { center: 0.35, centerFirst: 0.35, pastCenter: removed, pastCenterFirst: removed, originalPastCenter: removed,
     inverse: 0.4, pastInverse: level >= 2 && level <= 4 ? 0.5 : 0.4,
-    past: removed, familiar: removed, combined: removed, leastFrequent: removed, mostFrequent: removed };
+    past: removed, familiar: removed, combined: removed, leastFrequent: frequency, mostFrequent: frequency };
 }

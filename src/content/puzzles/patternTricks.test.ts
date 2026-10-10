@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { patternTricks, requiresBothAttributes } from './patternTricks';
+import { patternTricks, patternTrickLimits, requiresBothAttributes } from './patternTricks';
 import type { PatternTile, PatternView } from './pattern';
 
 const a: PatternTile = { shape: 'circle', color: 'blue', count: 1 };
@@ -10,6 +10,11 @@ const view = (options: PatternTile[]): PatternView => ({ layout: 'row', cells: [
   rules: { shape: { kind: 'cycle', values: ['triangle', 'circle'] }, color: { kind: 'cycle', values: ['blue', 'orange'] } } });
 
 describe('도형 규칙 공통 요령 검사', () => {
+  it.each([4, 5] as const)('★%s: 격자 판별 빈도만 50%로 허용하고 평균과 다른 요령 상한은 유지한다', level => {
+    const average = patternTrickLimits(level), board = patternTrickLimits(level, 'board');
+    expect(average.leastFrequent).toBe(0.4); expect(average.mostFrequent).toBe(0.4);
+    expect(board).toEqual({ ...average, leastFrequent: 0.5, mostFrequent: 0.5 });
+  });
   it('2×2는 네 보기의 유사도와 빈도가 동점이고 과거 칸 제거 뒤는 절반이다', () => {
     const board = view([a, b, c, d]), frozen = structuredClone(board);
     expect(patternTricks(board, a)).toEqual({ center: 0.25, centerFirst: 1, pastCenter: 0.5, pastCenterFirst: 1,

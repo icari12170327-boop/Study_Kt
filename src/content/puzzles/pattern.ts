@@ -168,7 +168,7 @@ function distractors(view: PatternView, answer: PatternTile, difficulty: Difficu
   const acceptable = (wrong: PatternTile[]) => {
     const options = [answer, ...wrong], board = { ...view, options };
     if (!requiresBothAttributes(board, answer)) return false;
-    const metrics = patternTricks(board, answer), limits = patternTrickLimits(difficulty);
+    const metrics = patternTricks(board, answer), limits = patternTrickLimits(difficulty, 'board');
     // ★3의 step은 1~6 범위에서 다음 수가 처음 등장하므로 빈도 최소 요령을 피할 수 없다.
     // 이 유형은 판 생성 전에 10%로 선택하고, 단계 전체 200판의 빈도 적중률을 따로 검사한다.
     if (difficulty === 3 && view.rules.count?.kind === 'step') limits.leastFrequent = 1;

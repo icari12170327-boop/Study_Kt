@@ -154,7 +154,7 @@ describe('T21 단계별 200판', () => {
   }, 20000);
 
   for (const level of levels) it(`★${level}: 형태·규칙·유일 해·가까운 오답 보기·같은 시드`, () => {
-    const blanks = new Set<number>(), turns = new Set<string>();
+    const blanks = new Set<number>(), blankCounts = new Map<number, number>(), turns = new Set<string>();
     for (let seed = 0; seed < 200; seed++) {
       const puzzle = patternGenerator.generate(level, seededRng(seed)), view = puzzle.view, expected = view.options[puzzle.answer - 1];
       expect(puzzle).toEqual(patternGenerator.generate(level, seededRng(seed))); expect(isPatternView(view)).toBe(true);
@@ -176,6 +176,8 @@ describe('T21 단계별 200판', () => {
         turns.add(active.find(([, rule]) => rule.kind !== 'cycle')![1].kind);
       } else {
         expect(view.cells).toHaveLength(9); expect(shown).toHaveLength(8); blanks.add(view.cells.indexOf(null));
+        const at = view.cells.indexOf(null);
+        blankCounts.set(at, (blankCounts.get(at) ?? 0) + 1);
         if (level === 4) {
           expect(view.rules.shape).toMatchObject({ kind: 'cycle', axis: 'diagonal' }); expect(view.rules.count).toMatchObject({ kind: 'step', axis: 'anti-diagonal' });
           expect(view.rules.color?.kind).toBe('fixed');
@@ -197,7 +199,11 @@ describe('T21 단계별 200판', () => {
       expect(explainRules(view)).not.toBe(''); expect(explainRules(view)).not.toContain('undefined');
       expect(patternGenerator.check(puzzle, puzzle.answer)).toBe(true); expect(patternGenerator.check(puzzle, String(puzzle.answer))).toBe(false);
     }
-    if (level === 4) expect(blanks.size).toBeGreaterThanOrEqual(2); if (level === 5) expect(blanks.size).toBeGreaterThanOrEqual(4); if (level === 3) expect(turns).toEqual(new Set(['step', 'turn']));
+    if (level >= 4) {
+      expect(blanks.size).toBeGreaterThanOrEqual(5);
+      for (const count of blankCounts.values()) expect(count / 200).toBeLessThanOrEqual(0.4);
+    }
+    if (level === 3) expect(turns).toEqual(new Set(['step', 'turn']));
   }, 20000);
 });
 describe('T21 대체 판과 규칙 설명', () => {
