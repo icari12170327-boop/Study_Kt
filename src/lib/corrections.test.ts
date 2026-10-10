@@ -133,6 +133,36 @@ describe('T22a 리뷰: 짧은 교정·핵심 표현·기회', () => {
     expect(updateRetrieval([legacy], [legacy], ["I've worked here since last year."], today).result.reused).toEqual([legacy.text]);
     expect(updateRetrieval([current], [current], ['I have', 'worked here.'], today).result.reused).toEqual([]);
   });
+  it.each([
+    ['I went to the park yesterday.', ' THE! ', 'I like the weather.'],
+    ['I work in an office.', 'in', 'I live in Seoul.'],
+    ['I bought a book.', 'a', 'I have a dog.'],
+    ['I went to school.', 'to', 'I want to eat.'],
+    ['She is working today.', 'is', 'He is happy.'],
+    ['I bought bread and milk.', 'and', 'She likes tea and coffee.'],
+    ['I finished it yesterday.', 'it', 'I like it.'],
+  ])('한 단어 기능어 %s / %s는 관련 없는 발화를 성공으로 세지 않는다', (text, focus, unrelated) => {
+    const current = target({ text, focus, stage: 2, misses: 2 });
+    const before = structuredClone(current);
+    const failed = updateRetrieval([current], [current], [unrelated], today);
+    expect(failed.result.reused).toEqual([]);
+    expect(failed.items[0]).toMatchObject({ stage: 2, misses: 3, dueDate: '2026-10-17' });
+    expect(updateRetrieval([current], [current], [unrelated], today, false).items).toEqual([current]);
+    const passed = updateRetrieval([current], [current], [`Yes, ${text.toUpperCase()} Thank you.`], today);
+    expect(passed.result.reused).toEqual([text]);
+    expect(passed.items[0]).toMatchObject({ stage: 3, misses: 0, dueDate: '2026-10-17' });
+    expect(updateRetrieval([current], [current], text.split(' '), today).result.reused).toEqual([]);
+    expect(current).toEqual(before);
+  });
+  it('여러 단어 핵심 구절과 한 단어 내용어는 전체 문장 없이도 재사용으로 인정한다', () => {
+    for (const [text, focus, spoken] of [
+      ['I am in charge of this project.', 'in charge', 'She is in charge today.'],
+      ['I went to the park yesterday.', 'went', 'We went to a cafe.'],
+    ]) {
+      const current = target({ text, focus });
+      expect(updateRetrieval([current], [current], [spoken], today).result.reused).toEqual([text]);
+    }
+  });
   it('복습 focus는 40자·부분 문자열·영어 단어를 확인하고 기존 항목을 지우지 않는다', () => {
     const current = target({ text: ' ' + 'a'.repeat(40) + ' ', focus: 'a'.repeat(40) });
     expect(normalizeRetrieval([current], today)[0].focus).toBe('a'.repeat(40));

@@ -38,8 +38,22 @@ export function reusedExpression(target: string, userLines: readonly string[]): 
     });
   });
 }
+
+// 관사·전치사 같은 한 단어 기능어는 다른 문장에서도 우연히 나오므로 전체 문장을 확인한다.
+const FUNCTION_WORDS = new Set([
+  'a', 'an', 'the', 'in', 'on', 'at', 'to', 'for', 'of', 'by', 'from', 'with', 'without', 'as', 'about', 'into', 'onto', 'over', 'under', 'between', 'through', 'during', 'before', 'after', 'since', 'until',
+  'and', 'or', 'but', 'so', 'if', 'because', 'although', 'while', 'than',
+  'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'my', 'your', 'his', 'its', 'our', 'their', 'this', 'that', 'these', 'those',
+  'am', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'do', 'does', 'did', 'have', 'has', 'had', 'can', 'could', 'will', 'would', 'shall', 'should', 'may', 'might', 'must', 'not',
+]);
+
+function retrievalExpression(item: RetrievalItem): string {
+  const words = normalizeWords(item.focus ?? '');
+  return words.length === 1 && FUNCTION_WORDS.has(words[0]) ? item.text : item.focus ?? item.text;
+}
+
 export function updateRetrieval(items: readonly RetrievalItem[], targets: readonly RetrievalItem[], userLines: readonly string[], today: string, countMisses = true): { items: RetrievalItem[]; result: ReviewResult } {
-  const reused = targets.filter(item => reusedExpression(item.focus ?? item.text, userLines));
+  const reused = targets.filter(item => reusedExpression(retrievalExpression(item), userLines));
   const targetIds = new Set(targets.map(item => item.id)), successIds = new Set(reused.map(item => item.id));
   return { result: { targets: targets.map(item => item.text), reused: reused.map(item => item.text) }, items: items.map(item => {
     if (!targetIds.has(item.id) || item.learnedAt) return { ...item };
