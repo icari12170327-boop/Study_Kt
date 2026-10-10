@@ -55,8 +55,8 @@ export function TalkRetell({ log }: { log: TalkLog }) {
       <div className="row-center">{canRecognize() && <button className="btn btn-soft" onClick={() => { if (listening) stopListening(); else void listen(); }}>{listening ? '듣기 멈춤' : '🎤 문장 말하기'}</button>}<button className="btn btn-primary" onClick={finish}>다시 말하기 끝내기</button></div>
       {!canRecognize() && <p className="small muted">음성 인식이 없어서 입력으로 연습해요.</p>}
     </>}
-    {phase === 'result' && result && <div role="status"><p>교정 표현 {used}/{targets.length} 사용{used > 0 && ' ✅'}</p><p>영어 단어 {englishWordCount(result.text)}개 · 분당 {Math.round(englishWordCount(result.text) / result.seconds * 60)}개</p><p lang="en" className="t22b-retell-text">{result.text || '말한 내용이 없어요. 다음에 다시 해도 돼요.'}</p>{rounds < 2 && <button className="btn btn-soft" onClick={() => start(90)}>1분 30초로 한 번 더</button>}</div>}
-    {phase === 'done' ? <p>다시 말하기를 건너뛰었어요. 대화 기록은 그대로 있어요.</p> : <button className="btn btn-ghost" onClick={() => { active.current = undefined; clearInterval(timer.current); stopListening(); setPhase('done'); }}>다시 말하기 건너뛰기</button>}
+    {phase === 'result' && result && <div role="status">{targets.length > 0 && <p>교정 표현 {used}/{targets.length} 사용{used > 0 && ' ✅'}</p>}<p>영어 단어 {englishWordCount(result.text)}개 · 분당 {Math.round(englishWordCount(result.text) / result.seconds * 60)}개</p><p lang="en" className="t22b-retell-text">{result.text || '말한 내용이 없어요. 다음에 다시 해도 돼요.'}</p>{rounds < 2 && <button className="btn btn-soft" onClick={() => start(90)}>1분 30초로 한 번 더</button>}</div>}
+    {phase === 'done' ? <p>다시 말하기를 건너뛰었어요. 대화 기록은 그대로 있어요.</p> : phase !== 'result' && <button className="btn btn-ghost" onClick={() => { active.current = undefined; clearInterval(timer.current); stopListening(); setPhase('done'); }}>다시 말하기 건너뛰기</button>}
     {message && <p role="alert">{message}</p>}
   </section>;
 }

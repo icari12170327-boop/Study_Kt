@@ -41,7 +41,7 @@ const mountRetell = async () => { await act(async () => root.render(createElemen
 it('음성 인식 없이 두 번 입력하고 단어·교정 사용·성장 지표를 저장하며 같은 표현은 한 번만 올린다', async () => {
   await mountRetell(); const before = saved(); await click('2분 다시 말하기 시작');
   await input(`We went to a cafe. ${TALK_CHUNKS[0].en}`); clock = 60000; await click('다시 말하기 끝내기');
-  expect(host.textContent).toContain('교정 표현 1/1 사용 ✅'); expect(host.textContent).toContain('영어 단어 9개');
+  expect(host.textContent).toContain('교정 표현 1/1 사용 ✅'); expect(host.textContent).not.toContain('다시 말하기 건너뛰기'); expect(host.textContent).toContain('영어 단어 9개');
   await click('1분 30초로 한 번 더'); await input(`We went home. ${TALK_CHUNKS[0].en}`); clock = 70000; await click('다시 말하기 끝내기');
   const after = saved(); expect(after.data.parent.talks[0].retells).toHaveLength(2); expect(after.data.parent.retrieval.map((item: { stage: number }) => item.stage)).toEqual([1, 1]);
   expect(after.data.parent.talks[0].growth.reuseRate).toBe(1); expect(after.data.parent.talks[0].growth.retellWordsPerMinute).toBeCloseTo(16 * 60 / 70);
@@ -87,4 +87,19 @@ it('교정이 0개면 다시 말하기로 넘어갈 수 있고 성장 지표 갱
   log.corrections = undefined; log.growth = buildTalkGrowth(log); store(); vi.mocked(generate).mockResolvedValue({ items: [], praiseKo: '잘했어요.' }); const complete = vi.fn();
   await act(async () => root.render(createElement(StrictMode, null, createElement(StoreProvider, null, createElement(TalkCorrections, { log, auto: true, onComplete: complete })))));
   expect(complete).toHaveBeenCalled(); expect(generate).toHaveBeenCalledOnce(); expect(saved().data.parent.talks[0].growth.correctionRate).toBe(0);
+});
+
+it('교정이 없으면 0/0을 표시하지 않고 결과 화면에는 건너뛰기가 없다', async () => {
+  log.corrections = { items: [], praiseKo: '좋아요.', createdAt: log.date }; store();
+  await mountRetell(); await click('2분 다시 말하기 시작'); await input('I had a nice day.'); clock = 30000; await click('다시 말하기 끝내기');
+  expect(host.textContent).not.toContain('교정 표현'); expect(host.textContent).not.toContain('0/0'); expect(host.textContent).not.toContain('다시 말하기 건너뛰기');
+  expect(host.textContent).toContain('영어 단어 5개'); expect(host.textContent).toContain('1분 30초로 한 번 더');
+});
+it.each([
+  ['I am happy.', 'You are happy!'], ['I am a manager.', 'Oh, you are a manager!'],
+  ["I'm working on a project.", "Oh, you're working on a project!"], ['I was tired.', 'You were tired?'],
+  ['I was born in Busan.', 'You were born in Busan!'], ['I am from Korea.', 'Oh, you are from Korea!'],
+])('올바른 되받기 %s → %s 는 DOM에 밑줄·교정 안내를 만들지 않는다', async (user, text) => {
+  await act(async () => root.render(createElement(RecastText, { user, text })));
+  expect(host.querySelector('u')).toBeNull(); expect(host.textContent).not.toContain('✏️ 이렇게도 말해요'); expect(host.textContent).toBe(text);
 });

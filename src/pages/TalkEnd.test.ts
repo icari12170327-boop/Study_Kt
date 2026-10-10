@@ -147,8 +147,9 @@ it.each(['coach', 'biz'] as const)('T22b %s 미리 보기·요청·복습·성�
   if (mode === 'coach') await click('🌱 코치 모드한국어로 대답하고 쉬운 영어를 따라 해요.');
   const displayed = [...host.querySelectorAll('.t22b-chunk [lang=en]')].map(node => node.textContent!); expect(displayed).toHaveLength(3);
   const history = JSON.parse(localStorage.getItem('study-kt:v1')!).data.parent.previewHistory;
-  expect(Object.keys(history).length).toBeGreaterThanOrEqual(3);
+  expect(history).toEqual({});
   await click('대화 시작'); expect(vi.mocked(startTalk).mock.lastCall![1].previewChunks).toEqual(displayed);
+  expect(Object.keys(JSON.parse(localStorage.getItem('study-kt:v1')!).data.parent.previewHistory)).toHaveLength(3);
   await act(async () => { callbacks.onUserText('u1', displayed[0]); callbacks.onAssistantText('a0', displayed[1], true); callbacks.onUserText('u2', 'I go yesterday.'); callbacks.onAssistantText('a1', 'Oh, you went yesterday!', true); callbacks.onFriendFinished?.(); });
   expect(host.querySelector('u.t22b-recast')!.textContent).toBe('went');
   await click('끝내기'); const data = JSON.parse(localStorage.getItem('study-kt:v1')!).data.parent;
@@ -163,4 +164,23 @@ it.each(['kid1', 'kid2'] as const)('T22b도 %s 미리 보기·리캐스트·다�
   await act(async () => { callbacks.onUserText('u', 'I go yesterday.'); callbacks.onAssistantText('a', 'Oh, you went yesterday!', true); }); expect(host.querySelector('.t22b-recast')).toBeNull(); await click('끝내기');
   const data = JSON.parse(localStorage.getItem('study-kt:v1')!).data[profileId];
   for (const key of ['growth', 'retells', 'previewChunks', 'retrievalApplied']) expect(data.talks[0]).not.toHaveProperty(key); expect(host.querySelector('.t22b-retell')).toBeNull();
+});
+
+it('주제를 훑어보기·건너뛰기·연결 실패는 미리 보기 기록을 쌓지 않는다', async () => {
+  const mount = async () => { await act(async () => root.render(createElement(StoreProvider, null, createElement(TalkSession, { profileId: 'parent', go: vi.fn() })))); };
+  await mount(); await click('🌱 코치 모드한국어로 대답하고 쉬운 영어를 따라 해요.');
+  await act(async () => [...host.querySelectorAll<HTMLButtonElement>('[aria-label="코치 주제"] button')][1].click());
+  expect(JSON.parse(localStorage.getItem('study-kt:v1')!).data.parent.previewHistory).toEqual({});
+  vi.mocked(startTalk).mockRejectedValueOnce(new AiError('network')); await click('대화 시작');
+  expect(JSON.parse(localStorage.getItem('study-kt:v1')!).data.parent.previewHistory).toEqual({});
+  await act(async () => root.render(null)); await mount(); await click('미리 보기 건너뛰고 대화 시작');
+  expect(JSON.parse(localStorage.getItem('study-kt:v1')!).data.parent.previewHistory).toEqual({});
+});
+it('같은 날 연결한 주제의 미리 보기 세 표현을 다시 방문해도 재사용한다', async () => {
+  const mount = async () => { await act(async () => root.render(createElement(StoreProvider, null, createElement(TalkSession, { profileId: 'parent', go: vi.fn() })))); };
+  await mount(); const first = [...host.querySelectorAll('.t22b-chunk [lang=en]')].map(node => node.textContent!);
+  await click('대화 시작'); const history = JSON.parse(localStorage.getItem('study-kt:v1')!).data.parent.previewHistory;
+  await act(async () => root.render(null)); await mount();
+  expect([...host.querySelectorAll('.t22b-chunk [lang=en]')].map(node => node.textContent!)).toEqual(first);
+  expect(JSON.parse(localStorage.getItem('study-kt:v1')!).data.parent.previewHistory).toEqual(history);
 });

@@ -104,7 +104,6 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
     if (!business || phase !== 'ready' || previewSelection?.key === previewKey) return;
     const chunks = pickPreviewChunks(previewGroup, retrieval ?? [], previewHistory ?? {}, today, seededRng([...previewKey].reduce((n, char) => n * 31 + char.charCodeAt(0), 0)));
     setPreviewSelection({ key: previewKey, chunks });
-    if (chunks.length) update(draft => { draft.data.parent.previewHistory = { ...normalizePreviewHistory(draft.data.parent.previewHistory, today), ...Object.fromEntries(chunks.map(chunk => [chunk.id, today])) }; });
   }, [business, phase, previewSelection, previewKey, previewGroup, retrieval, previewHistory, today, update]);
   const [correctionsDone, setCorrectionsDone] = useState(false);
   const correctionsComplete = useCallback(() => setCorrectionsDone(true), []);
@@ -250,6 +249,7 @@ export function TalkSession({ profileId, go }: { profileId: ProfileId; go: Go })
         onConnected: (seconds) => {
           if (run.finished) return;
           run.start = performance.now(); run.cap = seconds;
+          if (run.previewChunks?.length) update(draft => { draft.data.parent.previewHistory = { ...normalizePreviewHistory(draft.data.parent.previewHistory, run.date), ...Object.fromEntries(run.previewChunks!.map(chunk => [chunk.id, run.date])) }; });
           if (run.business?.situation) update(draft => { rememberSituation(draft.data.parent, run.business!.situation!); });
           if (alive.current) { setPhase('talking'); setRemaining(seconds); }
           run.timer = setInterval(() => {
