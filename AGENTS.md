@@ -5,7 +5,7 @@
 전체 흐름은 `docs/WORKFLOW.md`, 제품 기획은 `docs/PLAN.md`를 본다.
 
 ## 프로젝트 한눈에 보기
-- 가족(초5 첫째, 초3 둘째, 보호자)이 쓰는 학습 웹앱(PWA). UI 문구는 모두 한국어. 아이들은 Galaxy Fold4 + DeX(Chrome, 큰 모니터, 마우스와 터치)로 쓴다.
+- 가족(초5 첫째, 초3 둘째, 보호자)이 쓰는 학습 웹앱(PWA). UI 문구는 모두 한국어. 기기: 아이들은 아이뮤즈 뮤패드 K10 PLUS 태블릿(Android 13 Chrome, 10.4인치 2000×1200, RAM 4GB, 터치만), 보호자는 아이폰 13·14(Safari·홈 화면 앱, 390×844), 공용으로 2560×1440 PC 모니터(마우스·키보드)를 쓴다. 화면 검증은 이 세 가지 기준으로 한다(`docs/tasks/T24-device-fit.md`).
 - Vite + React 19 + TypeScript(strict) + Vitest. 상태는 `localStorage`에 저장. AI(영어 음성 대화 등)는 OpenAI API를 `worker/` 프록시로 호출.
 - 아이가 태블릿으로 쓰는 앱이다. **큰 터치 영역, 짧은 문장, 즉각적인 피드백**을 유지한다.
 
