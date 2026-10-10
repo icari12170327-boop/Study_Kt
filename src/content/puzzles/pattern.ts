@@ -19,6 +19,7 @@ export const COLOR_LABELS: Record<PatternColor, string> = { blue: '파랑', oran
 export const DIR_LABELS: Record<PatternDir, string> = { 0: '오른쪽', 90: '아래', 180: '왼쪽', 270: '위' };
 export const PATTERN_ATTRIBUTES: readonly PatternAttribute[] = ['shape', 'color', 'count', 'dir'];
 export const PATTERN_MAX_ATTEMPTS = 40;
+export const PATTERN_MAX_OPTION_ATTEMPTS = 7000;
 export const PATTERN_LEVELS = [{ layout: 'row' }, { layout: 'row' }, { layout: 'row' }, { layout: 'grid' }, { layout: 'grid' }] as const;
 const SHAPES: PatternShape[] = ['circle', 'triangle', 'square', 'star'];
 const COLORS: PatternColor[] = ['blue', 'orange', 'purple', 'green'];
@@ -158,28 +159,62 @@ function candidate(level: Difficulty, rng: Rng): { view: PatternView; expected: 
   const view: PatternView = { layout, cells, options: [], rules }; view.cells[blank] = null;
   return { view, expected };
 }
-function distractors(view: PatternView, answer: PatternTile, rng: Rng): PatternTile[] {
+function distractors(view: PatternView, answer: PatternTile, difficulty: Difficulty, rng: Rng): PatternTile[] | null {
   const blank = view.cells.indexOf(null);
   const attributes: PatternAttribute[] = answer.shape === 'arrow' ? ['color', 'count', 'dir'] : ['shape', 'color', 'count'];
+  const shown = view.cells.filter((tile): tile is PatternTile => !!tile);
+  const seenValues = Object.fromEntries(PATTERN_ATTRIBUTES.map(attr => [attr, new Set(shown.map(tile => valueOf(tile, attr)))])) as Record<PatternAttribute, Set<Value>>;
+  const isShown = (tile: PatternTile) => shown.some(previous => samePatternTile(previous, tile));
+  const hasSeenValues = (tile: PatternTile) => PATTERN_ATTRIBUTES.every(attr => seenValues[attr].has(valueOf(tile, attr)));
+  const chance = (options: PatternTile[]) => options.includes(answer) ? 1 / options.length : 0;
+  const scores = (options: PatternTile[]) => options.map(a => options.reduce((sum, b) => sum + PATTERN_ATTRIBUTES.filter(attr => valueOf(a, attr) === valueOf(b, attr)).length, 0));
+  const centerChance = (options: PatternTile[], source = options, least = false) => {
+    const points = scores(source), remaining = options.map(tile => points[source.indexOf(tile)]), extreme = least ? Math.min(...remaining) : Math.max(...remaining);
+    return chance(options.filter((_, i) => remaining[i] === extreme));
+  };
+  type ChoicePolicy = 'balanced' | 'original' | 'inverse';
+  const acceptable = (wrong: PatternTile[], policy: ChoicePolicy = 'balanced') => {
+    const options = [answer, ...wrong], unseen = options.filter(tile => !isShown(tile));
+    if (centerChance(options) > 0.35 || centerChance(unseen) > 0.4) return false;
+    if (difficulty === 1) return true;
+    const familiar = options.filter(hasSeenValues), combined = familiar.filter(tile => !isShown(tile));
+    if (chance(unseen) > 0.4 || chance(familiar) > 0.4 || chance(combined) > 0.4 || centerChance(unseen, unseen, true) > 0.4) return false;
+    const original = centerChance(unseen, options), inverse = centerChance(options, options, true);
+    if (policy === 'balanced') return original <= 0.4 && inverse <= 0.4;
+    // 예외 보기에서도 반대 유사도가 정답의 표식이 되지 않도록 두 편향을 각각 없앤 후보를 섞는다.
+    return policy === 'original' ? original === 0 : inverse === 0 && original <= 0.5;
+  };
   const wrongValues = Object.fromEntries(attributes.map(attribute => {
     const rule = view.rules[attribute]!, correct = valueOf(answer, attribute);
     const nearby = rule.kind === 'turn' ? [mod(Number(correct) + 180, 360), mod(Number(correct) - rule.deg, 360)] : rule.kind === 'step' ? [Number(correct) - rule.delta, Number(correct) + rule.delta] : [predictRule(view, attribute, rule, Math.max(0, blank - 1)), predictRule(view, attribute, rule, blank + 1)];
     const domain = attribute === 'shape' ? SHAPES : DOMAINS[attribute];
-    return [attribute, [...new Set([...nearby, ...shuffle(domain, rng)])].filter(value => value !== correct && domain.includes(value))];
+    const values = [...new Set([...nearby, ...shuffle(domain, rng)])].filter(value => value !== correct && domain.includes(value));
+    const familiar = values.filter(value => seenValues[attribute].has(value));
+    // 처음 보는 값이 곧 오답의 표식이 되지 않도록, 보인 대체 값이 있으면 반드시 그것을 쓴다.
+    return [attribute, familiar.length ? familiar : values];
   })) as Partial<Record<PatternAttribute, Value[]>>;
   const pairs = shuffle(attributes.flatMap((a, i) => attributes.slice(i + 1).map(b => [a, b] as const)), rng);
   // 2×2 조합은 어느 보기도 다른 보기의 중심이 되지 않는다. 가능한 한 움직이는 두 속성을 고른다.
   pairs.sort((a, b) => b.filter(attr => view.rules[attr]?.kind !== 'fixed').length - a.filter(attr => view.rules[attr]?.kind !== 'fixed').length);
-  let best: PatternTile[] | undefined, bestScore = Infinity;
   for (const [x, y] of pairs) for (const wrongX of wrongValues[x]!) for (const wrongY of wrongValues[y]!) {
     const options = [{ ...answer, [x]: wrongX }, { ...answer, [y]: wrongY }, { ...answer, [x]: wrongX, [y]: wrongY }];
-    const shown = options.map(option => view.cells.some(tile => tile && samePatternTile(tile, option)));
-    // 앞 타일을 지운 뒤 정답만 중심에 남는 경우도 피한다. 동시 오답이 과거 타일이면 우선 제외한다.
-    const score = Number(shown[2]) * 10 + Number(shown[0]) + Number(shown[1]);
-    if (score < bestScore) { best = options; bestScore = score; }
-    if (score <= 1) return options;
+    if (acceptable(options)) return options;
   }
-  return best!;
+  // 2×2로 기준을 만족하지 못하면 보인 속성값의 다른 조합을 유한하게 검사한다.
+  let pool = [{ ...answer }];
+  for (const attribute of attributes) {
+    const values = [valueOf(answer, attribute), ...wrongValues[attribute]!].filter(value => seenValues[attribute].has(value) || value === valueOf(answer, attribute));
+    pool = pool.flatMap(tile => values.map(value => ({ ...tile, [attribute]: value })));
+  }
+  pool = shuffle(pool.filter(tile => !samePatternTile(tile, answer) && PATTERN_ATTRIBUTES.filter(attr => valueOf(tile, attr) !== valueOf(answer, attr)).length <= 2), rng);
+  const policies: ChoicePolicy[] = ['balanced', rng() < 1 / 3 ? 'original' : 'inverse'];
+  let attempts = 0;
+  for (const policy of policies) for (let i = 0; i < pool.length; i++) for (let j = i + 1; j < pool.length; j++) for (let k = j + 1; k < pool.length; k++) {
+    if (++attempts > PATTERN_MAX_OPTION_ATTEMPTS) return null;
+    const options = [pool[i], pool[j], pool[k]];
+    if (acceptable(options, policy)) return options;
+  }
+  return null;
 }
 function accept(view: PatternView, expected: PatternTile, level: Difficulty): boolean {
   if (level >= 2 && view.cells.some(tile => tile && samePatternTile(tile, expected))) return false;
@@ -188,14 +223,25 @@ function accept(view: PatternView, expected: PatternTile, level: Difficulty): bo
 }
 export function generatePattern(difficulty: Difficulty, rng: Rng, attemptLimit = PATTERN_MAX_ATTEMPTS): Puzzle<PatternView, number> {
   const seed = randInt(0, 0xffffffff, rng), limit = Number.isInteger(attemptLimit) ? Math.max(0, Math.min(PATTERN_MAX_ATTEMPTS, attemptLimit)) : PATTERN_MAX_ATTEMPTS;
-  let result: ReturnType<typeof candidate> | undefined;
-  for (let attempt = 0; attempt < limit; attempt++) { const next = candidate(difficulty, rng); if (accept(next.view, next.expected, difficulty)) { result = next; break; } }
+  let result: (ReturnType<typeof candidate> & { wrong: PatternTile[] }) | undefined;
+  for (let attempt = 0; attempt < limit; attempt++) {
+    const next = candidate(difficulty, rng);
+    if (accept(next.view, next.expected, difficulty)) {
+      const wrong = distractors(next.view, next.expected, difficulty, rng);
+      if (wrong) { result = { ...next, wrong }; break; }
+    }
+  }
   // 상한 뒤에는 단계별로 검증된 시드의 고정 판을 쓰며, 다음 호출과 배열을 공유하지 않는다.
   const fallback = !result;
-  if (!result) result = candidate(difficulty, seededRng([1, 5, 1, 1, 1][difficulty - 1]));
-  const { view, expected } = result;
+  if (!result) {
+    const next = candidate(difficulty, seededRng([1, 5, 1, 1, 1][difficulty - 1]));
+    const wrong = distractors(next.view, next.expected, difficulty, seededRng(21));
+    if (!wrong) throw new Error('검증된 도형 규칙 대체 판의 보기를 만들지 못했어요.');
+    result = { ...next, wrong };
+  }
+  const { view, expected, wrong } = result;
   const optionRng = fallback ? seededRng(21) : rng;
-  view.options = shuffle([{ ...expected }, ...distractors(view, expected, optionRng)], optionRng);
+  view.options = shuffle([{ ...expected }, ...wrong], optionRng);
   return { type: 'pattern', difficulty, seed, view, answer: view.options.findIndex(tile => samePatternTile(tile, expected)) + 1, hint: hintFor(view) };
 }
 export function isPatternView(raw: unknown): raw is PatternView {

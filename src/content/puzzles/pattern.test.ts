@@ -18,10 +18,10 @@ function checkUnique(view: PatternView, expected: PatternTile) {
   for (const option of view.options) if (!samePatternTile(option, expected)) {
     expect([1, 2]).toContain(PATTERN_ATTRIBUTES.filter(attr => option[attr] !== expected[attr]).length);
   }
-  const changes = view.options.filter(option => !samePatternTile(option, expected)).map(option => PATTERN_ATTRIBUTES.filter(attr => option[attr] !== expected[attr]).length).sort();
-  expect(changes).toEqual([1, 1, 2]);
-  expect(PATTERN_ATTRIBUTES.filter(attr => new Set(view.options.map(option => option[attr])).size === 2)).toHaveLength(2);
-  for (const attr of PATTERN_ATTRIBUTES) expect(new Set(view.options.map(option => option[attr])).size).toBeLessThanOrEqual(2);
+  if (view.layout === 'row' && view.cells.length <= 8 && Object.values(view.rules).filter(rule => rule.kind !== 'fixed').length === 1) {
+    const changes = view.options.filter(option => !samePatternTile(option, expected)).map(option => PATTERN_ATTRIBUTES.filter(attr => option[attr] !== expected[attr]).length).sort();
+    expect(changes).toEqual([1, 1, 2]);
+  }
   for (const entry of [...view.cells.filter((row): row is PatternTile => !!row), ...view.options]) {
     expect(entry.count).toBeGreaterThanOrEqual(1); expect(entry.count).toBeLessThanOrEqual(6);
     if (entry.shape !== 'arrow') expect(entry.dir).toBeUndefined(); else expect([0, 90, 180, 270]).toContain(entry.dir);
@@ -79,27 +79,53 @@ describe('T21 도형 규칙 후보', () => {
   });
 });
 describe('T21 단계별 200판', () => {
+  for (const level of [2, 3, 4, 5] as Difficulty[]) it(`★${level}: 보지 못한 값 제거와 과거 타일까지 제거한 찍기 모두 40% 이하`, () => {
+    let valueHit = 0, combinedHit = 0, pastHit = 0;
+    for (let seed = 0; seed < 200; seed++) {
+      const puzzle = generatePattern(level, seededRng(seed)), view = puzzle.view, answer = view.options[puzzle.answer - 1];
+      const shown = view.cells.filter((tile): tile is PatternTile => !!tile);
+      const familiar = view.options.filter(option => PATTERN_ATTRIBUTES.every(attr => shown.some(tile => tile[attr] === option[attr])));
+      const unseen = (options: PatternTile[]) => options.filter(option => !shown.some(tile => samePatternTile(tile, option)));
+      const remaining = unseen(familiar), pastRemoved = unseen(view.options);
+      if (familiar.includes(answer)) valueHit += 1 / familiar.length;
+      if (remaining.includes(answer)) combinedHit += 1 / remaining.length;
+      if (pastRemoved.includes(answer)) pastHit += 1 / pastRemoved.length;
+      for (const option of view.options) for (const attr of PATTERN_ATTRIBUTES) {
+        const alternatives = shown.filter(tile => tile[attr] !== answer[attr]);
+        if (option[attr] !== answer[attr] && alternatives.length) expect(shown.some(tile => tile[attr] === option[attr])).toBe(true);
+      }
+    }
+    expect(valueHit / 200).toBeLessThanOrEqual(0.4); expect(combinedHit / 200).toBeLessThanOrEqual(0.4); expect(pastHit / 200).toBeLessThanOrEqual(0.4);
+  });
+
   for (const level of levels) it(`★${level}: 보기 중심 요령 35% 이하, 과거 보기 제거 뒤 40% 이하`, () => {
-    const centers = (options: PatternTile[]) => {
-      const scores = options.map(a => options.reduce((sum, b) => sum + PATTERN_ATTRIBUTES.filter(attr => a[attr] === b[attr]).length, 0));
-      return options.filter((_, i) => scores[i] === Math.max(...scores));
+    const centers = (options: PatternTile[], source = options, least = false) => {
+      const scores = options.map(a => source.reduce((sum, b) => sum + PATTERN_ATTRIBUTES.filter(attr => a[attr] === b[attr]).length, 0));
+      return options.filter((_, i) => scores[i] === (least ? Math.min(...scores) : Math.max(...scores)));
     };
-    let hit = 0, filteredHit = 0, firstHit = 0, filteredFirstHit = 0;
+    let hit = 0, filteredHit = 0, originalFilteredHit = 0, inverseHit = 0, inverseFilteredHit = 0, firstHit = 0, filteredFirstHit = 0;
     for (let seed = 0; seed < 200; seed++) {
       const puzzle = generatePattern(level, seededRng(seed)), view = puzzle.view, answer = view.options[puzzle.answer - 1];
       const all = centers(view.options);
-      // 동점을 무작위로 풀거나 첫 보기를 골라도 정답에 치우치지 않는다. 네 꼭짓점은 유사도가 같다.
-      expect(all).toHaveLength(4);
-      hit += 1 / all.length; firstHit += Number(all[0] === answer);
+      // 2×2가 아닌 예외 조합도 정답이 유사도만으로 드러나지 않아야 한다.
+      if (all.includes(answer)) hit += 1 / all.length; firstHit += Number(all[0] === answer);
+      const inverse = centers(view.options, view.options, true);
+      if (inverse.includes(answer)) inverseHit += 1 / inverse.length;
       const unseen = view.options.filter(option => !view.cells.some(tile => tile && samePatternTile(tile, option)));
       const filtered = centers(unseen);
       if (filtered.includes(answer)) filteredHit += 1 / filtered.length;
       filteredFirstHit += Number(filtered[0] === answer);
+      const inverseFiltered = centers(unseen, unseen, true);
+      if (inverseFiltered.includes(answer)) inverseFilteredHit += 1 / inverseFiltered.length;
+      const originalFiltered = centers(unseen, view.options);
+      if (originalFiltered.includes(answer)) originalFilteredHit += 1 / originalFiltered.length;
     }
     expect(hit / 200).toBeLessThanOrEqual(0.35); expect(firstHit / 200).toBeLessThanOrEqual(0.35);
+    expect(inverseHit / 200).toBeLessThanOrEqual(0.4); expect(inverseFilteredHit / 200).toBeLessThanOrEqual(0.4);
+    expect(originalFilteredHit / 200).toBeLessThanOrEqual(0.4);
     expect(filteredHit / 200).toBeLessThanOrEqual(0.4); expect(filteredFirstHit / 200).toBeLessThanOrEqual(0.4);
   });
-  for (const level of levels) it(`★${level}: 형태·규칙·유일 해·속성 하나만 다른 보기·같은 시드`, () => {
+  for (const level of levels) it(`★${level}: 형태·규칙·유일 해·가까운 오답 보기·같은 시드`, () => {
     const blanks = new Set<number>(), turns = new Set<string>();
     for (let seed = 0; seed < 200; seed++) {
       const puzzle = patternGenerator.generate(level, seededRng(seed)), view = puzzle.view, expected = view.options[puzzle.answer - 1];
