@@ -24,6 +24,7 @@ export interface SessionRequest {
   coachTopic?: CoachTopic;
   coach?: { level: CoachLevel; repeat: CoachRepeat };
   speed?: ParentSpeed;
+  reviewTargets?: string[];
 }
 export interface SessionResponse {
   sessionId: string;
@@ -42,7 +43,7 @@ export interface EndActiveResponse {
   closed: number;
   chargedSeconds: number;
 }
-export type GenerateKind = 'talk-summary' | 'biz-feedback' | 'memory-merge' | 'word-problem' | 'reading-quiz' | 'coach-gloss' | 'coach-wrapup' | 'coach-check' | 'weekly-report';
+export type GenerateKind = 'talk-summary' | 'biz-feedback' | 'memory-merge' | 'word-problem' | 'reading-quiz' | 'coach-gloss' | 'coach-wrapup' | 'coach-check' | 'weekly-report' | 'talk-corrections';
 export interface GenerateRequest {
   profileId: AiProfileId;
   level: AiLevel;

@@ -7,6 +7,7 @@ import { TalkSession } from './TalkSession';
 import { StoreProvider } from '../store/StoreContext';
 import { defaultState } from '../store/defaults';
 import { startTalk, type TalkCallbacks } from '../lib/realtime';
+import { toDateKey, addDays } from '../lib/date';
 import { AiError, fetchUsage, generate } from '../lib/ai';
 vi.mock('../lib/realtime', async original => ({ ...await original<typeof import('../lib/realtime')>(), startTalk: vi.fn() }));
 vi.mock('../lib/ai', async original => ({ ...await original<typeof import('../lib/ai')>(), fetchUsage: vi.fn(), generate: vi.fn() }));
@@ -87,4 +88,54 @@ it('코치 모드로 바꾸면 이전 사용량 조회 오류를 남기지 않�
   expect(host.querySelector('[role=alert]')!.textContent).toContain('Worker 설정');
   await click('🌱 코치 모드한국어로 대답하고 쉬운 영어를 따라 해요.');
   expect(host.querySelector('[role=alert]')!.textContent).toBe('대화를 연결하지 못했어요. 한 번 더 눌러 주세요.');
+});
+
+it.each(['coach', 'biz'] as const)('T22a %s는 시작 전 복습 대상을 보내고 사용자 줄만 비교해 종료 때 한 번 갱신한다', async mode => {
+  const today = toDateKey(), state = defaultState(); state.ai = { endpoint: 'https://worker.example', token: 't'.repeat(32) };
+  const target = { id: 'r1', text: 'I went yesterday.', mode, source: 'correction' as const, stage: 0 as const, misses: 0, createdAt: today, dueDate: today };
+  state.data.parent.retrieval = [target, { ...target, id: 'r2', text: 'I enjoy tea.' }];
+  localStorage.setItem('study-kt:v1', JSON.stringify(state));
+  vi.mocked(generate).mockImplementation(async (_cfg, req) => req.kind === 'talk-corrections' ? { items: [], praiseKo: '뜻을 잘 전했어요.' } : req.kind === 'coach-wrapup' ? { sentences: [] } : Promise.reject(new Error('피드백 없음')));
+  await act(async () => root.render(createElement(StoreProvider, null, createElement(TalkSession, { profileId: 'parent', go: vi.fn() }))));
+  if (mode === 'coach') await click('🌱 코치 모드한국어로 대답하고 쉬운 영어를 따라 해요.');
+  await click('대화 시작'); expect(vi.mocked(startTalk).mock.lastCall![1].reviewTargets).toEqual(['I went yesterday.', 'I enjoy tea.']);
+  await act(async () => { callbacks.onAssistantText('a', 'I enjoy tea.', true); callbacks.onUserText('u', 'Yes, I went yesterday!'); callbacks.onUserText('u2', 'I like the place.'); callbacks.onUserText('u3', 'Thank you.'); });
+  await click('끝내기'); await act(async () => callbacks.onState('ended'));
+  const data = JSON.parse(localStorage.getItem('study-kt:v1')!).data.parent;
+  expect(data.retrieval[0]).toMatchObject({ stage: 1, misses: 0 }); expect(data.retrieval[1]).toMatchObject({ stage: 0, misses: 1 });
+  expect(data.talks).toHaveLength(1); expect(data.talks[0].reviewResult).toEqual({ targets: ['I went yesterday.', 'I enjoy tea.'], reused: ['I went yesterday.'] });
+  expect(host.textContent).toContain('지난 표현 다시 쓰기: 2개 중 1개 성공 ✅');
+  expect(vi.mocked(generate).mock.calls.filter(([, req]) => req.kind === 'talk-corrections')).toHaveLength(1);
+  if (mode === 'coach') expect(host.querySelector('[aria-label="오늘의 교정"]')!.compareDocumentPosition(host.querySelector('[aria-label="코치 대화 마무리"]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+it.each(['kid1', 'kid2'] as const)('T22a는 %s 요청·완료·기록에 교정·복습 필드를 넣지 않는다', async profileId => {
+  await act(async () => root.render(createElement(StoreProvider, null, createElement(TalkSession, { profileId, go: vi.fn() })))); await click('대화 시작');
+  const request = vi.mocked(startTalk).mock.lastCall![1]; expect(request.mode).toBe('kid-friend'); expect(request).not.toHaveProperty('reviewTargets');
+  await act(async () => { callbacks.onUserText('u', 'I go yesterday.'); callbacks.onAssistantText('a', 'Nice!', true); }); await click('끝내기');
+  expect(host.textContent).not.toContain('오늘의 교정'); expect(vi.mocked(generate).mock.calls.some(([, req]) => req.kind === 'talk-corrections')).toBe(false);
+  const data = JSON.parse(localStorage.getItem('study-kt:v1')!).data[profileId]; expect(data.talks[0]).not.toHaveProperty('reviewResult'); expect(data.talks[0]).not.toHaveProperty('corrections'); expect(data).not.toHaveProperty('retrieval');
+});
+
+it.each([
+  { seconds: 10, lines: ['Hello.'], miss: 0, stage: 0 },
+  { seconds: 119, lines: ['Hello.', 'I like tea.'], miss: 0, stage: 0 },
+  { seconds: 120, lines: [], miss: 1, stage: 0 },
+  { seconds: 10, lines: ['Hi.', 'Yes.', 'I like tea.'], miss: 1, stage: 0 },
+  { seconds: 10, lines: ["I've worked here since 2025."], miss: 0, stage: 1 },
+])('T22a 짧은 대화의 기회·성공 반영: %j', async ({ seconds, lines, miss, stage }) => {
+  let clock = 0; const timer = vi.spyOn(performance, 'now').mockImplementation(() => clock);
+  try {
+    const today = toDateKey(), state = defaultState(); state.ai = { endpoint: 'https://worker.example', token: 't'.repeat(32) };
+    const target = { id: 'r-short', text: 'I have worked here since last year.', focus: 'have worked', mode: 'coach' as const, source: 'correction' as const, stage: 0 as const, misses: 0, createdAt: today, dueDate: today };
+    state.data.parent.retrieval = [target]; localStorage.setItem('study-kt:v1', JSON.stringify(state));
+    await act(async () => root.render(createElement(StoreProvider, null, createElement(TalkSession, { profileId: 'parent', go: vi.fn() }))));
+    await click('🌱 코치 모드한국어로 대답하고 쉬운 영어를 따라 해요.'); await click('대화 시작');
+    // 실제 2분 대화도 상한에서 잘리지 않도록 충분한 서버 시간을 전달한다.
+    await act(async () => { callbacks.onConnected?.(300); lines.forEach((text, i) => callbacks.onUserText(`u-${i}`, text)); }); clock = seconds * 1000;
+    await click('끝내기'); await act(async () => callbacks.onState('ended'));
+    const data = JSON.parse(localStorage.getItem('study-kt:v1')!).data.parent;
+    expect(data.retrieval[0]).toMatchObject({ stage, misses: miss, dueDate: miss || stage ? addDays(today, 1) : today });
+    if (!stage && !miss) expect(data.retrieval).toEqual([target]);
+    expect(data.talks).toHaveLength(1); expect(data.talks[0].reviewResult.reused).toHaveLength(stage ? 1 : 0);
+  } finally { timer.mockRestore(); }
 });

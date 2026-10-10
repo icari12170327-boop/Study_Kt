@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CORRECTION_PATTERNS } from '../../shared/corrections';
 import type { GenerateKind } from '../../shared/ai';
 import { weeklyReportInputSchema, weeklyReportOutputSchema } from './weeklyReport';
 export const profiles = ['kid1', 'kid2', 'parent'] as const;
@@ -23,6 +24,7 @@ export const sessionSchema = z
     mode: z.enum(['kid-friend', 'biz-talk', 'parent-coach']),
     coachTopic: z.enum(['daily', 'work', 'money']).optional(),
     coach: z.strictObject({ level: coachLevel, repeat: z.enum(['low', 'mid', 'high']) }).optional(),
+    reviewTargets: z.array(text(160)).max(2).optional(),
     speed: z.union([z.literal(0.85), z.literal(0.9), z.literal(1)]).optional(),
     offerSdp: text(64000).startsWith('v=0'),
     persona: z.strictObject({
@@ -46,6 +48,7 @@ export const sessionSchema = z
       ? r.level === 'adult' && ((r.mode === 'biz-talk' && !!r.scenarioId) || (r.mode === 'parent-coach' && r.scenarioId === undefined))
       : r.level !== 'adult' && r.mode === 'kid-friend' && !r.scenarioId && r.speed === undefined,
   )
+  .refine(r => r.reviewTargets === undefined || r.profileId === 'parent')
   .refine(r => r.persona.voiceStyle === undefined || (r.profileId === 'parent' ? ['young-woman', 'calm-man'] : ['kid-boy', 'kid-girl']).includes(r.persona.voiceStyle))
   .refine(r => r.profileId === 'parent' || r.persona.friendName !== 'Emma')
   .refine((r) => r.scenarioId === 'biz-custom' ? !!r.situation?.trim() : r.situation === undefined)
@@ -70,6 +73,9 @@ export const summarySchema = z.strictObject({
   nextTopics: z.array(text(40)).max(3),
 });
 export const inputSchemas = {
+  'talk-corrections': z.strictObject({ mode: z.enum(['coach', 'biz']), level: z.enum(['zero', 'words', 'short', 'daily', 'biz']),
+    lines: z.array(z.strictObject({ role: z.enum(['user', 'ai']), text: text(2000) })).min(1).max(300),
+  }).refine(r => r.mode === 'biz' ? r.level === 'biz' : r.level !== 'biz'),
   'weekly-report': weeklyReportInputSchema,
   'coach-gloss': z.strictObject({ text: text(300) }),
   'coach-wrapup': z.strictObject({ lines }),
@@ -105,6 +111,7 @@ export const inputSchemas = {
   }),
 };
 export const outputSchemas = {
+  'talk-corrections': z.strictObject({ items: z.array(z.strictObject({ said: text(200), better: text(160), focus: text(40), whyKo: text(120), hintKo: text(80), pattern: z.enum(CORRECTION_PATTERNS) })).max(3), praiseKo: text(120) }),
   'weekly-report': weeklyReportOutputSchema,
   'coach-gloss': z.strictObject({ ko: text(400) }),
   'coach-wrapup': z.strictObject({ sentences: z.array(z.strictObject({ en: text(120), ko: text(120) })).max(3) }),
@@ -138,4 +145,4 @@ export const generateSchema = z
     input: z.unknown(),
   })
   .refine((r) => (r.profileId === 'parent' ? r.level === 'adult' : r.level !== 'adult'))
-  .refine((r) => (r.kind !== 'biz-feedback' && r.kind !== 'weekly-report' && !r.kind.startsWith('coach-')) || r.profileId === 'parent');
+  .refine((r) => (r.kind !== 'talk-corrections' && r.kind !== 'biz-feedback' && r.kind !== 'weekly-report' && !r.kind.startsWith('coach-')) || r.profileId === 'parent');

@@ -1,3 +1,4 @@
+import { normalizeRetrieval } from '../lib/retrieval';
 import { normalizeReadingQuiz } from '../lib/readingQuiz';
 import { normalizeWordProblemRatio, withoutStory } from '../content/math/wordProblem';
 import { normalizeStories, normalizeStorySettings } from '../content/stories/progress';
@@ -65,7 +66,9 @@ export function normalizeState(raw: unknown, today = toDateKey()): AppState {
     data[p.id].bizSituations = normalizeBizSituations(s.data?.[p.id]?.bizSituations);
     data[p.id].bingo = normalizeBingoData(s.data?.[p.id]?.bingo);
     data[p.id].science = normalizeScience(s.data?.[p.id]?.science);
-    data[p.id].talks = normalizeTalkLogs(s.data?.[p.id]?.talks);
+    data[p.id].talks = normalizeTalkLogs(s.data?.[p.id]?.talks, p.id === 'parent');
+    if (p.id === 'parent') data[p.id].retrieval = normalizeRetrieval(s.data?.[p.id]?.retrieval, today);
+    else delete data[p.id].retrieval;
     data[p.id].friendMemory = typeof s.data?.[p.id]?.friendMemory === 'string' ? s.data[p.id].friendMemory.slice(0, 1500) : '';
     const math = s.data?.[p.id]?.math;
     data[p.id].math = {

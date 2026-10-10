@@ -98,7 +98,11 @@ export interface TalkLog {
   coachTopic?: import('../shared/ai').CoachTopic;
   coachWrapup?: CoachWrapup;
   coachCheck?: CoachCheck & { text: string };
+  corrections?: import('../shared/corrections').Corrections & { createdAt: string };
+  reviewResult?: ReviewResult;
 }
+export interface ReviewResult { targets: string[]; reused: string[] }
+export interface RetrievalItem { id: string; text: string; focus?: string; source: 'correction' | 'preview'; mode: 'coach' | 'biz'; stage: 0 | 1 | 2 | 3; dueDate: string; misses: number; createdAt: string; learnedAt?: string }
 export interface CoachSettings {
   level: import('../shared/ai').CoachLevel;
   repeat: import('../shared/ai').CoachRepeat;
@@ -219,6 +223,7 @@ export type ObbyColor = 'red' | 'blue' | 'green' | 'yellow' | 'purple';
 export type ObbyHat = 'cap' | 'tophat' | 'helmet';
 
 export interface ProfileData {
+  retrieval?: RetrievalItem[];
   weeklyAi?: Record<string, import('../shared/weeklyReport').WeeklyAi>;
   stories?: Record<string, StoryProgress>;
   puzzles?: PuzzleData;
