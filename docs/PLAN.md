@@ -220,8 +220,9 @@
 - [x] [T06](tasks/T06-brain-puzzles.md) 두뇌 퍼즐 6종 (자유 놀이, T06a → T06b)
 - [x] [T07](tasks/T07-reward-games.md) 오늘의 문제 게임과 형제 대결
 - [x] [T19](tasks/T19-obby-run.md) 오비 달리기 (첫째 아이디어, 수학 미션 보상)
-- [ ] **[T22](tasks/T22-parent-correction-loop.md) 보호자 영어 코칭 (연구 기반 한 판 구조: 리캐스트, 먼저 고쳐 보기, 간격 반복, 다시 말하기, 성장 지표)** · T22a 완료(PR #60)
+- [x] [T22](tasks/T22-parent-correction-loop.md) 보호자 영어 코칭 (연구 기반 한 판 구조: 리캐스트, 먼저 고쳐 보기, 간격 반복, 다시 말하기, 성장 지표) · PR #60, #62
 - [ ] **[T24](tasks/T24-device-fit.md) 실제 기기 맞춤 (뮤패드 태블릿, 아이폰, QHD 모니터)**
+- [ ] [T26](tasks/T26-bingo-5x5.md) 첫째 빙고판 5×5
 - [x] [T21](tasks/T21-pattern-rules.md) 도형 규칙 다시 만들기 (속성마다 다른 규칙, 격자)
 - [x] [T20](tasks/T20-field-fixes-1.md) 실사용 수정 1차: 대화 종료 버그, 목소리, 스도쿠 5×5, 블록 그림, 코치 뜻
 
