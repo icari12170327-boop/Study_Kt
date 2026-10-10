@@ -100,7 +100,13 @@ export interface TalkLog {
   coachCheck?: CoachCheck & { text: string };
   corrections?: import('../shared/corrections').Corrections & { createdAt: string };
   reviewResult?: ReviewResult;
+  previewChunks?: string[];
+  retrievalApplied?: string[];
+  retells?: RetellAttempt[];
+  growth?: TalkGrowth;
 }
+export interface RetellAttempt { text: string; seconds: number; limit: 120 | 90 }
+export interface TalkGrowth { averageEnglishWords: number | null; retellWordsPerMinute: number | null; correctionRate: number | null; selfFixedRate: number | null; englishRatio: number | null; reuseRate: number | null }
 export interface ReviewResult { targets: string[]; reused: string[] }
 export interface RetrievalItem { id: string; text: string; focus?: string; source: 'correction' | 'preview'; mode: 'coach' | 'biz'; stage: 0 | 1 | 2 | 3; dueDate: string; misses: number; createdAt: string; learnedAt?: string }
 export interface CoachSettings {
@@ -224,6 +230,7 @@ export type ObbyHat = 'cap' | 'tophat' | 'helmet';
 
 export interface ProfileData {
   retrieval?: RetrievalItem[];
+  previewHistory?: Record<string, string>;
   weeklyAi?: Record<string, import('../shared/weeklyReport').WeeklyAi>;
   stories?: Record<string, StoryProgress>;
   puzzles?: PuzzleData;

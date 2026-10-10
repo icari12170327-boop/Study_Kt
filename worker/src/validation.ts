@@ -25,6 +25,7 @@ export const sessionSchema = z
     coachTopic: z.enum(['daily', 'work', 'money']).optional(),
     coach: z.strictObject({ level: coachLevel, repeat: z.enum(['low', 'mid', 'high']) }).optional(),
     reviewTargets: z.array(text(160)).max(2).optional(),
+    previewChunks: z.array(text(160)).max(3).optional(),
     speed: z.union([z.literal(0.85), z.literal(0.9), z.literal(1)]).optional(),
     offerSdp: text(64000).startsWith('v=0'),
     persona: z.strictObject({
@@ -49,6 +50,7 @@ export const sessionSchema = z
       : r.level !== 'adult' && r.mode === 'kid-friend' && !r.scenarioId && r.speed === undefined,
   )
   .refine(r => r.reviewTargets === undefined || r.profileId === 'parent')
+  .refine(r => r.previewChunks === undefined || r.profileId === 'parent')
   .refine(r => r.persona.voiceStyle === undefined || (r.profileId === 'parent' ? ['young-woman', 'calm-man'] : ['kid-boy', 'kid-girl']).includes(r.persona.voiceStyle))
   .refine(r => r.profileId === 'parent' || r.persona.friendName !== 'Emma')
   .refine((r) => r.scenarioId === 'biz-custom' ? !!r.situation?.trim() : r.situation === undefined)

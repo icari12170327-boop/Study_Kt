@@ -1,3 +1,4 @@
+import { normalizePracticeFields } from './parentPractice';
 import { normalizeCorrections, normalizeReviewResult } from './talkCorrections';
 import { BUSINESS_SCENARIOS, isBizFeedback } from './business';
 import { COACH_TOPICS, isCoachCheck, isCoachWrapup } from './coach';
@@ -126,6 +127,7 @@ export function normalizeTalkLogs(raw: unknown, parent = false): TalkLog[] {
   return raw.filter((s: TalkLog) => s && typeof s.id === 'string' && typeof s.date === 'string' && Number.isFinite(s.seconds) && s.seconds >= 0 && Array.isArray(s.lines)).slice(-60).map((log: TalkLog) => {
     const lines = log.lines.filter((l) => l && ['kid', 'friend'].includes(l.role) && typeof l.text === 'string' && Number.isFinite(l.at) && l.at >= 0).map((l) => ({ role: l.role, text: l.text, at: l.at, ...(l.peeked ? { peeked: true } : {}) }));
     return {
+    ...(parent ? normalizePracticeFields(log) : {}),
     ...(parent && normalizeCorrections(log.corrections, lines.filter(line => line.role === 'kid').map(line => line.text)) ? { corrections: normalizeCorrections(log.corrections, lines.filter(line => line.role === 'kid').map(line => line.text)) } : {}),
     ...(parent && normalizeReviewResult(log.reviewResult) ? { reviewResult: normalizeReviewResult(log.reviewResult) } : {}),
     id: log.id, date: log.date, seconds: Math.floor(log.seconds),
