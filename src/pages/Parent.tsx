@@ -258,6 +258,7 @@ function Settings() {
             <input
               aria-label={`${pid === 'parent' && m.type === 'talk' ? '비즈니스 프리토킹' : MISSION_META[m.type].title} 하루 목표`}
               type="number"
+              disabled={m.type === 'opic'}
               min={1}
               max={100}
               value={m.target}

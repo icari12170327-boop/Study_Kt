@@ -28,7 +28,7 @@ export function WeeklyReport() {
         <option value={0}>이번 주</option><option value={-1}>지난주</option><option value={-2}>그 전 주</option>
       </select></label>
     </div>
-    {pid === 'parent' ? <ParentEnglishReport logs={state.data.parent.talks} today={today} offset={offset} /> : <>
+    {pid === 'parent' ? <ParentEnglishReport opic={state.data.parent.opic} logs={state.data.parent.talks} today={today} offset={offset} /> : <>
     <h2>{profile.name} · 주간 학습 리포트</h2>
     <p className="muted">{range.start} ~ {range.end} · 월요일부터 일요일</p>
     <p className="small muted">보관된 기록 기준이에요. 이번 주는 현재까지의 기록이며, 화살표는 선택한 주의 전주와 비교해요.</p>

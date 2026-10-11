@@ -13,7 +13,8 @@ export function recorderEnv(): RecorderEnv | undefined {
   return { getUserMedia: () => navigator.mediaDevices.getUserMedia({ audio: true }), create: (stream, mimeType) => new MediaRecorder(stream, { mimeType }), supports: type => MediaRecorder.isTypeSupported(type), now: () => performance.now(), document };
 }
 /** 녹음은 메모리에만 모으며 취소·숨김·자동 종료에서 마이크를 정리한다. */
-export async function startRecording(options: { env?: RecorderEnv; signal?: AbortSignal; onTick?: (remaining: number) => void } = {}): Promise<RecorderHandle> {
+export async function startRecording(options: { env?: RecorderEnv; signal?: AbortSignal; onTick?: (remaining: number) => void; maxSeconds?: 90 | 120 | 150 } = {}): Promise<RecorderHandle> {
+  const maximum = options.maxSeconds ?? 120;
   const env = options.env ?? recorderEnv(), signal = options.signal;
   const mime = env && formats.find(type => env.supports(type));
   if (!env || !mime) throw new Error('unsupported');
@@ -38,9 +39,9 @@ export async function startRecording(options: { env?: RecorderEnv; signal?: Abor
   const dispose = () => { if (done) return; done = true; recorder.ondataavailable = null; recorder.onstop = null; recorder.onerror = null; try { if (recorder.state !== 'inactive') recorder.stop(); } catch { /* 이미 종료된 녹음 */ } clean(); chunks.length = 0; reject(new DOMException('취소', 'AbortError')); };
   const hidden = () => { if (env.document.hidden) stop(); };
   recorder.ondataavailable = event => { if (!done && event.data.size) chunks.push(event.data); };
-  recorder.onstop = () => { if (done) return; done = true; clean(); const durationSec = Math.max(1, Math.min(120, ((stoppedAt ?? env.now()) - started) / 1000)); resolve({ audio: new Blob(chunks, { type: mime }), durationSec }); chunks.length = 0; };
+  recorder.onstop = () => { if (done) return; done = true; clean(); const durationSec = Math.max(1, Math.min(maximum, ((stoppedAt ?? env.now()) - started) / 1000)); resolve({ audio: new Blob(chunks, { type: mime }), durationSec }); chunks.length = 0; };
   recorder.onerror = () => { if (!done) { done = true; recorder.ondataavailable = null; recorder.onstop = null; try { if (recorder.state !== 'inactive') recorder.stop(); } catch { /* 오류 난 녹음 정리 */ } clean(); chunks.length = 0; reject(new Error('recording')); } };
-  const interval = setInterval(() => { const remaining = Math.max(0, 120 - (env.now() - started) / 1000); options.onTick?.(remaining); if (!remaining) stop(); }, 100);
+  const interval = setInterval(() => { const remaining = Math.max(0, maximum - (env.now() - started) / 1000); options.onTick?.(remaining); if (!remaining) stop(); }, 100);
   env.document.addEventListener('visibilitychange', hidden); signal?.addEventListener('abort', dispose, { once: true });
   try { recorder.start(250); } catch (error) { dispose(); throw error; }
 
