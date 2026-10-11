@@ -91,7 +91,11 @@ export function normalizeOpic(raw: unknown, today: string): OpicData | undefined
   // 이전 앱에서 완료 버튼을 누르지 않은 결과도 날짜로 진행 기록을 버리기 전에 보관한다.
   const completed = normalizeOpicMock(row.currentMock, today, normalizeOpicAttempt);
   if (completed?.answers.length === 15 && !mocks?.some(m => m.id === completed.id)) mocks = archiveCompletedMock(mocks ?? [], completed);
-  const currentMock = normalizeOpicMock(row.currentMock, today, normalizeOpicAttempt, true);
+  let currentMock = normalizeOpicMock(row.currentMock, today, normalizeOpicAttempt, true);
+  if (currentMock?.answers.length === 15) {
+    mocks = archiveCompletedMock(mocks ?? [], currentMock);
+    currentMock = structuredClone(mocks.find(m => m.id === currentMock!.id)!);
+  }
   return { settings, ...(validRetrievalDate(row.planStartedAt) && row.planStartedAt <= today ? { planStartedAt: row.planStartedAt } : {}), ...(mocks ? { mocks } : {}), ...(currentMock ? { currentMock } : {}), attempts: attempts.sort((a, b) => a.date.localeCompare(b.date)).slice(-200), scripts: scripts.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt)).slice(-150), skipsByDate: Object.fromEntries(Object.entries(skips).filter(([date, count]) => validRetrievalDate(date) && date >= addDays(today, -6) && date <= today && typeof count === 'number' && Number.isInteger(count) && count >= 0 && count <= 2)) as Record<string, number> };
 }
 export function modelAnswerParts(feedback: OpicFeedback): { text: string; changed: boolean }[] {

@@ -11,7 +11,15 @@ export interface OpicMock {
 export function archiveCompletedMock(mocks: readonly OpicMock[], mock: OpicMock): OpicMock[] {
   if (mock.answers.length !== 15) return [...mocks];
   const index = mocks.findIndex(row => row.id === mock.id), result = [...mocks], saved = structuredClone(mock);
-  if (index < 0) result.push(saved); else result[index] = saved;
+  if (index < 0) result.push(saved); else {
+    const previous = result[index];
+    saved.elapsedSec = Math.max(saved.elapsedSec, previous.elapsedSec);
+    saved.answers = saved.answers.map((answer, i) => {
+      const prior = previous.answers[i];
+      return !answer.feedback && prior?.questionId === answer.questionId && prior.transcript === answer.transcript && prior.feedback ? { ...answer, feedback: structuredClone(prior.feedback) } : answer;
+    });
+    result[index] = saved;
+  }
   return result.sort((a, b) => a.date.localeCompare(b.date)).slice(-20);
 }
 const choose = <T,>(items: readonly T[], rng: Rng): T => items[Math.min(items.length - 1, Math.floor(rng() * items.length))];

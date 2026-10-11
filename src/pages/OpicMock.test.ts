@@ -89,6 +89,6 @@ it('답안 90초 녹음은 받아쓰기만 사용하고 결과 파일은 저장�
   await mount(createElement(OpicScriptReview, { id: 's', onDone: done })); await click('다시 말하기 시작'); expect(vi.mocked(startRecording).mock.calls[0][0]).toMatchObject({ maxSeconds: 90 }); expect(transcribe).toHaveBeenCalledOnce(); expect(generate).not.toHaveBeenCalled(); expect(JSON.stringify(saved())).not.toContain('private-recording');
 });
 it('완료 기록에서도 피드백이 없는 문항만 다시 받고 기존 성공은 유지한다', async () => {
-  const mock = mockWithAnswers(15); mock.adjustment = 'same'; mock.answers.forEach((a, i) => { if (i !== 2) a.feedback = fb as typeof a.feedback; }); state.data.parent.opic!.mocks = [mock];
-  await mount(createElement(OpicMockHistory)); await click('실패한 문항만'); expect(generate).toHaveBeenCalledOnce(); expect(saved().data.parent.opic?.mocks?.[0].answers.every(a => a.feedback)).toBe(true);
+  const mock = mockWithAnswers(15); mock.adjustment = 'same'; mock.answers.forEach((a, i) => { if (i !== 2) a.feedback = fb as typeof a.feedback; }); state.data.parent.opic!.mocks = [mock]; state.data.parent.opic!.currentMock = structuredClone(mock);
+  await mount(createElement(OpicMockHistory)); await click('실패한 문항만'); expect(generate).toHaveBeenCalledOnce(); expect(saved().data.parent.opic?.mocks?.[0].answers.every(a => a.feedback)).toBe(true); expect(saved().data.parent.opic?.currentMock?.answers.every(a=>a.feedback)).toBe(true); expect(normalizeState(saved()).data.parent.opic?.currentMock?.answers.every(a=>a.feedback)).toBe(true);
 });

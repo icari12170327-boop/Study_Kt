@@ -94,7 +94,7 @@ describe('저장·미션·리포트 호환', () => {
     expect(saved).toHaveLength(20); expect(saved[0].id).toBe('m1'); expect(prior).toEqual(before);
     const changed = structuredClone(mock); changed.answers[0].feedback = feedback('IH-AL');
     const updated = archiveCompletedMock(saved, changed); expect(updated).toHaveLength(20); expect(updated.at(-1)?.answers[0].feedback?.levelBand).toBe('IH-AL');
-    expect(saved.at(-1)?.answers[0].feedback?.levelBand).toBe('IM1-IM2');
+    expect(saved.at(-1)?.answers[0].feedback?.levelBand).toBe('IM1-IM2'); delete changed.answers[0].feedback; expect(archiveCompletedMock(updated, changed).at(-1)?.answers[0].feedback?.levelBand).toBe('IH-AL'); changed.answers[0].transcript = 'A different answer.'; expect(archiveCompletedMock(updated, changed).at(-1)?.answers[0].feedback).toBeUndefined();
     expect(archiveCompletedMock([], { ...mock, answers: mock.answers.slice(0,14) })).toEqual([]);
   });
   it('마치기 없이 다음 날 넘어가도 완료 기록·피드백·백업은 남고 미완료 판만 버린다', () => {
