@@ -6,6 +6,9 @@ export interface Env {
   ALLOWED_ORIGINS: string;
   REALTIME_MODEL: string;
   TEXT_MODEL: string;
+  TRANSCRIBE_MODEL?: string;
+  TRANSCRIBE_LIMIT_DAY?: string;
+  TRANSCRIBE_MINUTES_DAY?: string;
   TALK_MINUTES_kid1: string;
   TALK_MINUTES_kid2: string;
   TALK_MINUTES_parent: string;

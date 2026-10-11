@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CORRECTION_PATTERNS } from '../../shared/corrections';
+import { OPIC_TYPES, OPIC_TARGETS, OPIC_BANDS } from '../../shared/opic';
 import type { GenerateKind } from '../../shared/ai';
 import { weeklyReportInputSchema, weeklyReportOutputSchema } from './weeklyReport';
 export const profiles = ['kid1', 'kid2', 'parent'] as const;
@@ -75,6 +76,7 @@ export const summarySchema = z.strictObject({
   nextTopics: z.array(text(40)).max(3),
 });
 export const inputSchemas = {
+  'opic-feedback': z.strictObject({ type: z.enum(OPIC_TYPES), topic: text(60), question: text(400), transcript: text(6000), durationSec: z.number().finite().min(1).max(150), targetLevel: z.enum(OPIC_TARGETS) }),
   'talk-corrections': z.strictObject({ mode: z.enum(['coach', 'biz']), level: z.enum(['zero', 'words', 'short', 'daily', 'biz']),
     lines: z.array(z.strictObject({ role: z.enum(['user', 'ai']), text: text(2000) })).min(1).max(300),
   }).refine(r => r.mode === 'biz' ? r.level === 'biz' : r.level !== 'biz'),
@@ -113,6 +115,10 @@ export const inputSchemas = {
   }),
 };
 export const outputSchemas = {
+  'opic-feedback': z.strictObject({ taskDone: z.boolean(), taskNoteKo: text(160), textType: z.enum(['words', 'sentences', 'strings', 'paragraph']), levelBand: z.enum(OPIC_BANDS), strengthsKo: z.array(text(120)).min(1).max(2),
+    corrections: z.array(z.strictObject({ said: text(200), better: text(160), focus: text(40), whyKo: text(120), pattern: z.enum(CORRECTION_PATTERNS) })).max(3),
+    nextStepKo: text(160), modelAnswer: text(1400), upgrades: z.array(z.strictObject({ from: text(120), to: text(160) })).max(4), keyPhrases: z.array(text(60)).min(2).max(5),
+  }),
   'talk-corrections': z.strictObject({ items: z.array(z.strictObject({ said: text(200), better: text(160), focus: text(40), whyKo: text(120), hintKo: text(80), pattern: z.enum(CORRECTION_PATTERNS) })).max(3), praiseKo: text(120) }),
   'weekly-report': weeklyReportOutputSchema,
   'coach-gloss': z.strictObject({ ko: text(400) }),
@@ -147,4 +153,4 @@ export const generateSchema = z
     input: z.unknown(),
   })
   .refine((r) => (r.profileId === 'parent' ? r.level === 'adult' : r.level !== 'adult'))
-  .refine((r) => (r.kind !== 'talk-corrections' && r.kind !== 'biz-feedback' && r.kind !== 'weekly-report' && !r.kind.startsWith('coach-')) || r.profileId === 'parent');
+  .refine((r) => (r.kind !== 'opic-feedback' && r.kind !== 'talk-corrections' && r.kind !== 'biz-feedback' && r.kind !== 'weekly-report' && !r.kind.startsWith('coach-')) || r.profileId === 'parent');

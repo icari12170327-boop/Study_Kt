@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { filterCorrections, type Corrections } from '../../shared/corrections';
+import { filterOpicFeedback, type OpicFeedback } from '../../shared/opic';
 import { z } from 'zod';
 import type { GenerateRequest, SessionRequest } from '../../shared/ai';
 import type { Env } from './env';
@@ -87,7 +88,7 @@ export async function generateText(env: Env, req: GenerateRequest): Promise<unkn
   const input = inputSchemas[req.kind].parse(req.input);
   const short = req.kind === 'biz-feedback' && 'mode' in inputSchemas['biz-feedback'].parse(input);
   const schema = short ? shortFeedbackSchema : outputSchemas[req.kind];
-  const client = new OpenAI({ apiKey: env.OPENAI_API_KEY, maxRetries: 0, timeout: 8000 });
+  const client = new OpenAI({ apiKey: env.OPENAI_API_KEY, maxRetries: 0, timeout: req.kind === 'opic-feedback' ? 20000 : 8000 });
   let flagged = false;
   if (req.kind === 'talk-summary' && 'lines' in input) {
     const childLines = input.lines
@@ -119,7 +120,7 @@ export async function generateText(env: Env, req: GenerateRequest): Promise<unkn
     try { return schema.parse(JSON.parse(result.output_text)); }
     catch { throw new GenerationSchemaError(); }
   };
-  const coach = ['coach-gloss', 'coach-check', 'coach-wrapup', 'talk-corrections'].includes(req.kind);
+  const coach = ['coach-gloss', 'coach-check', 'coach-wrapup', 'talk-corrections', 'opic-feedback'].includes(req.kind);
   let data: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
     try { data = await create(); break; }
@@ -133,7 +134,15 @@ export async function generateText(env: Env, req: GenerateRequest): Promise<unkn
     const parsed = inputSchemas['talk-corrections'].parse(input);
     return filterCorrections(data as Corrections, parsed.lines.filter(line => line.role === 'user').map(line => line.text));
   }
+  if (req.kind === 'opic-feedback') return filterOpicFeedback(data as OpicFeedback, inputSchemas['opic-feedback'].parse(input).transcript);
   if (req.kind === 'memory-merge') return (data as { memory: string }).memory;
   if (req.kind === 'talk-summary') return { ...(data as object), flagged };
   return data;
+}
+export async function transcribeAudio(env: Env, audio: Blob): Promise<{ text: string }> {
+  const client = new OpenAI({ apiKey: env.OPENAI_API_KEY, maxRetries: 0, timeout: 60000 });
+  const ext = audio.type.split('/')[1];
+  const result = await client.audio.transcriptions.create({ model: env.TRANSCRIBE_MODEL ?? 'gpt-4o-mini-transcribe', file: new File([audio], `recording.${ext}`, { type: audio.type }), response_format: 'json' });
+  if (typeof result.text !== 'string' || !result.text.trim() || result.text.length > 6000) throw new ProxyError('server', 502);
+  return { text: result.text };
 }

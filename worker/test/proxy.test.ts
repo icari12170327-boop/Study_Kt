@@ -153,6 +153,7 @@ beforeEach(() => {
       });
     throw new Error('알 수 없는 외부 호출');
   });
+  Object.assign(outgoing, { Response });
   vi.stubGlobal('fetch', outgoing);
 });
 afterEach(() => {
@@ -1024,5 +1025,59 @@ describe('T20c 코치 생성 재시도 범위·상한', () => {
     expect((await req('/api/usage')).status).toBe(200); expect((await req('/api/realtime/active')).status).toBe(200);
     result.resolve(Response.json({ id: 'response', object: 'response', status: 'completed', output: [{ type: 'message', id: 'message', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: JSON.stringify({ items: [item], praiseKo: '잘했어요.' }), annotations: [] }] }] }));
     expect((await pending).status).toBe(200); expect((await readUsage(await req('/api/usage'))).today.parent.generates).toBe(1);
+  });
+});
+
+const opicInput = { type: 'past', topic: '공원', question: 'Tell me about your trip.', transcript: 'I go to the park yesterday. 가족과 갔어요.', durationSec: 120, targetLevel: 'IM2' };
+const opicOutput = { taskDone: true, taskNoteKo: '경험을 말했어요.', textType: 'sentences', levelBand: 'IM1-IM2', strengthsKo: ['경험을 설명했어요.'], corrections: [{ said: 'I go to the park yesterday.', better: 'I went to the park yesterday.', focus: 'went', whyKo: '지난 일이에요.', pattern: 'tense' }], nextStepKo: '세부 내용을 더 말해요.', modelAnswer: 'I went to the park yesterday.', upgrades: [{ from: 'go', to: 'went' }], keyPhrases: ['I went', 'yesterday'] };
+const rawAudio = (seconds = 120, profileId = 'parent', mime = 'audio/webm', body: BodyInit = new TextEncoder().encode('private-recording-bytes')) => worker.fetch(new Request(`https://proxy/api/transcribe?profileId=${profileId}&durationSec=${seconds}`, { method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${token}`, 'Content-Type': mime }, body }), env);
+describe('T27a 받아쓰기 HTTP·사용량·오픽 피드백', () => {
+  it('실제 SDK multipart에 모델만 지정하고 녹음·원문을 KV·DO·로그에 남기지 않는다', async () => {
+    env.TRANSCRIBE_MODEL = 'configured-transcribe';
+    const logger = vi.spyOn(console, 'error').mockImplementation(() => {});
+    outgoing.mockImplementationOnce(async (url: string, init: RequestInit) => {
+      const request = new Request(url, init);
+      expect(lockDepth).toBe(0); expect(request.url).toContain('/audio/transcriptions');
+      const form = await request.formData(); expect(form.get('model')).toBe('configured-transcribe'); expect(form.has('language')).toBe(false); expect(await (form.get('file') as File).text()).toBe('private-recording-bytes');
+      return Response.json({ text: 'I like parks. 한국어도 좋아요.' });
+    });
+    try {
+      const response = await rawAudio(); expect(response.status).toBe(200); expect(await response.json()).toEqual({ text: 'I like parks. 한국어도 좋아요.' });
+      const usage = await readUsage(await req('/api/usage')); expect(usage.today.parent).toMatchObject({ transcribes: 1, transcribeSeconds: 120 }); expect(usage.today.kid1).not.toHaveProperty('transcribes');
+      const stored = JSON.stringify([...storage.entries(), ...kv.entries(), logger.mock.calls]); expect(stored).not.toContain('private-recording-bytes'); expect(stored).not.toContain('I like parks'); expect(stored).not.toContain('mock-openai-key');
+    } finally { logger.mockRestore(); }
+  });
+  it('권한·MIME·길이·메서드·크기·CORS를 API 입구에서 검사한다', async () => {
+    expect((await rawAudio(1, 'kid1')).status).toBe(403); expect((await rawAudio(151)).status).toBe(400); expect((await rawAudio(1, 'parent', 'text/plain')).status).toBe(400); expect((await rawAudio(1, 'parent', 'audio/webm', new Uint8Array(4 * 1024 * 1024 + 1))).status).toBe(400);
+    expect((await req('/api/transcribe')).status).toBe(405);
+    const preflight = await req('/api/transcribe', undefined, { 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'authorization,content-type' }, 'OPTIONS'); expect(preflight.status).toBe(204); expect(preflight.headers.get('Access-Control-Allow-Headers')).toBe('Authorization, Content-Type'); expect(outgoing).not.toHaveBeenCalled();
+  });
+  it('횟수 한도는 동시에 예약해도 초과하지 않고 실패도 한 번만 센다', async () => {
+    env.TRANSCRIBE_LIMIT_DAY = '1'; outgoing.mockResolvedValueOnce(Response.json({ text: 'a'.repeat(6001) }));
+    const responses = await Promise.all([rawAudio(), rawAudio()]); expect(responses.map(r => r.status).sort()).toEqual([429, 502]); expect(outgoing).toHaveBeenCalledTimes(1);
+    expect((await readUsage(await req('/api/usage'))).today.parent).toMatchObject({ transcribes: 1, transcribeSeconds: 120 });
+  });
+  it('초 한도 경계와 다음 날 초기화, 생성 한도와 분리', async () => {
+    env.TRANSCRIBE_MINUTES_DAY = '1'; env.GENERATE_LIMIT_DAY_TOTAL = '0'; outgoing.mockImplementation(async () => Response.json({ text: 'Answer.' }));
+    expect((await rawAudio(60)).status).toBe(200); expect((await rawAudio(1)).status).toBe(429);
+    vi.setSystemTime(now + 86400000); expect((await rawAudio(1)).status).toBe(200); expect((await readUsage(await req('/api/usage'))).today.parent.transcribeSeconds).toBe(1);
+  });
+  it('외부 받아쓰기가 지연돼도 사용량 조회·세션 시작이 잠금으로 막히지 않는다', async () => {
+    const wait = deferred<Response>(); outgoing.mockImplementationOnce(() => { expect(lockDepth).toBe(0); return wait.promise; });
+    const pending = rawAudio(); await vi.waitFor(() => expect(outgoing).toHaveBeenCalledTimes(1)); expect((await req('/api/usage')).status).toBe(200); expect((await start()).status).toBe(200); wait.resolve(Response.json({ text: 'Answer.' })); expect((await pending).status).toBe(200);
+  });
+  it('피드백은 보호자 전용, 스키마 실패를 한 번 재시도하고 공유 생성량은 한 번', async () => {
+    env.GENERATE_LIMIT_DAY_TOTAL = '1';
+    expect((await req('/api/generate', { profileId: 'kid1', level: 'g5', kind: 'opic-feedback', input: opicInput })).status).toBe(403);
+    const response = (data: unknown) => Response.json({ id: 'r', object: 'response', status: 'completed', output: [{ type: 'message', id: 'm', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: JSON.stringify(data), annotations: [] }] }] });
+    outgoing.mockResolvedValueOnce(response({})).mockResolvedValueOnce(response(opicOutput));
+    const result = await req('/api/generate', { profileId: 'parent', level: 'adult', kind: 'opic-feedback', input: opicInput }); expect(result.status).toBe(200); expect(await result.json()).toEqual({ ok: true, data: opicOutput }); expect(outgoing).toHaveBeenCalledTimes(2);
+    expect((await readUsage(await req('/api/usage'))).today.parent.generates).toBe(1); expect((await req('/api/generate', { profileId: 'parent', level: 'adult', kind: 'opic-feedback', input: opicInput })).status).toBe(429);
+  });
+  it('오픽만 20초에 재시도하고 두 번째 시간 초과에서도 사용량은 한 번이다', async () => {
+    const entered = deferred<void>(), retried = deferred<void>(); let count = 0; outgoing.mockImplementation((_url: string, init: RequestInit) => { expect(lockDepth).toBe(0); count++; if (count === 1) entered.resolve(); else retried.resolve(); return new Promise<Response>((_, reject) => init.signal!.addEventListener('abort', () => reject(new DOMException('시간 초과', 'AbortError')))); });
+    const result = req('/api/generate', { profileId: 'parent', level: 'adult', kind: 'opic-feedback', input: opicInput });
+    await entered.promise; await vi.advanceTimersByTimeAsync(19999); expect(count).toBe(1); await vi.advanceTimersByTimeAsync(1); await retried.promise; expect(count).toBe(2); await vi.advanceTimersByTimeAsync(20000); expect((await result).status).toBe(502);
+    expect((await readUsage(await req('/api/usage'))).today.parent.generates).toBe(1);
   });
 });
