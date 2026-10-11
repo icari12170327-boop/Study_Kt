@@ -115,6 +115,7 @@ export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
 
       {profile.level !== 'adult' && <button className="btn btn-soft" onClick={() => go({ name: 'science-collection', profileId })}>🔬 {profile.level === 'g5' ? '실험실 빌드' : '나의 과학 박물관'} 열기 · {Object.keys(data.science.collected).length}장 · 🏅 {data.science.badges.length}</button>}
 
+      {profileId === 'parent' && <button className="btn btn-soft" onClick={() => go({ name: 'opic' })}>🎯 오픽 · 하루 한 문항</button>}
       {profileId === 'parent' && <WeeklyReportNotice profileId={profileId} go={go} />}
       {profileId === 'parent' && <button className="btn btn-soft" onClick={() => go({ name: 'parent' })}>🔒 보호자 모드 · 대화 기록과 내 표현 관리</button>}
 
