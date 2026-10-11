@@ -223,6 +223,7 @@
 - [x] [T22](tasks/T22-parent-correction-loop.md) 보호자 영어 코칭 (연구 기반 한 판 구조: 리캐스트, 먼저 고쳐 보기, 간격 반복, 다시 말하기, 성장 지표) · PR #60, #62
 - [x] [T24](tasks/T24-device-fit.md) 실제 기기 맞춤 (뮤패드 태블릿, 아이폰, QHD 모니터) · PR #63, #67
 - [x] [T26](tasks/T26-bingo-5x5.md) 첫째 빙고판 5×5 · PR #66
+- [ ] **[T27](tasks/T27-opic-mode.md) 보호자 오픽 모드 (목표 IM2 → IH, 서버 받아쓰기, 내 답안 노트, 실전 모의고사)**
 - [x] [T21](tasks/T21-pattern-rules.md) 도형 규칙 다시 만들기 (속성마다 다른 규칙, 격자)
 - [x] [T20](tasks/T20-field-fixes-1.md) 실사용 수정 1차: 대화 종료 버그, 목소리, 스도쿠 5×5, 블록 그림, 코치 뜻
 
