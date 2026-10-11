@@ -6,7 +6,7 @@ export type ProfileId = 'kid1' | 'kid2' | 'parent';
 /** g3: 초등 3학년, g5: 초등 5학년, adult: 보호자 */
 export type Level = 'g3' | 'g5' | 'adult';
 
-export type MissionType = 'math' | 'vocab' | 'speaking' | 'reading' | 'talk' | 'science';
+export type MissionType = 'math' | 'vocab' | 'speaking' | 'reading' | 'talk' | 'science' | 'opic';
 
 export type ScienceTopic = 'float-sink' | 'electricity' | 'light' | 'sound' | 'magnet' | 'states' | 'mixing' | 'air' | 'living' | 'heat' | 'weather' | 'motion' | 'acid-base' | 'space';
 export interface ScienceCard {

@@ -78,7 +78,7 @@ export function Home({ profileId, go }: { profileId: ProfileId; go: Go }) {
               key={m.type}
               className={`mission-card ${finished ? 'finished' : ''}`}
               disabled={m.type === 'talk' && !aiReady(state.ai)}
-              onClick={() => go({ name: m.type, profileId })}
+              onClick={() => go(m.type === 'opic' ? { name: 'opic' } : { name: m.type, profileId })}
             >
               <div className="mission-icon" style={{ background: meta.color }}>
                 {finished ? '✔' : meta.icon}

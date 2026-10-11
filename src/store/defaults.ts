@@ -81,6 +81,7 @@ export function defaultSettings(level: Level, id?: ProfileId): ProfileSettings {
         bingo: defaultBingoSettings(level),
         talk: defaultTalkSettings(level, id),
         missions: [
+          { type: 'opic', enabled: false, target: 1 },
           { type: 'science', enabled: false, target: 5 },
           { type: 'math', enabled: false, target: 10 },
           { type: 'talk', enabled: true, target: 15 },

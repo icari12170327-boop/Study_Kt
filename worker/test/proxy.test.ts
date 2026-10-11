@@ -1032,6 +1032,15 @@ const opicInput = { type: 'past', topic: '공원', question: 'Tell me about your
 const opicOutput = { taskDone: true, taskNoteKo: '경험을 말했어요.', textType: 'sentences', levelBand: 'IM1-IM2', strengthsKo: ['경험을 설명했어요.'], corrections: [{ said: 'I go to the park yesterday.', better: 'I went to the park yesterday.', focus: 'went', whyKo: '지난 일이에요.', pattern: 'tense' }], nextStepKo: '세부 내용을 더 말해요.', modelAnswer: 'I went to the park yesterday.', upgrades: [{ from: 'go', to: 'went' }], keyPhrases: ['I went', 'yesterday'] };
 const rawAudio = (seconds = 120, profileId = 'parent', mime = 'audio/webm', body: BodyInit = new TextEncoder().encode('private-recording-bytes')) => worker.fetch(new Request(`https://proxy/api/transcribe?profileId=${profileId}&durationSec=${seconds}`, { method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${token}`, 'Content-Type': mime }, body }), env);
 describe('T27a 받아쓰기 HTTP·사용량·오픽 피드백', () => {
+  it('모의고사 시작에 필요한 남은 한도는 실제 환경 설정과 가족 전체 생성량으로 계산한다', async () => {
+    env.TRANSCRIBE_LIMIT_DAY = '17'; env.TRANSCRIBE_MINUTES_DAY = '40'; env.GENERATE_LIMIT_DAY_TOTAL = '18';
+    outgoing.mockResolvedValueOnce(Response.json({ text: 'Answer.' })); expect((await rawAudio(150)).status).toBe(200);
+    output = summary;
+    expect((await req('/api/generate', { profileId: 'kid1', level: 'g5', kind: 'talk-summary', input: { lines: [{ role: 'kid', text: 'Hello.', at: 1 }] } })).status).toBe(200);
+    expect((await readUsage(await req('/api/usage'))).opicRemaining).toEqual({ transcribes: 16, transcribeSeconds: 2250, generates: 17 });
+    env.TRANSCRIBE_LIMIT_DAY = '0'; env.TRANSCRIBE_MINUTES_DAY = '0'; env.GENERATE_LIMIT_DAY_TOTAL = '0';
+    expect((await readUsage(await req('/api/usage'))).opicRemaining).toEqual({ transcribes: 0, transcribeSeconds: 0, generates: 0 });
+  });
   it('실제 SDK multipart에 모델만 지정하고 녹음·원문을 KV·DO·로그에 남기지 않는다', async () => {
     env.TRANSCRIBE_MODEL = 'configured-transcribe';
     const logger = vi.spyOn(console, 'error').mockImplementation(() => {});

@@ -21,6 +21,7 @@ export type Route =
 export type Go = (route: Route) => void;
 
 export const MISSION_META = {
+  opic: { icon: '🎯', title: '오픽 1문항', unit: '문항', color: '#6366f1' },
   science: { icon: '🔬', title: '과학 문제', unit: '문제', color: '#0d9488' },
   math: { icon: '🔢', title: '수학 도전', unit: '문제', color: '#f97316' },
   vocab: { icon: '🔤', title: '영어 단어', unit: '단어', color: '#10b981' },
