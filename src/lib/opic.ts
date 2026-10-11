@@ -1,4 +1,4 @@
-import { normalizeOpicMock, type OpicMock } from './opicMock';
+import { archiveCompletedMock, normalizeOpicMock, type OpicMock } from './opicMock';
 import { opicFocusWeight } from './opicPlan';
 import { OPIC_BANDS, OPIC_TARGETS, filterOpicFeedback, type OpicFeedback, type OpicType } from '../../shared/opic';
 import { CORRECTION_PATTERNS } from '../../shared/corrections';
@@ -87,7 +87,10 @@ export function normalizeOpic(raw: unknown, today: string): OpicData | undefined
     if (s && q && text(s.id, 150) && s.type === q.type && s.topic === q.topic && text(s.text, 1600) && validRetrievalDate(s.createdAt) && validRetrievalDate(s.updatedAt)) scripts.push({ id: s.id, questionId: q.id, type: q.type, topic: q.topic, text: s.text, createdAt: s.createdAt, updatedAt: s.updatedAt, ...([0, 1, 2, 3].includes(Number(s.stage)) && typeof s.stage === 'number' ? { stage: s.stage as OpicScript['stage'] } : {}), ...(validRetrievalDate(s.dueDate) ? { dueDate: s.dueDate } : {}), ...(strings(s.keyPhrases, 60, 1, 3) ? { keyPhrases: [...s.keyPhrases] } : {}) });
   }
   const skips = object(row.skipsByDate) ?? {};
-  const mocks = Array.isArray(row.mocks) ? [...new Map(row.mocks.flatMap(raw => { const mock = normalizeOpicMock(raw, today, normalizeOpicAttempt); return mock && mock.answers.length === 15 ? [[mock.id, mock] as const] : []; })).values()].slice(-20) : undefined;
+  let mocks = Array.isArray(row.mocks) ? [...new Map(row.mocks.flatMap(raw => { const mock = normalizeOpicMock(raw, today, normalizeOpicAttempt); return mock && mock.answers.length === 15 ? [[mock.id, mock] as const] : []; })).values()].slice(-20) : undefined;
+  // 이전 앱에서 완료 버튼을 누르지 않은 결과도 날짜로 진행 기록을 버리기 전에 보관한다.
+  const completed = normalizeOpicMock(row.currentMock, today, normalizeOpicAttempt);
+  if (completed?.answers.length === 15 && !mocks?.some(m => m.id === completed.id)) mocks = archiveCompletedMock(mocks ?? [], completed);
   const currentMock = normalizeOpicMock(row.currentMock, today, normalizeOpicAttempt, true);
   return { settings, ...(validRetrievalDate(row.planStartedAt) && row.planStartedAt <= today ? { planStartedAt: row.planStartedAt } : {}), ...(mocks ? { mocks } : {}), ...(currentMock ? { currentMock } : {}), attempts: attempts.sort((a, b) => a.date.localeCompare(b.date)).slice(-200), scripts: scripts.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt)).slice(-150), skipsByDate: Object.fromEntries(Object.entries(skips).filter(([date, count]) => validRetrievalDate(date) && date >= addDays(today, -6) && date <= today && typeof count === 'number' && Number.isInteger(count) && count >= 0 && count <= 2)) as Record<string, number> };
 }

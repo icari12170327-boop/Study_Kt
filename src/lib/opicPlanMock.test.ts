@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { opicPlan, opicFocusWeight, gradeScriptRetell, reviewOpicScript, dueOpicScript, scriptKeyPhrases } from './opicPlan';
-import { buildOpicMock, adjustOpicMock, mockAllowance, resumeOpicMock, opicMockResult, type OpicMock } from './opicMock';
+import { archiveCompletedMock, buildOpicMock, adjustOpicMock, mockAllowance, resumeOpicMock, opicMockResult, type OpicMock } from './opicMock';
 import { emptyOpic, defaultOpicSettings, pickOpicQuestion, opicMetrics, type OpicAttempt, type OpicScript } from './opic';
 import { seededRng } from './random';
 import { addDays } from './date';
@@ -21,7 +21,7 @@ describe('8주 계획과 초점', () => {
   it('시험일 역산과 4구간·월말·연말 경계, 지난 시험 숨김', () => {
     const data = emptyOpic(); data.settings.examDate = '2027-01-25';
     const start = addDays(data.settings.examDate, -55);
-    expect(start).toBe('2026-12-01');
+    expect(start).toBe('2026-12-01'); data.planStartedAt = start;
     for (const [offset, phase] of [[0, 0], [13, 0], [14, 1], [27, 1], [28, 2], [41, 2], [42, 3], [55, 3]]) expect(opicPlan(data, addDays(start, offset))?.phase).toBe(phase);
     expect(opicPlan(data, '2027-01-25')?.daysLeft).toBe(0); expect(opicPlan(data, '2027-01-26')).toBeUndefined();
   });
@@ -35,6 +35,18 @@ describe('8주 계획과 초점', () => {
     const data = fullMock(); const previous = { ...answer(data, 1), date: addDays(today, -1) }; const next = pickOpicQuestion(OPIC_QUESTIONS, { ...settings, survey: [previous.topic] }, [previous], today, { rng: () => .1, phase: 1 }); expect(next.type).toBe('routine'); expect(next.id).not.toBe(previous.questionId);
     expect(pickOpicQuestion(OPIC_QUESTIONS, settings, [{ ...previous, date: today }], today, { phase: 3 }).id).toBe(previous.questionId);
   });
+});
+it('시험까지 20일이면 시작일을 고정해 남은 21일을 4등분하고 매일 재시작하지 않는다', () => {
+  const data = { ...emptyOpic(), planStartedAt: '2026-12-20' }; data.settings.examDate = '2027-01-09';
+  for (const [offset, phase] of [[0,0],[5,0],[6,1],[10,1],[11,2],[15,2],[16,3],[20,3]]) expect(opicPlan(data, addDays(data.planStartedAt, offset))).toMatchObject({ start: '2026-12-20', phase });
+  expect(opicPlan(data, data.planStartedAt)?.daysLeft).toBe(20);
+  expect(opicPlan(data, '2027-01-10')).toBeUndefined();
+});
+it('시험 당일 새로 시작해도 유효한 구간이고 오래 준비한 경우에는 최대 8주다', () => {
+  const data = { ...emptyOpic(), planStartedAt: today }; data.settings.examDate = today;
+  expect(opicPlan(data,today)).toMatchObject({ phase: 0, daysLeft: 0 });
+  data.planStartedAt = '2026-01-01'; data.settings.examDate = '2027-01-25';
+  expect(opicPlan(data,'2026-12-01')).toMatchObject({ start: '2026-12-01', phase: 0 });
 });
 describe('답안 다시 말하기', () => {
   it('핵심 표현 세 개 중 두 개를 직접 이어 말해야 성공한다', () => { expect(gradeScriptRetell(script.keyPhrases!, 'I am taking a walk in the fresh air.')).toEqual({ used: 2, total: 3, success: true }); expect(gradeScriptRetell(script.keyPhrases!, 'I like the walk and fresh food.').success).toBe(false); expect(gradeScriptRetell([], 'Any words.').success).toBe(false); });
@@ -75,6 +87,22 @@ describe('저장·미션·리포트 호환', () => {
     expect(normalizeState(normalized, addDays(today, 1)).data.parent.opic?.currentMock).toBeUndefined();
     const bad = structuredClone(state); Object.assign(bad.data.parent.opic!.scripts[0], { stage: 9, dueDate: '2026-02-30' }); expect(normalizeState(bad, today).data.parent.opic?.scripts[0].stage).toBeUndefined();
     const backup = importState(exportState(normalized)); expect(backup.data.parent.opic).toEqual(normalized.data.parent.opic);
+  });
+  it('마지막 답변부터 완료 기록을 자동 보관하고 피드백은 같은 ID에 갱신하며 최대 20회다', () => {
+    const mock = fullMock('latest'), prior = Array.from({ length: 20 }, (_, i) => fullMock(`m${i}`));
+    const before = structuredClone(prior), saved = archiveCompletedMock(prior, mock);
+    expect(saved).toHaveLength(20); expect(saved[0].id).toBe('m1'); expect(prior).toEqual(before);
+    const changed = structuredClone(mock); changed.answers[0].feedback = feedback('IH-AL');
+    const updated = archiveCompletedMock(saved, changed); expect(updated).toHaveLength(20); expect(updated.at(-1)?.answers[0].feedback?.levelBand).toBe('IH-AL');
+    expect(saved.at(-1)?.answers[0].feedback?.levelBand).toBe('IM1-IM2');
+    expect(archiveCompletedMock([], { ...mock, answers: mock.answers.slice(0,14) })).toEqual([]);
+  });
+  it('마치기 없이 다음 날 넘어가도 완료 기록·피드백·백업은 남고 미완료 판만 버린다', () => {
+    const state = defaultState(); state.data.parent.opic = { ...emptyOpic(), currentMock: fullMock() };
+    const next = normalizeState(state, addDays(today,1));
+    expect(next.data.parent.opic?.currentMock).toBeUndefined(); expect(next.data.parent.opic?.mocks?.[0]).toEqual(fullMock());
+    expect(importState(exportState(next)).data.parent.opic?.mocks).toEqual(next.data.parent.opic?.mocks);
+    state.data.parent.opic.currentMock!.answers.pop(); expect(normalizeState(state,addDays(today,1)).data.parent.opic?.mocks).toBeUndefined();
   });
   it('T27a 데이터는 유지되고 오픽 미션은 보호자만 기본 꺼짐이며 한 번만 진행한다', () => {
     const original = defaultState(), legacy = emptyOpic(); legacy.scripts = [script]; original.data.parent.opic = legacy;

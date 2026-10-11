@@ -45,7 +45,7 @@ function mockWithAnswers(n: number) {
 }
 it('남은 실제 한도를 먼저 표시하고, 부족하거나 누락되면 시작하지 않는다', async () => {
   vi.mocked(fetchUsage).mockResolvedValueOnce({ opicRemaining: { transcribes: 14, transcribeSeconds: 3600, generates: 200 } } as Awaited<ReturnType<typeof fetchUsage>>);
-  await mount(); await click('남은 한도 확인'); expect(host.textContent).toContain('오늘은 14회'); expect(host.textContent).toContain('남은 한도: 받아쓰기 14회'); expect(saved().data.parent.opic?.currentMock).toBeUndefined();
+  await mount(); await click('남은 한도 확인'); expect(host.textContent).toContain('오늘은 14회'); expect(host.textContent).toContain('남은 한도: 받아쓰기 14회'); expect(host.textContent).toContain('아이들 사용량까지 합친 가족 전체'); expect(saved().data.parent.opic?.currentMock).toBeUndefined();
   await click('남은 한도 확인'); expect(saved().data.parent.opic?.currentMock).toBeUndefined(); await click('모의고사 시작'); expect(saved().data.parent.opic?.currentMock).toBeDefined();
 });
 it('한도 확인·시작 중 중복 클릭과 이탈 뒤 늦은 한도 응답을 막는다', async () => {
@@ -56,10 +56,10 @@ it('한도 확인·시작 중 중복 클릭과 이탈 뒤 늦은 한도 응답�
 });
 it('15문항 글 답변·7번 뒤 조정·자동 피드백·실패만 재시도·기록을 끝까지 진행한다', async () => {
   vi.mocked(generate).mockRejectedValueOnce(new AiError('network')); await mount(); await click('남은 한도 확인'); expect(saved().data.parent.opic?.currentMock).toBeUndefined(); await click('모의고사 시작');
-  for (let i = 0; i < 15; i++) { if (i === 7) await click('그대로'); await click('글로 답하기'); await fill('I enjoy walking in the park.'); await click('답변 끝내기'); }
-  expect(generate).toHaveBeenCalledTimes(15); expect(host.textContent).toContain('1문항의 피드백'); expect(saved().data.parent.opic?.currentMock?.answers.filter(a => a.feedback)).toHaveLength(14);
-  await click('실패한 문항만 다시 받기'); expect(generate).toHaveBeenCalledTimes(16); expect(host.textContent).toContain('피드백 15/15문항');
-  await click('모의고사 기록하고 마치기'); expect(done).toHaveBeenCalledOnce(); expect(saved().data.parent.opic?.mocks).toHaveLength(1); expect(saved().data.parent.opic?.currentMock).toBeUndefined(); expect(transcribe).not.toHaveBeenCalled();
+  for (let i = 0; i < 15; i++) { if (i === 7) { expect(host.textContent).toContain('난이도 변형이 없는 유형은 같은 수준'); await click('그대로'); } await click('글로 답하기'); await fill('I enjoy walking in the park.'); await click('답변 끝내기'); }
+  expect(saved().data.parent.opic?.mocks).toHaveLength(1); expect(saved().data.parent.opic?.mocks?.[0].answers).toHaveLength(15); expect(generate).toHaveBeenCalledTimes(15); expect(host.textContent).toContain('1문항의 피드백'); expect(saved().data.parent.opic?.currentMock?.answers.filter(a => a.feedback)).toHaveLength(14);
+  await click('실패한 문항만 다시 받기'); expect(generate).toHaveBeenCalledTimes(16); expect(saved().data.parent.opic?.mocks?.[0].answers.every(a=>a.feedback)).toBe(true); expect(normalizeState(saved(), addDays(toDateKey(),1)).data.parent.opic?.mocks).toHaveLength(1); expect(host.textContent).toContain('피드백 15/15문항');
+  await click('모의고사 마치기'); expect(done).toHaveBeenCalledOnce(); expect(saved().data.parent.opic?.mocks).toHaveLength(1); expect(saved().data.parent.opic?.currentMock).toBeUndefined(); expect(transcribe).not.toHaveBeenCalled();
 });
 it('오늘만 이어 보고 40분을 넘어도 끊지 않으며 타이머와 늦은 피드백은 이탈 때 정리한다', async () => {
   vi.useFakeTimers(); state.data.parent.opic!.currentMock = { ...mockWithAnswers(15), adjustment: 'same', elapsedSec: 2400 };

@@ -3,7 +3,7 @@ import { useStore } from '../store/StoreContext';
 import { OpicAnswer } from '../components/OpicAnswer';
 import { requestOpicFeedback } from '../lib/opicFeedback';
 import { fetchUsage } from '../lib/ai';
-import { buildOpicMock, adjustOpicMock, mockAllowance, resumeOpicMock, opicMockResult, type OpicMock } from '../lib/opicMock';
+import { archiveCompletedMock, buildOpicMock, adjustOpicMock, mockAllowance, resumeOpicMock, opicMockResult, type OpicMock } from '../lib/opicMock';
 import { opicMetrics } from '../lib/opic';
 import { applyOpicProgress } from '../lib/opicProgress';
 import { runOpicFeedbackBatch } from '../lib/opicFeedbackBatch';
@@ -22,7 +22,7 @@ export function OpicMockPractice({ onDone }: { onDone: () => void }) {
     if (!started || !latest.current) return;
     const current = latest.current, at = performance.now();
     const now = () => Math.min(86400, current.elapsedSec + (performance.now() - at) / 1000);
-    const persist = () => update(draft => { const row = draft.data.parent.opic?.currentMock; if (row?.id === current.id) row.elapsedSec = now(); });
+    const persist = () => update(draft => { const row = draft.data.parent.opic?.currentMock; if (row?.id === current.id) { row.elapsedSec = now(); if (row.answers.length === 15) draft.data.parent.opic!.mocks = archiveCompletedMock(draft.data.parent.opic!.mocks ?? [], row); } });
     let ticks = 0;
     const timer = setInterval(() => { setElapsed(now()); if (++ticks % 5 === 0) persist(); }, 1000);
     window.addEventListener('pagehide', persist);
@@ -41,7 +41,7 @@ export function OpicMockPractice({ onDone }: { onDone: () => void }) {
     } catch { if (live.current && !controller.signal.aborted) setError('한도를 확인하지 못했어요. AI 연결을 확인하고 다시 눌러 주세요.'); }
     finally { busy.current = false; if (live.current) setPending(false); }
   };
-  const patch = (change: (mock: OpicMock) => void) => update(draft => { const current = draft.data.parent.opic?.currentMock; if (current && current.id === mock?.id) change(current); });
+  const patch = (change: (mock: OpicMock) => void) => update(draft => { const current = draft.data.parent.opic?.currentMock; if (current && current.id === mock?.id) { change(current); if (current.answers.length === 15) draft.data.parent.opic!.mocks = archiveCompletedMock(draft.data.parent.opic!.mocks ?? [], current); } });
   const feedback = async () => {
     if (!mock || busy.current) return;
     busy.current = true; setPending(true); setError(''); const controller = new AbortController(); abort.current = controller;
@@ -52,17 +52,17 @@ export function OpicMockPractice({ onDone }: { onDone: () => void }) {
     busy.current = false;
   };
   useEffect(() => { if (started && mock?.answers.length === 15 && !mock.feedbackAttempted && !busy.current) void feedback(); });
-  const finish = () => { if (!mock || pending) return; update(draft => { const opic = draft.data.parent.opic!; opic.mocks = [...(opic.mocks ?? []).filter(m => m.id !== mock.id), { ...structuredClone(mock), elapsedSec: elapsed }].slice(-20); delete opic.currentMock; }); onDone(); };
+  const finish = () => { if (!mock || pending) return; update(draft => { const opic = draft.data.parent.opic!; opic.mocks = archiveCompletedMock(opic.mocks ?? [], { ...mock, elapsedSec: elapsed }); delete opic.currentMock; }); onDone(); };
   if (!started || !mock) return <section className="panel"><h2>실전 모의고사 · 자기 평가</h2><p>15문항 · 질문 듣기와 최대 2분 30초 답변 · 40분은 참고 타이머예요.</p><p>받아쓰기 15회·최대 37.5분, 피드백 15회가 필요해요. 시작 전에 서버의 남은 한도를 확인해요.</p>
-    {mock ? <><p>오늘 {mock.answers.length}/15문항을 답했어요. 녹음 파일은 남기지 않아요.</p><button className="btn btn-primary" onClick={() => setStarted(true)}>오늘 모의고사 이어 보기</button></> : <><label>지금 나에게 맞는 난이도<select value={difficulty} onChange={e => setDifficulty(Number(e.target.value) as typeof difficulty)}>{['1 · 짧은 단어로 답해요', '2 · 간단한 문장을 말해요', '3 · 익숙한 일상을 말해요', '4 · 경험을 여러 문장으로 말해요', '5 · 비교와 문제 해결도 말해요', '6 · 복잡한 주제도 이어 말해요'].map((label, i) => <option key={i} value={i + 1}>{label}</option>)}</select></label><button className="btn btn-primary" disabled={pending} onClick={() => void start()}>{pending ? '한도 확인 중…' : remaining && !mockAllowance(remaining) ? '모의고사 시작' : '남은 한도 확인'}</button>{remaining && <p>남은 한도: 받아쓰기 {remaining.transcribes}회 · {Math.floor(remaining.transcribeSeconds / 60)}분 / 생성 {remaining.generates}회</p>}</>}{error && <p role="alert">{error}</p>}
+    {mock ? <><p>오늘 {mock.answers.length}/15문항을 답했어요. 녹음 파일은 남기지 않아요.</p><button className="btn btn-primary" onClick={() => setStarted(true)}>오늘 모의고사 이어 보기</button></> : <><label>지금 나에게 맞는 난이도<select value={difficulty} onChange={e => setDifficulty(Number(e.target.value) as typeof difficulty)}>{['1 · 짧은 단어로 답해요', '2 · 간단한 문장을 말해요', '3 · 익숙한 일상을 말해요', '4 · 경험을 여러 문장으로 말해요', '5 · 비교와 문제 해결도 말해요', '6 · 복잡한 주제도 이어 말해요'].map((label, i) => <option key={i} value={i + 1}>{label}</option>)}</select></label><button className="btn btn-primary" disabled={pending} onClick={() => void start()}>{pending ? '한도 확인 중…' : remaining && !mockAllowance(remaining) ? '모의고사 시작' : '남은 한도 확인'}</button>{remaining && <p>남은 한도: 받아쓰기 {remaining.transcribes}회 · {Math.floor(remaining.transcribeSeconds / 60)}분 / 생성 {remaining.generates}회</p>}</>}<p className="muted">생성 한도는 아이들 사용량까지 합친 가족 전체 한도예요.</p>{error && <p role="alert">{error}</p>}
   </section>;
   const index = mock.answers.length, adjustment = index === 7 && !mock.adjustment;
   const seconds = Math.max(0, Math.ceil(2400 - elapsed));
-  return <section aria-label="오픽 실전 모의고사"><h2>실전 모의고사 · {Math.min(index + 1, 15)}/15문항</h2>{mock.adjustedDifficulty && <p>이후 선택 난이도 {mock.adjustedDifficulty} · 문항 은행에서 가능한 같은 유형의 문항을 골라요.</p>}<p role="timer">{seconds ? `40분까지 ${Math.floor(seconds / 60)}분 ${seconds % 60}초` : `40분 초과 · ${Math.floor((elapsed - 2400) / 60)}분 더 연습했어요`}</p><p className="muted">중간에 나가도 오늘은 이어 볼 수 있어요. 녹음은 저장하지 않아요.</p>
-    {adjustment ? <div className="panel"><h3>7문항을 마쳤어요. 뒤 문항의 난이도를 골라요.</h3><div className="opic-actions">{([['easier', '쉽게'], ['same', '그대로'], ['harder', '어렵게']] as const).map(([choice, label]) => <button className="btn btn-primary" key={choice} onClick={() => update(draft => { draft.data.parent.opic!.currentMock = adjustOpicMock(mock, choice); })}>{label}</button>)}</div></div> : index < 15 ? <><h3>{TYPE_NAMES[QUESTION_MAP.get(mock.questionIds[index])!.type]}</h3><OpicAnswer key={`${mock.id}:${index}`} maxSeconds={150} question={QUESTION_MAP.get(mock.questionIds[index])} onAnswer={(text, durationSec) => {
+  return <section aria-label="오픽 실전 모의고사"><h2>실전 모의고사 · {Math.min(index + 1, 15)}/15문항</h2>{mock.adjustedDifficulty && <p>이후 선택 난이도 {mock.adjustedDifficulty} · 문항 은행에서 바꿀 수 있는 문항만 바뀌어요. 더 쉽거나 어려운 변형이 없는 유형은 같은 수준으로 이어져요.</p>}<p role="timer">{seconds ? `40분까지 ${Math.floor(seconds / 60)}분 ${seconds % 60}초` : `40분 초과 · ${Math.floor((elapsed - 2400) / 60)}분 더 연습했어요`}</p><p className="muted">중간에 나가도 오늘은 이어 볼 수 있어요. 녹음은 저장하지 않아요.</p>
+    {adjustment ? <div className="panel"><h3>7문항을 마쳤어요. 뒤 문항의 난이도를 골라요.</h3><p className="muted">문항 은행에서 바꿀 수 있는 문항만 바뀌어요. 과거 경험·롤플레이처럼 난이도 변형이 없는 유형은 같은 수준으로 이어져요.</p><div className="opic-actions">{([['easier', '쉽게'], ['same', '그대로'], ['harder', '어렵게']] as const).map(([choice, label]) => <button className="btn btn-primary" key={choice} onClick={() => update(draft => { draft.data.parent.opic!.currentMock = adjustOpicMock(mock, choice); })}>{label}</button>)}</div></div> : index < 15 ? <><h3>{TYPE_NAMES[QUESTION_MAP.get(mock.questionIds[index])!.type]}</h3><OpicAnswer key={`${mock.id}:${index}`} maxSeconds={150} question={QUESTION_MAP.get(mock.questionIds[index])} onAnswer={(text, durationSec) => {
       const q = QUESTION_MAP.get(mock.questionIds[index])!;
-      update(draft => { const current = draft.data.parent.opic!.currentMock; if (!current || current.id !== mock.id || current.answers.length !== index) return; current.answers.push({ id: `${current.id}:${index}`, date: current.date, questionId: q.id, topic: q.topic, type: q.type, transcript: text, durationSec, ...opicMetrics(text, durationSec) }); applyOpicProgress(draft, current.date); });
-    }} /></> : <><OpicMockResult mock={mock} /><button className="btn btn-primary" disabled={pending || mock.answers.every(a => a.feedback)} onClick={() => void feedback()}>{pending ? '피드백을 받는 중…' : mock.answers.some(a => a.feedback) ? '실패한 문항만 다시 받기' : '15문항 피드백 받기'}</button>{error && <p role="alert">{error}</p>}<button className="btn btn-soft" disabled={pending} onClick={finish}>모의고사 기록하고 마치기</button></>}
+      update(draft => { const current = draft.data.parent.opic!.currentMock; if (!current || current.id !== mock.id || current.answers.length !== index) return; current.answers.push({ id: `${current.id}:${index}`, date: current.date, questionId: q.id, topic: q.topic, type: q.type, transcript: text, durationSec, ...opicMetrics(text, durationSec) }); applyOpicProgress(draft, current.date); if (current.answers.length === 15) draft.data.parent.opic!.mocks = archiveCompletedMock(draft.data.parent.opic!.mocks ?? [], current); });
+    }} /></> : <><p role="status">15문항 답변은 자동으로 기록에 저장됐어요. 피드백도 받는 대로 저장해요.</p><OpicMockResult mock={mock} /><button className="btn btn-primary" disabled={pending || mock.answers.every(a => a.feedback)} onClick={() => void feedback()}>{pending ? '피드백을 받는 중…' : mock.answers.some(a => a.feedback) ? '실패한 문항만 다시 받기' : '15문항 피드백 받기'}</button>{error && <p role="alert">{error}</p>}<button className="btn btn-soft" disabled={pending} onClick={finish}>모의고사 마치기</button></>}
   </section>;
 }
 export function OpicMockResult({ mock }: { mock: OpicMock }) {

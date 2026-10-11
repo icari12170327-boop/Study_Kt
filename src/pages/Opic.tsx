@@ -36,7 +36,7 @@ export function Opic({ go }: { go: Go }) {
   const attempt = data?.attempts.find(a => a.id === attemptId);
   return <div className="page opic-page">
     <TopBar title="🎯 오픽" onBack={() => tab === 'home' || (!data && tab === 'settings') ? go({ name: 'home', profileId: 'parent' }) : setTab('home')} />
-    {tab === 'settings' && <OpicSettingsForm initial={data?.settings} onSave={settings => { update(draft => { draft.data.parent.opic ??= emptyOpic(); draft.data.parent.opic.settings = settings; draft.data.parent.opic.planStartedAt ??= today; }); setTab('home'); }} />}
+    {tab === 'settings' && <OpicSettingsForm initial={data?.settings} onSave={settings => { update(draft => { draft.data.parent.opic ??= emptyOpic(); if (draft.data.parent.opic.settings.examDate !== settings.examDate) draft.data.parent.opic.planStartedAt = today; draft.data.parent.opic.settings = settings; draft.data.parent.opic.planStartedAt ??= today; }); setTab('home'); }} />}
     {data && tab === 'home' && <>
       {plan && <article className="panel opic-plan"><h2>{plan.daysLeft === null ? `8주 계획 · ${plan.week}주차` : `시험까지 D-${plan.daysLeft}`}</h2><p>이번 주 초점: {plan.label}</p><p>이번 주 연습 {plan.practices}/5회</p></article>}
       <p className="panel">목표 {data.settings.targetLevel} · 난이도 {data.settings.difficulty}{data.settings.examDate && ` · 시험 ${data.settings.examDate}`}<br />한 문항씩, 내 경험으로 연습해요.</p>

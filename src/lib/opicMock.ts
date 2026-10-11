@@ -7,6 +7,13 @@ export interface OpicMock {
   id: string; date: string; difficulty: OpicSettings['difficulty']; questionIds: string[];
   answers: OpicAttempt[]; elapsedSec: number; adjustment?: 'easier' | 'same' | 'harder'; adjustedDifficulty?: OpicSettings['difficulty']; feedbackAttempted?: boolean;
 }
+/** 완료 기록은 마지막 답변부터 보관하고 이후 피드백도 같은 ID에 갱신한다. */
+export function archiveCompletedMock(mocks: readonly OpicMock[], mock: OpicMock): OpicMock[] {
+  if (mock.answers.length !== 15) return [...mocks];
+  const index = mocks.findIndex(row => row.id === mock.id), result = [...mocks], saved = structuredClone(mock);
+  if (index < 0) result.push(saved); else result[index] = saved;
+  return result.sort((a, b) => a.date.localeCompare(b.date)).slice(-20);
+}
 const choose = <T,>(items: readonly T[], rng: Rng): T => items[Math.min(items.length - 1, Math.floor(rng() * items.length))];
 function question(topic: string, type: OpicType, level: number, rng: Rng, used: Set<string>): string {
   const all = OPIC_QUESTIONS.filter(q => q.topic === topic && q.type === type);

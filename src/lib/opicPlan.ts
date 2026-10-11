@@ -14,13 +14,15 @@ const dayDistance = (a: string, b: string) => {
   const x = parseDateKey(a), y = parseDateKey(b);
   return Math.round((Date.UTC(y.getFullYear(), y.getMonth(), y.getDate()) - Date.UTC(x.getFullYear(), x.getMonth(), x.getDate())) / 86400000);
 };
-/** 시험일에서 8주를 역산한다. 날짜가 없으면 저장한 시작일부터 8주다. */
+/** 최대 8주를 역산하되 짧은 준비 기간은 저장한 시작일부터 4등분한다. */
 export function opicPlan(data: OpicData, today: string) {
   const exam = data.settings.examDate;
   if (exam && exam < today) return undefined;
-  const start = exam ? addDays(exam, -55) : data.planStartedAt ?? [...data.attempts.map(a => a.date), ...data.scripts.map(s => s.createdAt)].sort()[0] ?? today;
+  const anchor = data.planStartedAt ?? [...data.attempts.map(a => a.date), ...data.scripts.map(s => s.createdAt)].sort()[0] ?? today;
+  const start = exam ? (anchor > addDays(exam, -55) ? anchor : addDays(exam, -55)) : anchor;
   const end = exam ?? addDays(start, 55), elapsed = Math.max(0, dayDistance(start, today));
-  const phase = Math.min(3, Math.floor(elapsed / 14));
+  const duration = Math.max(1, dayDistance(start, end) + 1);
+  const phase = Math.min(3, Math.floor(elapsed * 4 / duration));
   const range = weekRange(today);
   const practices = opicWeeklyStats(data, range).practices;
   return { start, end, phase, daysLeft: exam ? dayDistance(today, exam) : null, week: Math.min(8, Math.floor(elapsed / 7) + 1), label: OPIC_FOCUS[phase].label, practices };
