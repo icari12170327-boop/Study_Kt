@@ -35,7 +35,7 @@ export function OpicMockPractice({ onDone }: { onDone: () => void }) {
       if (!live.current || controller.signal.aborted) return;
       setRemaining(usage.opicRemaining);
       if (reason) { setError(reason); return; }
-      if (!remaining) return;
+      if (!remaining || mockAllowance(remaining)) return;
       const nonce = Date.now(), next = buildOpicMock({ ...data.settings, difficulty }, today, seededRng(nonce), `${today}:mock:${nonce}`);
       update(draft => { draft.data.parent.opic!.currentMock = next; }); setElapsed(0); setStarted(true);
     } catch { if (live.current && !controller.signal.aborted) setError('한도를 확인하지 못했어요. AI 연결을 확인하고 다시 눌러 주세요.'); }

@@ -46,7 +46,7 @@ function mockWithAnswers(n: number) {
 it('남은 실제 한도를 먼저 표시하고, 부족하거나 누락되면 시작하지 않는다', async () => {
   vi.mocked(fetchUsage).mockResolvedValueOnce({ opicRemaining: { transcribes: 14, transcribeSeconds: 3600, generates: 200 } } as Awaited<ReturnType<typeof fetchUsage>>);
   await mount(); await click('남은 한도 확인'); expect(host.textContent).toContain('오늘은 14회'); expect(host.textContent).toContain('남은 한도: 받아쓰기 14회'); expect(saved().data.parent.opic?.currentMock).toBeUndefined();
-  await click('남은 한도 확인'); expect(saved().data.parent.opic?.currentMock).toBeDefined();
+  await click('남은 한도 확인'); expect(saved().data.parent.opic?.currentMock).toBeUndefined(); await click('모의고사 시작'); expect(saved().data.parent.opic?.currentMock).toBeDefined();
 });
 it('한도 확인·시작 중 중복 클릭과 이탈 뒤 늦은 한도 응답을 막는다', async () => {
   const wait = defer<Awaited<ReturnType<typeof fetchUsage>>>(); vi.mocked(fetchUsage).mockReturnValue(wait.promise); await mount();
