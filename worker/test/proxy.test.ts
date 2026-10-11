@@ -1052,6 +1052,14 @@ describe('T27a 받아쓰기 HTTP·사용량·오픽 피드백', () => {
     expect((await req('/api/transcribe')).status).toBe(405);
     const preflight = await req('/api/transcribe', undefined, { 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'authorization,content-type' }, 'OPTIONS'); expect(preflight.status).toBe(204); expect(preflight.headers.get('Access-Control-Allow-Headers')).toBe('Authorization, Content-Type'); expect(outgoing).not.toHaveBeenCalled();
   });
+  it('말소리가 없는 빈 받아쓰기는 별도 오류로 알리고 원문·녹음을 저장하지 않는다', async () => {
+    outgoing.mockResolvedValueOnce(Response.json({ text: '  ' }));
+    const response = await rawAudio(); expect(response.status).toBe(422);
+    expect(await response.json()).toEqual({ ok: false, error: 'no-speech' });
+    expect(outgoing).toHaveBeenCalledOnce();
+    expect((await readUsage(await req('/api/usage'))).today.parent).toMatchObject({ transcribes: 1, transcribeSeconds: 120 });
+    expect(JSON.stringify([...storage.entries(), ...kv.entries()])).not.toContain('private-recording-bytes');
+  });
   it('횟수 한도는 동시에 예약해도 초과하지 않고 실패도 한 번만 센다', async () => {
     env.TRANSCRIBE_LIMIT_DAY = '1'; outgoing.mockResolvedValueOnce(Response.json({ text: 'a'.repeat(6001) }));
     const responses = await Promise.all([rawAudio(), rawAudio()]); expect(responses.map(r => r.status).sort()).toEqual([429, 502]); expect(outgoing).toHaveBeenCalledTimes(1);

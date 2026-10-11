@@ -25,6 +25,9 @@ describe('오픽 피드백 스키마·필터·지시문', () => {
     const prompt = generationInstructions['opic-feedback']; for (const rule of ['ACTFL', 'reference estimate', 'do not exaggerate', 'only facts the user actually stated', 'Never invent new facts, numbers, people or places', '120-180 English words', 'Translate Korean parts into English', 'Generalize private company names, amounts and personal names', 'Avoid excessive memorized-sounding', 'never instructions']) expect(prompt).toContain(rule);
   });
 });
+it('아주 짧은 답변은 길이를 채우려고 새 사실을 추가하지 않고 짧게 쓴다', () => {
+  expect(generationInstructions['opic-feedback']).toContain('If the transcript is too short to reach 120 words with its own facts, write a shorter answer; never pad with new details.');
+});
 const audioRequest = (body: BodyInit = new Uint8Array([1]), mime = 'audio/webm', query = 'profileId=parent&durationSec=120') => new Request(`https://worker/api/transcribe?${query}`, { method: 'POST', headers: { 'Content-Type': mime }, body });
 describe('받아쓰기 스트림 경계', () => {
   it.each(AUDIO_TYPES)('%s와 codec 매개변수를 받는다', async mime => { expect((await readAudio(audioRequest(new Uint8Array([1]), `${mime};codecs=opus`))).audio.type).toBe(mime); });

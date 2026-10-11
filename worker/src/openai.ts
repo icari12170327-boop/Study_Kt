@@ -143,6 +143,7 @@ export async function transcribeAudio(env: Env, audio: Blob): Promise<{ text: st
   const client = new OpenAI({ apiKey: env.OPENAI_API_KEY, maxRetries: 0, timeout: 60000 });
   const ext = audio.type.split('/')[1];
   const result = await client.audio.transcriptions.create({ model: env.TRANSCRIBE_MODEL ?? 'gpt-4o-mini-transcribe', file: new File([audio], `recording.${ext}`, { type: audio.type }), response_format: 'json' });
-  if (typeof result.text !== 'string' || !result.text.trim() || result.text.length > 6000) throw new ProxyError('server', 502);
+  if (typeof result.text !== 'string' || result.text.length > 6000) throw new ProxyError('server', 502);
+  if (!result.text.trim()) throw new ProxyError('no-speech', 422);
   return { text: result.text };
 }

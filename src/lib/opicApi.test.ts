@@ -4,5 +4,15 @@ const cfg = { endpoint: 'https://worker.example', token: 't'.repeat(32) };
 const recording = { audio: new Blob(['memory-recording'], { type: 'audio/mp4' }), durationSec: 12.5 };
 afterEach(() => vi.unstubAllGlobals());
 it('받아쓰기는 raw Blob·기존 헤더·쿼리를 쓰고 한글 섞인 원문을 받는다', async () => { const fetcher = vi.fn(async () => Response.json({ text: 'I like parks. 좋아요.' })); vi.stubGlobal('fetch', fetcher); expect(await transcribe(cfg, recording)).toBe('I like parks. 좋아요.'); const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit]; expect(url).toBe('https://worker.example/api/transcribe?profileId=parent&durationSec=12.5'); expect(init.body).toBe(recording.audio); expect(init.headers).toEqual({ Authorization: `Bearer ${cfg.token}`, 'Content-Type': 'audio/mp4' }); });
-it('길이 초과·잘못된 응답·권한·한도·실패는 안전한 오류로 바꾼다', async () => { for (const [body, status, kind] of [[{ text: 'a'.repeat(6001) }, 200, 'server'], [{ text: '' }, 200, 'server'], [{}, 200, 'server'], [{}, 403, 'unauthorized'], [{}, 429, 'limit']] as const) { vi.stubGlobal('fetch', vi.fn(async () => Response.json(body, { status }))); await expect(transcribe(cfg, recording)).rejects.toMatchObject({ kind }); } });
+it('길이 초과·잘못된 응답·권한·한도·실패는 안전한 오류로 바꾼다', async () => { for (const [body, status, kind] of [[{ text: 'a'.repeat(6001) }, 200, 'server'], [{}, 200, 'server'], [{}, 403, 'unauthorized'], [{}, 429, 'limit']] as const) { vi.stubGlobal('fetch', vi.fn(async () => Response.json(body, { status }))); await expect(transcribe(cfg, recording)).rejects.toMatchObject({ kind }); } });
 it('화면 이탈의 취소 신호와 요청별 시간 상한을 합친다', async () => { const controller = new AbortController(); let signal: AbortSignal | null | undefined; vi.stubGlobal('fetch', vi.fn(async (_url, init: RequestInit) => { signal = init.signal; return new Promise((_, reject) => signal?.addEventListener('abort', () => reject(new Error('abort')))); })); const promise = transcribe(cfg, recording, controller.signal); controller.abort(); await expect(promise).rejects.toMatchObject({ kind: 'network' }); expect(signal?.aborted).toBe(true); });
+
+it('빈 녹음은 요청 전에 거부하고 빈 받아쓰기는 연결 오류와 구분한다', async () => {
+  const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
+  await expect(transcribe(cfg, { ...recording, audio: new Blob([]) })).rejects.toMatchObject({ kind: 'empty-recording', message: '녹음이 비었어요. 글로 답하거나 다시 녹음해 주세요.' });
+  expect(fetcher).not.toHaveBeenCalled();
+  for (const [body, status] of [[{ text: '  ' }, 200], [{ ok: false, error: 'no-speech' }, 422]] as const) {
+    fetcher.mockResolvedValueOnce(Response.json(body, { status }));
+    await expect(transcribe(cfg, recording)).rejects.toMatchObject({ kind: 'no-speech', message: '말소리가 들리지 않았어요. 글로 답하거나 다시 녹음해 주세요.' });
+  }
+});
