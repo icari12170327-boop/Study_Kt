@@ -86,7 +86,7 @@ export function isUsage(value: unknown): value is Usage {
     !!month &&
     ['kid1', 'kid2', 'parent'].every((id) => {
       const record = today[id as keyof Usage['today']];
-      return !!record && nonnegative(record.talkSeconds) && nonnegative(record.generates);
+      return !!record && nonnegative(record.talkSeconds) && nonnegative(record.generates) && (record.transcribes === undefined || nonnegative(record.transcribes)) && (record.transcribeSeconds === undefined || nonnegative(record.transcribeSeconds));
     }) &&
     nonnegative(month.talkSeconds) &&
     nonnegative(month.estimatedKrw) &&

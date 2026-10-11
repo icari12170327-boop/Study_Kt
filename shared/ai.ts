@@ -44,7 +44,7 @@ export interface EndActiveResponse {
   closed: number;
   chargedSeconds: number;
 }
-export type GenerateKind = 'talk-summary' | 'biz-feedback' | 'memory-merge' | 'word-problem' | 'reading-quiz' | 'coach-gloss' | 'coach-wrapup' | 'coach-check' | 'weekly-report' | 'talk-corrections';
+export type GenerateKind = 'talk-summary' | 'biz-feedback' | 'memory-merge' | 'word-problem' | 'reading-quiz' | 'coach-gloss' | 'coach-wrapup' | 'coach-check' | 'weekly-report' | 'talk-corrections' | 'opic-feedback';
 export interface GenerateRequest {
   profileId: AiProfileId;
   level: AiLevel;
@@ -53,6 +53,6 @@ export interface GenerateRequest {
 }
 export interface Usage {
   remainingSeconds?: Record<AiProfileId, number>;
-  today: Record<AiProfileId, { talkSeconds: number; generates: number }>;
+  today: Record<AiProfileId, { talkSeconds: number; generates: number; transcribes?: number; transcribeSeconds?: number }>;
   month: { talkSeconds: number; estimatedKrw: number };
 }

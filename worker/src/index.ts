@@ -1,5 +1,7 @@
 import type { Env } from './env';
 import { endActiveSchema, endSchema, generateSchema, inputSchemas, sessionSchema } from './validation';
+import { readAudio } from './transcribe';
+import { ProxyError } from './openai';
 export { FamilyUsage } from './family';
 // 입력 길이와 무관하게 같은 길이의 SHA-256 결과를 비교한다.
 export async function authenticated(header: string | null, token: string): Promise<boolean> {
@@ -40,11 +42,15 @@ export default {
     if (!(await authenticated(request.headers.get('Authorization'), env.FAMILY_TOKEN)))
       return json('unauthorized', 401);
     const path = new URL(request.url).pathname;
-    if (!['/api/usage', '/api/realtime/active', '/api/realtime/end-active', '/api/realtime/session', '/api/realtime/end', '/api/generate'].includes(path))
+    if (!['/api/transcribe', '/api/usage', '/api/realtime/active', '/api/realtime/end-active', '/api/realtime/session', '/api/realtime/end', '/api/generate'].includes(path))
       return json('invalid', 404);
     if (request.method !== (['/api/usage', '/api/realtime/active'].includes(path) ? 'GET' : 'POST')) return json('invalid', 405);
     let body: unknown;
-    if (request.method === 'POST') {
+    let audio: Blob | undefined;
+    if (path === '/api/transcribe') {
+      try { audio = (await readAudio(request)).audio; }
+      catch (error) { return json(error instanceof ProxyError ? error.code : 'invalid', error instanceof ProxyError ? error.status : 400); }
+    } else if (request.method === 'POST') {
       if (!request.headers.get('Content-Type')?.startsWith('application/json')) return json('invalid', 400);
       try {
         // 스트림을 읽으며 상한을 검사해 Content-Length 생략으로 우회하지 못하게 한다.
@@ -67,6 +73,7 @@ export default {
         else if (path === '/api/realtime/end') body = endSchema.parse(body);
         else if (path === '/api/realtime/end-active') body = endActiveSchema.parse(body);
         else {
+          if (body && typeof body === 'object' && 'kind' in body && body.kind === 'opic-feedback' && 'profileId' in body && body.profileId !== 'parent') return json('unauthorized', 403);
           const parsed = generateSchema.parse(body);
           body = { ...parsed, input: inputSchemas[parsed.kind].parse(parsed.input) };
         }
@@ -77,9 +84,9 @@ export default {
     if (!env.OPENAI_API_KEY) return json('server', 503);
     try {
       const response = await env.FAMILY.get(env.FAMILY.idFromName('family')).fetch(
-        new Request(`https://family${path}`, {
+        new Request(`https://family${path}${path === '/api/transcribe' ? new URL(request.url).search : ''}`, {
           method: request.method,
-          ...(body === undefined
+          ...(audio ? { body: audio, headers: { 'Content-Type': audio.type } } : body === undefined
             ? {}
             : { body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } }),
         }),
