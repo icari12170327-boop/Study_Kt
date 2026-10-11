@@ -2,6 +2,7 @@ import type { GameId, ProfileId } from './types';
 
 export type Route =
   | { name: 'profiles' }
+  | { name: 'opic' }
   | { name: 'home'; profileId: ProfileId }
   | { name: 'games'; profileId: ProfileId; game?: GameId }
   | { name: 'puzzles'; profileId: ProfileId }

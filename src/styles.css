@@ -826,3 +826,20 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 .game-paused .obby-character, .game-paused .obby-obstacle { animation-play-state: paused; }
 .game-pause { position: fixed; z-index: 40; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(24rem, calc(100vw - 2rem - var(--safe-left) - var(--safe-right))); box-shadow: 0 0 0 100vmax #0006; text-align: center; }
 .game-paused .question-card, .game-paused .fish-pond { pointer-events: none; }
+
+/* 오픽 하루 연습: 다른 대화 화면과 독립된 배치 */
+.opic-page { overflow-wrap: anywhere; }
+.opic-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin: 1rem 0; }
+.opic-settings { display: grid; gap: 1rem; }
+.opic-settings > label { display: grid; gap: .4rem; }
+.opic-settings fieldset { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .5rem; min-width: 0; }
+.opic-settings fieldset label, .opic-check { display: flex; align-items: center; gap: .5rem; min-height: 48px; }
+.opic-page select, .opic-page input[type="date"] { max-width: 100%; min-height: 48px; }
+.opic-page summary { min-height: 48px; cursor: pointer; align-content: center; }
+.opic-answer { display: block; width: 100%; min-height: 200px; margin: .75rem 0; font-size: 1rem; }
+.opic-text { white-space: pre-wrap; line-height: 1.7; }
+.opic-progress { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .5rem; }
+.opic-progress > div { display: grid; gap: .4rem; padding: 1rem; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+
+.opic-page section { display: flex; flex-direction: column; gap: 1rem; }
+.opic-page select, .opic-page textarea, .opic-page input[type="date"] { color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: .65rem; color-scheme: light dark; }

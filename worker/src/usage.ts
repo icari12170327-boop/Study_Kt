@@ -4,6 +4,8 @@ import { profiles } from './validation';
 export interface DayUsage {
   talkSeconds: number;
   generates: number;
+  transcribes?: number;
+  transcribeSeconds?: number;
   sessionId?: string;
   startedAt?: number;
 }

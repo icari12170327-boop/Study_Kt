@@ -233,6 +233,7 @@ export type ObbyColor = 'red' | 'blue' | 'green' | 'yellow' | 'purple';
 export type ObbyHat = 'cap' | 'tophat' | 'helmet';
 
 export interface ProfileData {
+  opic?: import('./lib/opic').OpicData;
   retrieval?: RetrievalItem[];
   previewHistory?: Record<string, string>;
   weeklyAi?: Record<string, import('../shared/weeklyReport').WeeklyAi>;

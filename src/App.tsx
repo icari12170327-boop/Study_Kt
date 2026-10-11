@@ -1,3 +1,4 @@
+import { Opic } from './pages/Opic';
 import { requestStorageProtection } from './lib/deviceStorage';
 import { BrainPuzzles } from './pages/BrainPuzzles';
 import { RewardGames } from './pages/RewardGames';
@@ -26,7 +27,7 @@ export function App() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    if (route.name !== 'parent') setParentUnlocked(false);
+    if (route.name !== 'parent' && route.name !== 'opic') setParentUnlocked(false);
   }, [route]);
 
   switch (route.name) {
@@ -58,6 +59,8 @@ export function App() {
       return <TalkSession profileId={route.profileId} go={setRoute} />;
     case 'rewards':
       return <Rewards profileId={route.profileId} go={setRoute} />;
+    case 'opic':
+      return parentUnlocked ? <Opic go={setRoute} /> : <PinGate onPass={() => setParentUnlocked(true)} onCancel={() => setRoute({ name: 'home', profileId: 'parent' })} />;
     case 'parent':
       return parentUnlocked ? (
         <Parent go={setRoute} initialTab={route.tab} />

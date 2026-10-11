@@ -1,6 +1,7 @@
 import { normalizeDeviceSettings } from '../lib/deviceCheck';
 import { validMinuteTime } from '../lib/date';
 import { normalizePreviewHistory } from '../lib/talkPreview';
+import { normalizeOpic } from '../lib/opic';
 import { normalizeRetrieval } from '../lib/retrieval';
 import { normalizeReadingQuiz } from '../lib/readingQuiz';
 import { normalizeWordProblemRatio, withoutStory } from '../content/math/wordProblem';
@@ -73,9 +74,11 @@ export function normalizeState(raw: unknown, today = toDateKey()): AppState {
     data[p.id].science = normalizeScience(s.data?.[p.id]?.science);
     data[p.id].talks = normalizeTalkLogs(s.data?.[p.id]?.talks, p.id === 'parent');
     if (p.id === 'parent') {
+      const opic = normalizeOpic(s.data?.[p.id]?.opic, today);
+      if (opic) data[p.id].opic = opic; else delete data[p.id].opic;
       data[p.id].retrieval = normalizeRetrieval(s.data?.[p.id]?.retrieval, today);
       data[p.id].previewHistory = normalizePreviewHistory(s.data?.[p.id]?.previewHistory, today);
-    } else { delete data[p.id].retrieval; delete data[p.id].previewHistory; }
+    } else { delete data[p.id].opic; delete data[p.id].retrieval; delete data[p.id].previewHistory; }
     data[p.id].friendMemory = typeof s.data?.[p.id]?.friendMemory === 'string' ? s.data[p.id].friendMemory.slice(0, 1500) : '';
     const math = s.data?.[p.id]?.math;
     data[p.id].math = {

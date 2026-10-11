@@ -10,7 +10,7 @@ import { SENTENCE_DECKS } from '../content/english/sentences';
 import { defaultBingoSettings } from '../content/math/bingo';
 import { defaultTalkSettings } from '../lib/talk';
 
-/** 완료 시각은 기본 데이터에 넣지 않고 첫 완료 순간에만 선택 필드로 기록한다. */
+/** 오픽은 보호자가 처음 설정할 때만 선택 필드로 만든다. 완료 시각은 기본 데이터에 넣지 않고 첫 완료 순간에만 선택 필드로 기록한다. */
 export function emptyProfileData(level: Level = 'g3'): ProfileData {
   return { ...(level === 'adult' ? { retrieval: [], previewHistory: {} } : {}), weeklyAi: {}, stories: {}, puzzles: emptyPuzzleData(level), games: [], obby: normalizeObby(undefined), customCards: [], bizSituations: [], bingo: { recent: [], best: {} }, science: { collected: {}, experiments: {}, badges: [], recentWrong: [] }, math: defaultMathState(level), stars: 0, streak: 0, days: {}, wrongNotes: [], srs: {}, coupons: [], notes: [], talks: [], friendMemory: '' };
 }

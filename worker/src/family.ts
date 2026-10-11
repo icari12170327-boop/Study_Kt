@@ -1,6 +1,7 @@
 import type { GenerateRequest, SessionRequest } from '../../shared/ai';
 import type { Env } from './env';
-import { generateText, hangup, openCall, ProxyError } from './openai';
+import { generateText, hangup, openCall, ProxyError, transcribeAudio } from './openai';
+import { readAudio } from './transcribe';
 import {
   chargeSession,
   abandonHangup,
@@ -269,6 +270,17 @@ export class FamilyUsage {
   async fetch(request: Request): Promise<Response> {
     const path = new URL(request.url).pathname;
     try {
+      if (path === '/api/transcribe') {
+        const { audio, durationSec } = await readAudio(request);
+        await this.update(ledger => {
+          const usage = todayUsage(ledger, dateKeys(Date.now()).day).parent;
+          if ((usage.transcribes ?? 0) >= setting(this.env.TRANSCRIBE_LIMIT_DAY ?? '60', 60) || (usage.transcribeSeconds ?? 0) + durationSec > setting(this.env.TRANSCRIBE_MINUTES_DAY ?? '60', 60) * 60) throw new ProxyError('limit', 429);
+          usage.transcribes = (usage.transcribes ?? 0) + 1;
+          usage.transcribeSeconds = (usage.transcribeSeconds ?? 0) + durationSec;
+        });
+        // 녹음은 저장하지 않는다. 잠금 밖에서 외부 API에 보내고 숫자 사용량만 남긴다.
+        return Response.json(await transcribeAudio(this.env, audio));
+      }
       if (path === '/api/realtime/active') {
         const sessions = await this.snapshot((ledger) => Object.values(ledger.sessions).filter((s) => !s.ended).map((s) => ({
           profileId: s.profileId,
@@ -307,7 +319,7 @@ export class FamilyUsage {
           const today = Object.fromEntries(
             Object.entries(todayUsage(ledger, day)).map(([id, record]) => [
               id,
-              { talkSeconds: record.talkSeconds, generates: record.generates },
+              { talkSeconds: record.talkSeconds, generates: record.generates, ...(id === 'parent' ? { transcribes: record.transcribes ?? 0, transcribeSeconds: record.transcribeSeconds ?? 0 } : {}) },
             ]),
           ) as ReturnType<typeof todayUsage>;
           let monthSeconds = ledger.months[month] ?? 0;

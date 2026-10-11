@@ -276,6 +276,7 @@ export function AiConnection() {
                 생성 {usage.today[id].generates}회
               </p>
             ))}
+            <p>보호자 받아쓰기: 오늘 {usage.today.parent.transcribes ?? 0}회 · {duration(usage.today.parent.transcribeSeconds ?? 0)}</p>
             <p>이번 달 가족 대화: {duration(usage.month.talkSeconds)}</p>
             <p>이번 달 예상 음성 비용: 약 {usage.month.estimatedKrw.toLocaleString('ko-KR')}원</p>
             <p className="small muted">
