@@ -9,7 +9,7 @@ import { defaultState } from '../store/defaults';
 import { normalizeState } from '../store/storage';
 import { emptyOpic, reserveOpicQuestion } from '../lib/opic';
 import { OPIC_QUESTIONS } from '../content/opic/questions';
-import { toDateKey } from '../lib/date';
+import { toDateKey, addDays } from '../lib/date';
 import { AiError, generate } from '../lib/ai';
 import { transcribe, TranscribeError } from '../lib/opicApi';
 import { startRecording, type Recording } from '../lib/recorder';
@@ -94,4 +94,11 @@ it('날짜별 기록에서 원래 질문의 영어·한국어를 펼쳐 볼 수 
   state.data.parent.opic!.attempts[0].transcript = 'I like parks.';
   await mount(); await click('📊 기록'); const question = [...container.querySelectorAll('details')].find(el => el.querySelector('summary')?.textContent === '질문 보기')!;
   expect(question.textContent).toContain(q.en); expect(question.textContent).toContain(q.ko);
+});
+it('시험 날짜를 바꾸면 그날부터 짧은 계획을 시작하고 같은 날짜 저장은 시작일을 유지한다', async () => {
+  state.data.parent.opic!.planStartedAt = '2026-01-01'; state.data.parent.opic!.settings.examDate = addDays(toDateKey(), 30);
+  await mount(); await click('⚙️ 설정'); await click('설정 저장'); expect(saved().data.parent.opic?.planStartedAt).toBe('2026-01-01');
+  await click('⚙️ 설정'); const date = container.querySelector<HTMLInputElement>('input[type=date]')!;
+  await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(date, addDays(toDateKey(),20)); date.dispatchEvent(new Event('input', { bubbles: true })); });
+  await click('설정 저장'); expect(saved().data.parent.opic?.planStartedAt).toBe(toDateKey()); expect(container.textContent).toContain('이번 주 초점: 자기소개');
 });

@@ -11,6 +11,15 @@ const usage = {
 };
 afterEach(() => vi.unstubAllGlobals());
 describe('AI 클라이언트', () => {
+  it('모의고사 남은 한도를 검증하고 조회 취소 신호를 전달하며 예전 사용량도 허용한다', async () => {
+    const remaining = { transcribes: 15, transcribeSeconds: 2250, generates: 16 };
+    const fetcher = vi.fn().mockResolvedValueOnce(Response.json({ ...usage, opicRemaining: remaining })).mockResolvedValueOnce(Response.json({ ...usage, opicRemaining: { ...remaining, transcribes: -1 } })).mockResolvedValueOnce(Response.json(usage));
+    vi.stubGlobal('fetch', fetcher); const controller = new AbortController();
+    expect((await fetchUsage(cfg, controller.signal)).opicRemaining).toEqual(remaining);
+    expect(fetcher.mock.calls[0][1].signal).toBe(controller.signal);
+    await expect(fetchUsage(cfg)).rejects.toMatchObject({ kind: 'server' });
+    expect(await fetchUsage(cfg)).toEqual(usage);
+  });
   it('활성 대화와 강제 종료 응답을 검증하고 프로필만 전송한다', async () => {
     const sessions = [{ profileId: 'kid1', sessionId: 'test', startedAt: 1000, elapsedSeconds: 10, remainingSeconds: 50 }];
     const fetcher = vi.fn().mockResolvedValueOnce(Response.json({ sessions }))

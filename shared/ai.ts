@@ -52,6 +52,7 @@ export interface GenerateRequest {
   input: unknown;
 }
 export interface Usage {
+  opicRemaining?: { transcribes: number; transcribeSeconds: number; generates: number };
   remainingSeconds?: Record<AiProfileId, number>;
   today: Record<AiProfileId, { talkSeconds: number; generates: number; transcribes?: number; transcribeSeconds?: number }>;
   month: { talkSeconds: number; estimatedKrw: number };

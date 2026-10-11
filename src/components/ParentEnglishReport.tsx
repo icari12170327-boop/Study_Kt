@@ -1,11 +1,15 @@
+import { opicWeeklyStats } from '../lib/weeklyReport';
+import type { OpicData } from '../lib/opic';
 import type { TalkLog } from '../types';
 import { GROWTH_METRICS, parentGrowthWeeks } from '../lib/talkGrowth';
-export function ParentEnglishReport({ logs, today, offset }: { logs: readonly TalkLog[]; today: string; offset: number }) {
+export function ParentEnglishReport({ logs, today, offset, opic }: { opic?: OpicData; logs: readonly TalkLog[]; today: string; offset: number }) {
   const weeks = parentGrowthWeeks(logs, today, offset), current = weeks[3], previous = weeks[2];
+  const opicStats = opicWeeklyStats(opic, current.range);
   const show = (value: number | null, unit: string) => value === null ? '기록 없음' : `${(value * (unit === '%' ? 100 : 1)).toFixed(unit === '%' ? 0 : 1)}${unit}`;
   return <section className="t22b-growth" aria-label="보호자 영어 성장 지표">
     <h2>보호자 영어</h2><p>{current.range.start} ~ {current.range.end}</p>
     <p className="small muted">대화별 수치의 평균이에요. 최근 4주를 살펴봐요. 교정 비율은 대화 내용에 따라 달라지며 평가 점수가 아니에요.</p>
+<article className="panel"><h3>🎯 오픽 연습</h3><p>이번 주 {opicStats.practices}회 · {opicStats.answered}문항 · 평균 {opicStats.averageWords === null ? '기록 없음' : `${opicStats.averageWords.toFixed(1)}단어`}</p><p>최근 예상 범위 {opicStats.latestBand ?? '기록 없음'} · 참고용</p></article>
     <div className="t22b-growth-grid">{GROWTH_METRICS.map(metric => {
       const value = current.stats[metric.key], old = previous.stats[metric.key], trend = value === null || old === null ? '' : value > old ? '▲' : value < old ? '▼' : '–';
       const maximum = Math.max(metric.scale, ...weeks.map(week => week.stats[metric.key] ?? 0));

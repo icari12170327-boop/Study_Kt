@@ -42,6 +42,10 @@ export function normalizeState(raw: unknown, today = toDateKey()): AppState {
     settings[p.id].puzzles = normalizePuzzleSettings(s.settings?.[p.id]?.puzzles);
     settings[p.id].gamesPerDay = normalizeGamesPerDay(s.settings?.[p.id]?.gamesPerDay);
     settings[p.id].missions = settings[p.id].missions.map((m) => ({ ...m }));
+    if (p.id === 'parent') {
+      const opic = settings[p.id].missions.find(m => m.type === 'opic');
+      if (opic) { opic.target = 1; opic.enabled = opic.enabled === true; } else settings[p.id].missions.push({ type: 'opic', enabled: false, target: 1 });
+    } else settings[p.id].missions = settings[p.id].missions.filter(m => m.type !== 'opic');
     if (!settings[p.id].missions.some(m => m.type === 'science')) settings[p.id].missions.push({ type: 'science', enabled: p.level !== 'adult', target: 5 });
     if (s.settings?.[p.id]?.scienceV2 !== true) {
       const science = settings[p.id].missions.find(m => m.type === 'science')!;

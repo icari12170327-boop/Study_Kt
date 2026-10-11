@@ -169,3 +169,12 @@ export function weeklyReportRequest(stats: WeeklyStats, level: 'g3' | 'g5') {
     },
   } };
 }
+
+/** 날짜가 있는 오픽 답변만 집계하며 같은 모의고사 답안을 중복 세지 않는다. */
+export function opicWeeklyStats(data: import('./opic').OpicData | undefined, range: WeekRange) {
+  const unique = new Map([...(data?.attempts ?? []), ...(data?.mocks ?? []).flatMap(m => m.answers), ...(data?.currentMock?.answers ?? [])].filter(a => a.date >= range.start && a.date <= range.end && a.transcript.trim()).map(a => [a.id, a]));
+  const answers = [...unique.values()], latest = answers.filter(a => a.feedback).sort((a, b) => a.date.localeCompare(b.date)).at(-1);
+  const daily = data?.attempts.filter(a => a.date >= range.start && a.date <= range.end && a.transcript.trim()).length ?? 0;
+  const mockIds = new Set([...(data?.mocks ?? []), ...(data?.currentMock ? [data.currentMock] : [])].filter(m => m.date >= range.start && m.date <= range.end && m.answers.length > 0).map(m => m.id));
+  return { practices: daily + mockIds.size, answered: answers.length, averageWords: answers.length ? answers.reduce((n, a) => n + a.words, 0) / answers.length : null, latestBand: latest?.feedback?.levelBand };
+}

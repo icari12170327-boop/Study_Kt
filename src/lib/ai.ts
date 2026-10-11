@@ -88,13 +88,14 @@ export function isUsage(value: unknown): value is Usage {
       const record = today[id as keyof Usage['today']];
       return !!record && nonnegative(record.talkSeconds) && nonnegative(record.generates) && (record.transcribes === undefined || nonnegative(record.transcribes)) && (record.transcribeSeconds === undefined || nonnegative(record.transcribeSeconds));
     }) &&
+    (!('opicRemaining' in value) || (!!value.opicRemaining && typeof value.opicRemaining === 'object' && ['transcribes', 'transcribeSeconds', 'generates'].every(key => nonnegative((value.opicRemaining as Record<string, unknown>)[key])))) &&
     nonnegative(month.talkSeconds) &&
     nonnegative(month.estimatedKrw) &&
     (!('remainingSeconds' in value) || (!!value.remainingSeconds && typeof value.remainingSeconds === 'object' && ['kid1', 'kid2', 'parent'].every((id) => nonnegative((value.remainingSeconds as Record<string, unknown>)[id]))))
   );
 }
-export async function fetchUsage(cfg: AiConfig): Promise<Usage> {
-  const body = await aiRequest(cfg, '/api/usage');
+export async function fetchUsage(cfg: AiConfig, signal?: AbortSignal): Promise<Usage> {
+  const body = await aiRequest(cfg, '/api/usage', undefined, false, signal);
   if (!isUsage(body)) throw new AiError('server');
   return body;
 }

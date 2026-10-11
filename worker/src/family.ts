@@ -330,6 +330,11 @@ export class FamilyUsage {
           }
           return Response.json({
             today,
+            opicRemaining: {
+              transcribes: Math.max(0, setting(this.env.TRANSCRIBE_LIMIT_DAY ?? '60', 60) - (today.parent.transcribes ?? 0)),
+              transcribeSeconds: Math.max(0, setting(this.env.TRANSCRIBE_MINUTES_DAY ?? '60', 60) * 60 - (today.parent.transcribeSeconds ?? 0)),
+              generates: Math.max(0, setting(this.env.GENERATE_LIMIT_DAY_TOTAL, 200) - Object.values(today).reduce((sum, record) => sum + record.generates, 0)),
+            },
             remainingSeconds: Object.fromEntries((['kid1', 'kid2', 'parent'] as const).map((id) => [id, remainingSeconds(ledger, this.env, id, now)])),
             month: {
               talkSeconds: monthSeconds,

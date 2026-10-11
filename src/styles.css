@@ -843,3 +843,9 @@ button.science-choice { width: 100%; text-align: left; min-height: 64px; gap: .6
 
 .opic-page section { display: flex; flex-direction: column; gap: 1rem; }
 .opic-page select, .opic-page textarea, .opic-page input[type="date"] { color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: .65rem; color-scheme: light dark; }
+
+/* T27b: 보호자 오픽 계획·모의고사. 다른 화면의 구조와 크기를 바꾸지 않는다. */
+.opic-answer-input textarea { display: block; width: 100%; min-height: 9rem; margin: .8rem 0; }
+.opic-mock-results { padding-left: 1.4rem; }
+.opic-mock-results .panel { overflow-wrap: anywhere; }
+.opic-plan h2 { margin-top: 0; }

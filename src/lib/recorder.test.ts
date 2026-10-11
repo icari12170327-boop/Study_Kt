@@ -10,6 +10,12 @@ function fixture() {
 }
 afterEach(() => vi.useRealTimers());
 describe('메모리 녹음과 마이크 정리', () => {
+  it.each([90, 150] as const)('%s초 답안 복습·모의고사도 경과 시간으로 종료하고 트랙을 정리한다', async maxSeconds => {
+    vi.useFakeTimers(); const f = fixture(), handle = await startRecording({ env: f.env, maxSeconds });
+    f.advance(maxSeconds * 1000 - 1); await vi.advanceTimersByTimeAsync(100); expect(f.rec.stop).not.toHaveBeenCalled();
+    f.advance(500); await vi.advanceTimersByTimeAsync(100); expect((await handle.result).durationSec).toBe(maxSeconds);
+    expect(f.rec.stop).toHaveBeenCalledOnce(); expect(f.stopTrack).toHaveBeenCalled(); expect(vi.getTimerCount()).toBe(0);
+  });
   it('webm/opus 우선, mp4 대체, 멈춘 시각과 Blob만 반환한다', async () => {
     vi.useFakeTimers(); const f = fixture(); const handle = await startRecording({ env: f.env }); f.advance(2300); handle.stop(); const result = await handle.result; expect(result.durationSec).toBe(2.3); expect(result.audio.type).toBe('audio/webm;codecs=opus'); expect(await result.audio.text()).toBe('memory-only'); expect(f.stopTrack).toHaveBeenCalled(); expect(vi.getTimerCount()).toBe(0);
     const ios = fixture(); ios.env.supports = type => type === 'audio/mp4'; const next = await startRecording({ env: ios.env }); next.stop(); expect((await next.result).audio.type).toBe('audio/mp4');
